@@ -1,0 +1,40 @@
+{
+  "name": "sistema-alquiler-herramientas",
+  "version": "0.1.0",
+  "description": "Sistema de Alquiler de Herramientas de Construcción",
+  "private": true,
+  "main": "src/main/main.js",
+  "scripts": {
+    "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "vite build && electron-builder",
+    "vite:dev": "vite",
+    "electron:dev": "electron .",
+    "postinstall": "electron-rebuild -f -w better-sqlite3"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.3.0",
+    "better-sqlite3": "^12.11.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.21.0",
+    "motion": "^12.40.0",
+    "pdfkit": "^0.19.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "signature_pad": "^5.1.3",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.5.0",
+    "concurrently": "^9.1.2",
+    "electron": "^33.3.1",
+    "tailwindcss": "^3.4.17",
+    "vite": "^6.0.7",
+    "wait-on": "^8.0.1"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  }
+}
