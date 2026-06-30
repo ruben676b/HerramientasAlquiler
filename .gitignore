@@ -1,0 +1,9 @@
+node_modules/
+dist/
+alquiler_herramientas.db
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+*.log
+/env/
