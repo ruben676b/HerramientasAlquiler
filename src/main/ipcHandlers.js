@@ -1,4 +1,5 @@
-const { ipcMain, app } = require('electron');
+const fs = require('fs');
+const { ipcMain, app, shell } = require('electron');
 const db = require('./db/database');
 const {
   crearContrato,
@@ -32,7 +33,7 @@ const {
   getHerramientasPorCategoria,
 } = require('./services/inventarioService');
 const { consultarDni } = require('./services/reniecService');
-const { generarPdf, guardarFirma } = require('./services/contratoPdfService');
+const { generarPdf, guardarFirma, generarPdfDesdeDatos } = require('./services/contratoPdfService');
 
 function registerIpcHandlers() {
   // --- Catálogo ---
@@ -104,6 +105,10 @@ function registerIpcHandlers() {
       depositoMonto,
       depositoDni,
       items,
+      pagos,
+      dniCliente,
+      nombreCliente,
+      telefonoCliente,
     } = data;
 
     return crearContrato(
@@ -113,14 +118,18 @@ function registerIpcHandlers() {
       fechaDevolucionPactada,
       depositoMonto,
       depositoDni,
-      items
+      items,
+      pagos,
+      dniCliente,
+      nombreCliente,
+      telefonoCliente
     );
   });
 
   ipcMain.handle('registrar-devolucion', (_event, data) => {
-    const { idContrato, fechaDevolucionReal, itemsDevueltos } = data;
+    const { idContrato, fechaDevolucionReal, itemsDevueltos, observaciones } = data;
 
-    return registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos);
+    return registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, observaciones);
   });
 
   ipcMain.handle('get-contratos', (_e, filtros) => {
@@ -196,6 +205,37 @@ function registerIpcHandlers() {
 
   ipcMain.handle('guardar-firma', async (_e, idContrato, firmaBase64) => {
     return guardarFirma(idContrato, firmaBase64);
+  });
+
+  ipcMain.handle('get-config', (_e, clave) => {
+    const row = db.prepare('SELECT valor FROM CONFIGURACION WHERE clave = ?').get(clave);
+    return row ? row.valor : '';
+  });
+
+  ipcMain.handle('abrir-archivo', async (_e, ruta) => {
+    return shell.openPath(ruta);
+  });
+
+  ipcMain.handle('generar-pdf-preview', async (_e, datos) => {
+    return await generarPdfDesdeDatos(datos);
+  });
+
+  ipcMain.handle('leer-archivo-base64', async (_e, ruta) => {
+    const buffer = fs.readFileSync(ruta);
+    return buffer.toString('base64');
+  });
+
+  // --- Configuración ---
+  ipcMain.handle('get-all-config', () => {
+    const rows = db.prepare('SELECT clave, valor, descripcion FROM CONFIGURACION').all();
+    const obj = {};
+    rows.forEach(r => { obj[r.clave] = r.valor; });
+    return obj;
+  });
+
+  ipcMain.handle('save-config', (_e, clave, valor) => {
+    db.prepare('INSERT OR REPLACE INTO CONFIGURACION (clave, valor) VALUES (?, ?)').run(clave, valor);
+    return { ok: true };
   });
 
   ipcMain.handle('crear-granel', (_e, data) => {

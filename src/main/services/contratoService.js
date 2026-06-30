@@ -19,7 +19,11 @@ function crearContrato(
   fechaDevolucionPactada,
   depositoMonto,
   depositoDni,
-  items
+  items,
+  pagos,
+  dniCliente,
+  nombreCliente,
+  telefonoCliente
 ) {
   if (!items || items.length === 0) {
     throw new Error('El contrato debe contener al menos un ítem.');
@@ -27,6 +31,25 @@ function crearContrato(
 
   if (fechaDevolucionPactada <= fechaSalida) {
     throw new Error('La fecha de devolución debe ser posterior a la fecha de salida.');
+  }
+
+  // Auto-crear cliente si no existe
+  let idClienteReal = idCliente;
+  if (!idClienteReal || idClienteReal < 1) {
+    if (dniCliente && dniCliente.length === 8) {
+      const existente = db.prepare('SELECT id FROM CLIENTE WHERE dni = ?').get(dniCliente);
+      if (existente) {
+        idClienteReal = existente.id;
+      }
+    }
+    if (!idClienteReal && nombreCliente) {
+      const r = db.prepare('INSERT INTO CLIENTE (tipo, nombre, dni, telefono) VALUES (?, ?, ?, ?)')
+        .run('persona', nombreCliente, dniCliente || null, telefonoCliente || null);
+      idClienteReal = r.lastInsertRowid;
+    }
+  }
+  if (!idClienteReal || idClienteReal < 1) {
+    throw new Error('No se pudo identificar al cliente. Ingrese DNI o nombre.');
   }
 
   const ejecutar = db.transaction(() => {
@@ -45,7 +68,7 @@ function crearContrato(
     `);
 
     const resultado = insertContrato.run(
-      idCliente,
+      idClienteReal,
       idUsuario,
       fechaSalida,
       fechaDevolucionPactada,
@@ -133,6 +156,17 @@ function crearContrato(
       }
     }
 
+    // Insertar pagos
+    if (pagos && pagos.length > 0) {
+      const insertPago = db.prepare(`
+        INSERT INTO PAGO (id_contrato, monto, metodo, tipo)
+        VALUES (?, ?, ?, 'saldo')
+      `);
+      for (const p of pagos) {
+        insertPago.run(idContrato, p.monto, p.metodo);
+      }
+    }
+
     return { idContrato };
   });
 
@@ -147,7 +181,7 @@ function crearContrato(
  * @param {Array}  itemsDevueltos       - [{ id_detalle, estado_devolucion }]
  * @returns {{ diasAtraso: number, totalMora: number }}
  */
-function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos) {
+function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, observaciones) {
   if (!itemsDevueltos || itemsDevueltos.length === 0) {
     throw new Error('Debe especificar al menos un ítem para la devolución.');
   }
@@ -211,6 +245,14 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos) {
             nuevoEstado,
             detalle.id_herramienta
           );
+
+          // Registrar en MANTENIMIENTO si esta danado y hay observacion
+          if (item.estado_devolucion === 'dañado' && observaciones?.[item.id_detalle]) {
+            const hoy = new Date().toISOString().slice(0, 10);
+            db.prepare(
+              'INSERT INTO MANTENIMIENTO (id_herramienta, fecha_inicio, descripcion, tipo) VALUES (?, ?, ?, ?)'
+            ).run(detalle.id_herramienta, hoy, 'Devolucion: ' + observaciones[item.id_detalle], 'correctivo');
+          }
         } else if (detalle.tipo_item === 'granel') {
           db.prepare(
             'UPDATE ITEM_GRANEL SET cantidad_disponible = cantidad_disponible + ? WHERE id = ?'
@@ -232,8 +274,17 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos) {
 }
 
 function getContratos(filtros = {}) {
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  // Marcar atrasados automáticamente
+  db.prepare(`
+    UPDATE CONTRATO SET estado = 'atrasado'
+    WHERE estado = 'alquilado' AND fecha_devolucion_pactada < ?
+  `).run(hoy);
+
   let sql = `
     SELECT DISTINCT c.*, cl.nombre AS cliente_nombre, cl.dni AS cliente_dni,
+           cl.telefono AS cliente_telefono,
       (SELECT COUNT(*) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS total_items,
       (SELECT SUM(precio_dia_aplicado * cantidad) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS subtotal_diario
     FROM CONTRATO c
@@ -263,13 +314,34 @@ function getContratos(filtros = {}) {
   sql += ` ORDER BY
     CASE c.estado
       WHEN 'devolución incompleta' THEN 1
-      WHEN 'alquilado' THEN 2
-      WHEN 'reservado' THEN 3
-      WHEN 'devuelto' THEN 4
+      WHEN 'atrasado' THEN 2
+      WHEN 'alquilado' THEN 3
+      WHEN 'reservado' THEN 4
+      WHEN 'devuelto' THEN 5
     END,
     c.fecha_devolucion_pactada ASC`;
 
-  return db.prepare(sql).all(...params);
+  const contratos = db.prepare(sql).all(...params);
+
+  // Enriquecer con items y días de atraso
+  return contratos.map(c => {
+    const items = db.prepare(`
+      SELECT d.*, COALESCE(h.nombre, i.nombre) AS item_nombre,
+             COALESCE(h.id, 'MAT') AS item_codigo,
+             i.condicion AS item_condicion
+      FROM DETALLE_CONTRATO d
+      LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id
+      LEFT JOIN ITEM_GRANEL i ON d.id_item_granel = i.id
+      WHERE d.id_contrato = ?
+    `).all(c.id);
+
+    let dias_atraso = 0;
+    if (c.estado === 'atrasado' || (c.estado === 'alquilado' && c.fecha_devolucion_pactada < hoy)) {
+      dias_atraso = Math.ceil((new Date(hoy + 'T00:00:00') - new Date(c.fecha_devolucion_pactada + 'T00:00:00')) / 86400000);
+    }
+
+    return { ...c, items, dias_atraso };
+  });
 }
 
 module.exports = { crearContrato, registrarDevolucion, getContratos };

@@ -1,15 +1,18 @@
 import { useState, useCallback, lazy, Suspense } from 'react';
 import Sidebar from './Sidebar';
 import MultiSessionModal from './MultiSessionModal';
+import MultiDevolucionModal from './MultiDevolucionModal';
 
 const Alquileres = lazy(() => import('../views/Alquileres'));
 const Mostrador = lazy(() => import('../views/Mostrador'));
 const Inventario = lazy(() => import('../views/Inventario'));
+const Configuracion = lazy(() => import('../views/Configuracion'));
 
 const VIEWS = {
   alquileres: Alquileres,
   mostrador: Mostrador,
   inventario: Inventario,
+  configuracion: Configuracion,
   clientes: () => <Placeholder titulo="Clientes" />,
   caja: () => <Placeholder titulo="Caja" />,
   reportes: () => <Placeholder titulo="Reportes" />,
@@ -52,6 +55,7 @@ export default function Layout() {
       </main>
 
       <MultiSessionModal />
+      <MultiDevolucionModal />
     </div>
   );
 }

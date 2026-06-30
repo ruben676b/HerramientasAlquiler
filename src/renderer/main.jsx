@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ToastProvider } from './components/Toast';
 import { SessionsProvider } from './contexts/SessionsContext';
+import { DevolucionesProvider } from './contexts/DevolucionesContext';
 import Layout from './components/Layout';
 import './index.css';
 
@@ -31,9 +32,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
       <ToastProvider>
-        <SessionsProvider>
+      <SessionsProvider>
+        <DevolucionesProvider>
           <Layout />
-        </SessionsProvider>
+        </DevolucionesProvider>
+      </SessionsProvider>
       </ToastProvider>
     </ErrorBoundary>
   </React.StrictMode>

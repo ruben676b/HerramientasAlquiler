@@ -11,9 +11,12 @@ import {
   Sun,
   Moon,
   Layers,
+  Settings,
+  RotateCcw,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useSessions } from '../contexts/SessionsContext';
+import { useDevoluciones } from '../contexts/DevolucionesContext';
 
 const NAV_ITEMS = [
   { id: 'alquileres', label: 'Alquileres', icon: Store },
@@ -21,6 +24,7 @@ const NAV_ITEMS = [
   { id: 'clientes', label: 'Clientes', icon: Users },
   { id: 'caja', label: 'Caja', icon: DollarSign },
   { id: 'reportes', label: 'Reportes', icon: BarChart3 },
+  { id: 'configuracion', label: 'Configuración', icon: Settings },
 ];
 
 const SHOP_NAME = 'Ferretería El Martillo';
@@ -44,6 +48,7 @@ function useTheme() {
 export default function Sidebar({ activeView, onNavigate, collapsed, onToggle }) {
   const [theme, toggleTheme] = useTheme();
   const { activeAlquileres, activeReservas, openDialog, isOpen, closeDialog } = useSessions();
+  const { pendientes, openDialog: openDevoluciones, isOpen: isDevolOpen, closeDialog: closeDevoluciones } = useDevoluciones();
 
   return (
     <aside
@@ -139,6 +144,24 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggle })
               {activeAlquileres + activeReservas > 0
                 ? `${activeAlquileres + activeReservas} cliente${activeAlquileres + activeReservas !== 1 ? 's' : ''}`
                 : 'Clientes'}
+            </span>
+            <Layers size={11} style={{ opacity: 0.5 }} />
+          </button>
+
+          <button
+            onClick={() => isDevolOpen ? closeDevoluciones() : openDevoluciones()}
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[12px] font-bold transition-all duration-150 w-full mt-1"
+            style={{
+              border: '1.5px solid oklch(0.55 0.08 240 / 0.27)',
+              backgroundColor: 'oklch(0.55 0.08 240 / 0.07)',
+              color: 'oklch(0.55 0.08 240)',
+            }}
+          >
+            <RotateCcw size={12} />
+            <span className="flex-1 text-left">
+              {pendientes > 0
+                ? `${pendientes} devolucion${pendientes !== 1 ? 'es' : ''}`
+                : 'Devoluciones'}
             </span>
             <Layers size={11} style={{ opacity: 0.5 }} />
           </button>

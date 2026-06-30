@@ -47,4 +47,10 @@ contextBridge.exposeInMainWorld('api', {
   consultarDni: (dni) => ipcRenderer.invoke('consultar-dni', dni),
   generarContratoPdf: (idContrato) => ipcRenderer.invoke('generar-contrato-pdf', idContrato),
   guardarFirma: (idContrato, firma) => ipcRenderer.invoke('guardar-firma', idContrato, firma),
+  getConfig: (clave) => ipcRenderer.invoke('get-config', clave),
+  abrirArchivo: (ruta) => ipcRenderer.invoke('abrir-archivo', ruta),
+  generarPdfPreview: (datos) => ipcRenderer.invoke('generar-pdf-preview', datos),
+  leerArchivoBase64: (ruta) => ipcRenderer.invoke('leer-archivo-base64', ruta),
+  getAllConfig: () => ipcRenderer.invoke('get-all-config'),
+  saveConfig: (clave, valor) => ipcRenderer.invoke('save-config', clave, valor),
 });

@@ -69,7 +69,7 @@ function initDatabase() {
       fecha_salida TEXT NOT NULL,
       fecha_devolucion_pactada TEXT NOT NULL,
       fecha_devolucion_real TEXT,
-      estado TEXT NOT NULL DEFAULT 'alquilado' CHECK (estado IN ('reservado', 'alquilado', 'devuelto', 'devolución incompleta')),
+      estado TEXT NOT NULL DEFAULT 'alquilado' CHECK (estado IN ('reservado', 'alquilado', 'atrasado', 'devuelto', 'devolución incompleta')),
       deposito_dni INTEGER NOT NULL DEFAULT 0 CHECK (deposito_dni IN (0, 1)),
       deposito_monto REAL NOT NULL DEFAULT 0 CHECK (deposito_monto >= 0),
       firma_digital_path TEXT,
@@ -131,6 +131,23 @@ function initDatabase() {
   try { db.exec("ALTER TABLE CATEGORIA_HERRAMIENTA ADD COLUMN precio_dia REAL NOT NULL DEFAULT 0"); } catch {}
   try { db.exec("ALTER TABLE CATEGORIA_HERRAMIENTA ADD COLUMN mora_dia REAL NOT NULL DEFAULT 0"); } catch {}
 
+  // Siempre actualizar cláusulas (pueden cambiar entre versiones)
+  db.prepare(`INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion) VALUES (?, ?, ?)`)
+    .run('contrato_clausulas', `Conste por el presente documento que celebra de una parte como ARRENDADORA la Sr(a). [ARRENDADORA_NOMBRE], identificada con DNI N° [ARRENDADORA_DNI], con domicilio en [ARRENDADORA_DIRECCION], y de la otra parte como ARRENDATARIO el Sr(a). [CLIENTE_NOMBRE], identificado con DNI N° [CLIENTE_DNI], con domicilio en [CLIENTE_DIRECCION], quienes convienen de mutuo acuerdo y regulado por las leyes vigentes sobre la materia, en los términos y condiciones siguientes:
+
+PRIMERO: EL ARRENDADOR es propietario de los equipos y maquinarias de construcción civil ubicado en [ARRENDADORA_DIRECCION], del distrito y provincia de Andahuaylas.
+
+SEGUNDO: EL ARRENDADOR deja constancia que los equipos a que se refiere la cláusula anterior se encuentran en buen estado de conservación y sin mayor desgaste que el producto por uso normal y ordinario.
+
+TERCERO: Mediante el presente contrato el ARRENDADOR da en alquiler al ARRENDATARIO los equipos descritos en la cláusula primera para destinarlo únicamente como alquiler de maquinarias de construcción civil, en el cual es recibido en perfecto estado de operatividad conforme a lo señalado en la cláusula segunda. Por su parte el ARRENDATARIO se obliga a pagar al arrendador el monto de la renta pactada en la cláusula siguiente en la forma y oportunidad convenidas.
+
+CUARTO: Las partes acuerdan que el monto de la renta que pagará el ARRENDATARIO en calidad de contraprestación por el alquiler de equipos y maquinarias de construcción civil asciende a la suma de S/ [TOTAL], por el período comprendido entre [FECHA_INICIO] y [FECHA_DEVOLUCION].
+
+QUINTO: El pago del monto total del alquiler se realizará al momento de la entrega de los equipos o según lo acordado entre las partes. En caso de atraso en la devolución, se aplicará una mora según lo indicado en el detalle de equipos.
+
+SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora por día de atraso según el detalle indicado en la tabla de equipos. El ARRENDATARIO se hace responsable de cualquier daño, pérdida o deterioro de los equipos más allá del desgaste normal de uso.`, 'Cláusulas del contrato de alquiler');
+  console.log('[DB] Cláusulas actualizadas correctamente.');
+
   // --- Datos semilla (solo primera vez) ---
 
   const yaSembrado = db.prepare(
@@ -190,7 +207,7 @@ function initDatabase() {
     `INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion) VALUES (?, ?, ?)`
   ).run('db_seeded', 'true', 'Indica que los datos semilla ya fueron insertados');
 
-  // Datos de la arrendadora
+  // Datos de la arrendadora (siempre actualizar)
   const confsArrendadora = [
     ['arrendadora_nombre', 'SOLEDAD SUPANTA QUISPE', 'Nombre completo de la arrendadora'],
     ['arrendadora_dni', '72094861', 'DNI de la arrendadora'],
@@ -198,19 +215,21 @@ function initDatabase() {
     ['arrendadora_direccion', 'Av. Los Pinos N° 348', 'Dirección del negocio'],
     ['arrendadora_telefono', '985618849', 'Teléfono principal'],
     ['arrendadora_telefono2', '936719836', 'Teléfono secundario'],
-    ['contrato_clausulas', `PRIMERO: La arrendadora, identificada con DNI N° [ARRENDADORA_DNI], es propietaria de los equipos y maquinarias de construcción civil que administra desde [ARRENDADORA_DIRECCION], distrito y provincia de Andahuaylas.
+    ['arrendadora_firma_base64', '', 'Firma de la arrendadora en base64'],
+    ['api_reniec_key', '0fcd1cebbc5801a8f374999685f4293a', 'API Key de PeruAPI para consulta RENIEC'],
+    ['contrato_clausulas', `Conste por el presente documento que celebra de una parte como ARRENDADORA la Sr(a). [ARRENDADORA_NOMBRE], identificada con DNI N° [ARRENDADORA_DNI], con domicilio en [ARRENDADORA_DIRECCION], y de la otra parte como ARRENDATARIO el Sr(a). [CLIENTE_NOMBRE], identificado con DNI N° [CLIENTE_DNI], con domicilio en [CLIENTE_DIRECCION], quienes convienen de mutuo acuerdo y regulado por las leyes vigentes sobre la materia, en los términos y condiciones siguientes:
 
-SEGUNDO: Los equipos descritos en el presente contrato se entregan al ARRENDATARIO en perfecto estado de operatividad y funcionamiento, hecho que el ARRENDATARIO declara conocer y aceptar al momento de la firma.
+PRIMERO: EL ARRENDADOR es propietario de los equipos y maquinarias de construcción civil ubicado en [ARRENDADORA_DIRECCION], del distrito y provincia de Andahuaylas.
 
-TERCERO: El ARRENDATARIO se compromete a usar los equipos únicamente para fines de construcción civil, a devolverlos en las mismas condiciones en que los recibió y en la fecha pactada. Queda prohibido subalquilar, prestar o ceder los equipos a terceros sin autorización expresa de la arrendadora.
+SEGUNDO: EL ARRENDADOR deja constancia que los equipos a que se refiere la cláusula anterior se encuentran en buen estado de conservación y sin mayor desgaste que el producto por uso normal y ordinario.
 
-CUARTO: El monto total del alquiler asciende a S/. [TOTAL], a razón de los precios diarios detallados en la tabla de equipos, por el período comprendido entre [FECHA_INICIO] y [FECHA_DEVOLUCION].
+TERCERO: Mediante el presente contrato el ARRENDADOR da en alquiler al ARRENDATARIO los equipos descritos en la cláusula primera para destinarlo únicamente como alquiler de maquinarias de construcción civil, en el cual es recibido en perfecto estado de operatividad conforme a lo señalado en la cláusula segunda. Por su parte el ARRENDATARIO se obliga a pagar al arrendador el monto de la renta pactada en la cláusula siguiente en la forma y oportunidad convenidas.
 
-QUINTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora por día adicional por cada equipo, según lo detallado en la tabla de equipos, la cual será cobrada al momento de la devolución.
+CUARTO: Las partes acuerdan que el monto de la renta que pagará el ARRENDATARIO en calidad de contraprestación por el alquiler de equipos y maquinarias de construcción civil asciende a la suma de S/ [TOTAL], por el período comprendido entre [FECHA_INICIO] y [FECHA_DEVOLUCION].
 
-SEXTO: El ARRENDATARIO se hace responsable de cualquier daño, pérdida o deterioro de los equipos más allá del desgaste normal de uso. El costo de reposición o reparación será descontado del depósito de garantía o cobrado directamente al ARRENDATARIO.
+QUINTO: El pago del monto total del alquiler se realizará al momento de la entrega de los equipos o según lo acordado entre las partes. En caso de atraso en la devolución, se aplicará una mora según lo indicado en el detalle de equipos.
 
-SÉPTIMO: El ARRENDATARIO deja como garantía: DNI N° [CLIENTE_DNI] [DEPOSITO_TEXTO], los cuales serán devueltos íntegramente al momento de la devolución conforme de los equipos.`, 'Cláusulas del contrato de alquiler'],
+SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora por día de atraso según el detalle indicado en la tabla de equipos. El ARRENDATARIO se hace responsable de cualquier daño, pérdida o deterioro de los equipos más allá del desgaste normal de uso.`, 'Cláusulas del contrato de alquiler'],
   ];
 
   const insertConf = db.prepare(
