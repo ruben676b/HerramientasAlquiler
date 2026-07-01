@@ -236,7 +236,7 @@ function SessionForm({ session }) {
     }
   }, []);
   useEffect(() => {
-    if (!window.api) return;
+    if (step !== 1 || !window.api) return;
     Promise.all([
       window.api.getHerramientas({}),
       window.api.getGranel(),
@@ -244,7 +244,7 @@ function SessionForm({ session }) {
       setTodasHerramientas(h);
       setGranelCat(g);
     }).catch(() => {});
-  }, []);
+  }, [step]);
 
   // Granel reservado en otras sesiones activas
   const granelEnOtrasSesiones = useMemo(() => {
@@ -294,6 +294,11 @@ function SessionForm({ session }) {
     const q = busquedaEquipo.toLowerCase();
     const herr = todasHerramientas
       .filter(h => h.id.toLowerCase().includes(q) || h.nombre.toLowerCase().includes(q) || h.id.replace('-', '').toLowerCase().includes(q))
+      .sort((a, b) => {
+        if (a.estado === 'disponible' && b.estado !== 'disponible') return -1;
+        if (b.estado === 'disponible' && a.estado !== 'disponible') return 1;
+        return 0;
+      })
       .slice(0, 8)
       .map(h => ({ ...h, _tipo: 'herramienta', _enLista: items.some(i => i.id_herramienta === h.id) }));
     const gran = granelCat
@@ -361,7 +366,7 @@ function SessionForm({ session }) {
 
   // Sugerencias por DNI
   useEffect(() => {
-    if (dni.length < 2 || clienteSeleccionado) { setSugerenciasDni([]); return; }
+    if (dni.length < 1 || clienteSeleccionado) { setSugerenciasDni([]); return; }
     const t = setTimeout(async () => {
       if (!window.api) return;
       setBuscando(true);
@@ -374,7 +379,7 @@ function SessionForm({ session }) {
 
   // Sugerencias por nombre
   useEffect(() => {
-    if (nombre.length < 2 || clienteSeleccionado) { setSugerenciasNombre([]); return; }
+    if (nombre.length < 1 || clienteSeleccionado) { setSugerenciasNombre([]); return; }
     const t = setTimeout(async () => {
       if (!window.api) return;
       setBuscando(true);
@@ -389,7 +394,7 @@ function SessionForm({ session }) {
     setClienteSeleccionado(c);
     setDni(c.dni || '');
     setNombre(c.nombre || '');
-    setTelefono(c.telefono || '');
+    setTelefono(c.telefono ? String(c.telefono) : '');
     setSugerenciasDni([]);
     setSugerenciasNombre([]);
   };

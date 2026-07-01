@@ -309,7 +309,7 @@ function crearLote({ id_categoria, nombre, precio_dia, mora_dia, cantidad, descr
     .run(nombre, precio_dia || 0, mora_dia || 0, id_categoria);
 
   const existentes = db
-    .prepare("SELECT id FROM HERRAMIENTA WHERE id_categoria = ? AND id LIKE ? ORDER BY id DESC LIMIT 1")
+    .prepare("SELECT id FROM HERRAMIENTA WHERE id_categoria = ? AND id LIKE ? ORDER BY CAST(SUBSTR(id, INSTR(id, '-') + 1) AS INTEGER) DESC LIMIT 1")
     .get(id_categoria, id_categoria + '-%');
 
   let inicio = 1;
@@ -344,7 +344,7 @@ function agregarUnidades(id_categoria, cantidad) {
   if (!cat) throw new Error('Categoría no encontrada.');
 
   const ultima = db
-    .prepare("SELECT id, nombre, precio_dia, mora_dia, descripcion FROM HERRAMIENTA WHERE id_categoria = ? AND activo = 1 ORDER BY id DESC LIMIT 1")
+    .prepare("SELECT id, nombre, precio_dia, mora_dia, descripcion FROM HERRAMIENTA WHERE id_categoria = ? AND activo = 1 ORDER BY CAST(SUBSTR(id, INSTR(id, '-') + 1) AS INTEGER) DESC LIMIT 1")
     .get(id_categoria);
 
   let inicio = 1;
