@@ -276,12 +276,6 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
 function getContratos(filtros = {}) {
   const hoy = new Date().toISOString().slice(0, 10);
 
-  // Marcar atrasados automáticamente
-  db.prepare(`
-    UPDATE CONTRATO SET estado = 'atrasado'
-    WHERE estado = 'alquilado' AND fecha_devolucion_pactada < ?
-  `).run(hoy);
-
   let sql = `
     SELECT DISTINCT c.*, cl.nombre AS cliente_nombre, cl.dni AS cliente_dni,
            cl.telefono AS cliente_telefono,
