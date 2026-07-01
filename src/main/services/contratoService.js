@@ -311,15 +311,7 @@ function getContratos(filtros = {}) {
     params.push(p, p, p, p, pSinGuion);
   }
 
-  sql += ` ORDER BY
-    CASE c.estado
-      WHEN 'devolución incompleta' THEN 1
-      WHEN 'atrasado' THEN 2
-      WHEN 'alquilado' THEN 3
-      WHEN 'reservado' THEN 4
-      WHEN 'devuelto' THEN 5
-    END,
-    c.fecha_devolucion_pactada ASC`;
+  sql += ` ORDER BY c.fecha_modificacion DESC`;
 
   const contratos = db.prepare(sql).all(...params);
 

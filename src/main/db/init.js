@@ -74,6 +74,7 @@ function initDatabase() {
       deposito_monto REAL NOT NULL DEFAULT 0 CHECK (deposito_monto >= 0),
       firma_digital_path TEXT,
       notas TEXT,
+      fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (id_cliente) REFERENCES CLIENTE(id),
       FOREIGN KEY (id_usuario) REFERENCES USUARIO(id)
     );
@@ -130,6 +131,20 @@ function initDatabase() {
   // Migración: agregar columnas de precio/mora a CATEGORIA_HERRAMIENTA
   try { db.exec("ALTER TABLE CATEGORIA_HERRAMIENTA ADD COLUMN precio_dia REAL NOT NULL DEFAULT 0"); } catch {}
   try { db.exec("ALTER TABLE CATEGORIA_HERRAMIENTA ADD COLUMN mora_dia REAL NOT NULL DEFAULT 0"); } catch {}
+
+  // Migración: agregar fecha_modificacion a CONTRATO
+  try { db.exec("ALTER TABLE CONTRATO ADD COLUMN fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"); } catch {}
+  try {
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS trg_update_contrato_mod
+      AFTER UPDATE ON CONTRATO
+      BEGIN
+        UPDATE CONTRATO SET fecha_modificacion = CURRENT_TIMESTAMP WHERE id = NEW.id;
+      END;
+    `);
+  } catch (err) {
+    console.error('[DB] Error creando trigger trg_update_contrato_mod:', err);
+  }
 
   // Siempre actualizar cláusulas (pueden cambiar entre versiones)
   db.prepare(`INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion) VALUES (?, ?, ?)`)
