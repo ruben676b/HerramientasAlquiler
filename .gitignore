@@ -7,3 +7,4 @@ alquiler_herramientas.db
 .DS_Store
 *.log
 /env/
+release/
