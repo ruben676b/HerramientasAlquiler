@@ -230,11 +230,21 @@ function registerIpcHandlers() {
     const rows = db.prepare('SELECT clave, valor, descripcion FROM CONFIGURACION').all();
     const obj = {};
     rows.forEach(r => { obj[r.clave] = r.valor; });
-    return obj;
+    
+    // Merge from JSON
+    const configService = require('./services/configService');
+    const jsonConfig = configService.readConfigJson();
+    return { ...obj, ...jsonConfig };
   });
 
   ipcMain.handle('save-config', (_e, clave, valor) => {
-    db.prepare('INSERT OR REPLACE INTO CONFIGURACION (clave, valor) VALUES (?, ?)').run(clave, valor);
+    const jsonKeys = ['api_reniec_key', 'licencia_activacion'];
+    if (jsonKeys.includes(clave)) {
+      const configService = require('./services/configService');
+      configService.setJsonConfigValue(clave, valor);
+    } else {
+      db.prepare('INSERT OR REPLACE INTO CONFIGURACION (clave, valor) VALUES (?, ?)').run(clave, valor);
+    }
     return { ok: true };
   });
 

@@ -1,13 +1,34 @@
 const https = require('https');
+const db = require('../db/database');
 
-const API_KEY = '0fcd1cebbc5801a8f374999685f4293a';
 const BASE_URL = 'peruapi.com';
 const TIMEOUT_MS = 8000;
+
+const configService = require('./configService');
+
+function getApiKey() {
+  let key = configService.getJsonConfigValue('api_reniec_key');
+  if (!key) {
+    try {
+      const row = db.prepare('SELECT valor FROM CONFIGURACION WHERE clave = ?').get('api_reniec_key');
+      key = row ? row.valor : '';
+    } catch (err) {
+      key = '';
+    }
+  }
+  return key;
+}
 
 function consultarDni(dni) {
   return new Promise((resolve, reject) => {
     if (!dni || dni.length !== 8 || !/^\d{8}$/.test(dni)) {
       reject(new Error('DNI inválido. Debe tener 8 dígitos.'));
+      return;
+    }
+
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      reject(new Error('API Key de RENIEC no configurada en las opciones.'));
       return;
     }
 
@@ -17,7 +38,7 @@ function consultarDni(dni) {
       path: url,
       method: 'GET',
       headers: {
-        'X-API-KEY': API_KEY,
+        'X-API-KEY': apiKey,
       },
       timeout: TIMEOUT_MS,
     };

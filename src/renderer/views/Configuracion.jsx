@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, User, FileText, PenTool, Save } from 'lucide-react';
+import { Settings, User, FileText, PenTool, Save, Key } from 'lucide-react';
 import Button from '../components/ui/button';
 import SignaturePad from '../components/SignaturePad';
 import { useToast } from '../components/Toast';
@@ -8,6 +8,7 @@ const TABS = [
   { id: 'empresa', label: 'Datos empresa', icon: User },
   { id: 'clausulas', label: 'Cláusulas', icon: FileText },
   { id: 'firma', label: 'Firma', icon: PenTool },
+  { id: 'api', label: 'API', icon: Key },
 ];
 
 export default function Configuracion() {
@@ -127,6 +128,21 @@ export default function Configuracion() {
                 toast('Firma guardada');
               }} disabled={false} />
             )}
+          </>
+        )}
+
+        {tab === 'api' && (
+          <>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Configuraciones de servicios externos y licencias.</p>
+            <Field label="API Key de RENIEC (PeruAPI)">
+              <input value={config.api_reniec_key || ''} onChange={e => setConfig(p => ({ ...p, api_reniec_key: e.target.value }))}
+                className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+            </Field>
+            <div className="flex justify-end pt-2">
+              <Button variant="primary" size="sm" onClick={() => guardar('api_reniec_key', config.api_reniec_key || '')}>
+                <Save size={14} /> Guardar API Key
+              </Button>
+            </div>
           </>
         )}
       </div>

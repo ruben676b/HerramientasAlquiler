@@ -8,3 +8,4 @@ alquiler_herramientas.db
 *.log
 /env/
 release/
+.vscode/

@@ -410,7 +410,7 @@ export default function Inventario() {
                         <span className="w-5" />
                         <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0"
                           style={{ backgroundColor: cb?.soft, color: cb?.variable }}>{v.condicion}</span>
-                        <span className="flex-1 text-xs" style={{ color: 'var(--muted)' }}>S/ {v.precio_dia.toFixed(2)}/día · mora S/ {v.mora_dia.toFixed(2)}</span>
+                        <span className="flex-1 text-xs" style={{ color: 'var(--muted)' }}>S/ {v.precio_dia.toFixed(2)}/día</span>
                         <span className="text-xs font-mono w-20 text-right" style={{ color: bajo ? 'var(--danger)' : 'var(--ink)' }}>
                           {v.cantidad_disponible}/{v.cantidad_total}
                           {bajo && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full align-middle" style={{ backgroundColor: 'var(--danger)' }} />}
@@ -707,7 +707,7 @@ function ModalCrearFamilia({ onSave, onClose }) {
     onSave({
       nombre: f.nombre.trim(),
       precio_dia: parseFloat(f.precio_dia) || 0,
-      mora_dia: parseFloat(f.mora_dia) || 0,
+      mora_dia: parseFloat(f.precio_dia) || 0,
       cantidad: parseInt(f.cantidad, 10) || 1,
     });
   };
@@ -718,12 +718,9 @@ function ModalCrearFamilia({ onSave, onClose }) {
         <input value={f.nombre} onChange={(e) => set('nombre', e.target.value)} className={inputCls} placeholder="Ej: Roto Martillo" autoFocus
           style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
       </Field>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <Field label="Precio/día S/" req>
           <input type="number" step="0.01" min="0" value={f.precio_dia} onChange={(e) => set('precio_dia', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
-        </Field>
-        <Field label="Mora/día S/" req>
-          <input type="number" step="0.01" min="0" value={f.mora_dia} onChange={(e) => set('mora_dia', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
         </Field>
         <Field label="Cantidad" req>
           <input type="number" min="1" value={f.cantidad} onChange={(e) => set('cantidad', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
@@ -753,18 +750,15 @@ function ModalAgregarUnidades({ familia, onSave, onClose }) {
 function ModalEditarFamilia({ familia, onSave, onClose }) {
   const [f, setF] = useState({ nombre: familia.nombre || '', precio_dia: familia.precio_dia ?? '', mora_dia: familia.mora_dia ?? '' });
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
-  const submit = () => onSave(familia.id_categoria, { ...f, precio_dia: parseFloat(f.precio_dia) || 0, mora_dia: parseFloat(f.mora_dia) || 0 }, familia.nombre);
+  const submit = () => onSave(familia.id_categoria, { ...f, precio_dia: parseFloat(f.precio_dia) || 0, mora_dia: parseFloat(f.precio_dia) || 0 }, familia.nombre);
   return (
     <ModalShell title={'Editar ' + familia.nombre} onClose={onClose} onSubmit={submit}>
       <Field label="Nombre">
         <input value={f.nombre} onChange={(e) => set('nombre', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} autoFocus />
       </Field>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2">
         <Field label="Precio/día S/">
           <input type="number" step="0.01" min="0" value={f.precio_dia} onChange={(e) => set('precio_dia', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
-        </Field>
-        <Field label="Mora/día S/">
-          <input type="number" step="0.01" min="0" value={f.mora_dia} onChange={(e) => set('mora_dia', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
         </Field>
       </div>
       {familia.total > 0 ? (
@@ -781,7 +775,7 @@ function ModalCrearGranel({ onSave, onClose }) {
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const submit = () => {
     if (!f.nombre.trim()) return;
-    onSave({ nombre: f.nombre.trim(), precio_nuevo: parseFloat(f.precio_nuevo) || 0, mora_nuevo: parseFloat(f.mora_nuevo) || 0, precio_usado: parseFloat(f.precio_usado) || 0, mora_usado: parseFloat(f.mora_usado) || 0 });
+    onSave({ nombre: f.nombre.trim(), precio_nuevo: parseFloat(f.precio_nuevo) || 0, mora_nuevo: parseFloat(f.precio_nuevo) || 0, precio_usado: parseFloat(f.precio_usado) || 0, mora_usado: parseFloat(f.precio_usado) || 0 });
   };
   return (
     <ModalShell title="Nuevo material" onClose={onClose} onSubmit={submit}>
@@ -790,12 +784,10 @@ function ModalCrearGranel({ onSave, onClose }) {
         <div>
           <label className="text-[11px] font-medium mb-1 block" style={{ color: 'var(--success)' }}>Nuevo</label>
           <Field label="Precio/día"><input type="number" step="0.01" min="0" value={f.precio_nuevo} onChange={(e) => set('precio_nuevo', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
-          <div className="mt-1"><Field label="Mora/día"><input type="number" step="0.01" min="0" value={f.mora_nuevo} onChange={(e) => set('mora_nuevo', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field></div>
         </div>
         <div>
           <label className="text-[11px] font-medium mb-1 block" style={{ color: 'var(--warning)' }}>Usado</label>
           <Field label="Precio/día"><input type="number" step="0.01" min="0" value={f.precio_usado} onChange={(e) => set('precio_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
-          <div className="mt-1"><Field label="Mora/día"><input type="number" step="0.01" min="0" value={f.mora_usado} onChange={(e) => set('mora_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field></div>
         </div>
       </div>
     </ModalShell>
@@ -816,9 +808,9 @@ function ModalEditarGranel({ data, onSave, onClose }) {
   const submit = () => onSave(data.nombre, {
     nombre: f.nombre.trim(),
     precio_nuevo: parseFloat(f.precio_nuevo) || 0,
-    mora_nuevo: parseFloat(f.mora_nuevo) || 0,
+    mora_nuevo: parseFloat(f.precio_nuevo) || 0,
     precio_usado: parseFloat(f.precio_usado) || 0,
-    mora_usado: parseFloat(f.mora_usado) || 0,
+    mora_usado: parseFloat(f.precio_usado) || 0,
   });
   return (
     <ModalShell title="Editar material" onClose={onClose} onSubmit={submit}>
@@ -827,12 +819,10 @@ function ModalEditarGranel({ data, onSave, onClose }) {
         <div>
           <label className="text-[11px] font-medium mb-1 block" style={{ color: 'var(--success)' }}>Nuevo</label>
           <Field label="Precio/día"><input type="number" step="0.01" min="0" value={f.precio_nuevo} onChange={(e) => set('precio_nuevo', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
-          <div className="mt-1"><Field label="Mora/día"><input type="number" step="0.01" min="0" value={f.mora_nuevo} onChange={(e) => set('mora_nuevo', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field></div>
         </div>
         <div>
           <label className="text-[11px] font-medium mb-1 block" style={{ color: 'var(--warning)' }}>Usado</label>
           <Field label="Precio/día"><input type="number" step="0.01" min="0" value={f.precio_usado} onChange={(e) => set('precio_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
-          <div className="mt-1"><Field label="Mora/día"><input type="number" step="0.01" min="0" value={f.mora_usado} onChange={(e) => set('mora_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field></div>
         </div>
       </div>
     </ModalShell>
