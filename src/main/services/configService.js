@@ -8,9 +8,13 @@ const { app } = require('electron');
 // (Nota: Si se compila la app, process.cwd() puede ser diferente, 
 //  pero por ahora usaremos app.getPath('userData') para asegurar que sea escribible)
 const getConfigPath = () => {
-  // Cuando la app corre, app.getPath('userData') es la carpeta de datos de la app.
-  // Es la mejor práctica para Electron.
-  return path.join(app ? app.getPath('userData') : process.cwd(), 'app_config.json');
+  let userDataPath = '';
+  try {
+    userDataPath = app ? app.getPath('userData') : process.cwd();
+  } catch (err) {
+    userDataPath = process.cwd();
+  }
+  return path.join(userDataPath, 'app_config.json');
 };
 
 function readConfigJson() {
@@ -50,6 +54,7 @@ function setJsonConfigValue(key, value) {
 }
 
 module.exports = {
+  getConfigPath,
   readConfigJson,
   getJsonConfigValue,
   setJsonConfigValue

@@ -22,7 +22,8 @@ export function DevolucionesProvider({ children }) {
 
   const addDevolucion = useCallback((contrato) => {
     // Evitar duplicados
-    if (devoluciones.find(d => d.contrato_id === contrato.id && !d.completada)) return null;
+    const existente = devoluciones.find(d => d.contrato_id === contrato.id && !d.completada);
+    if (existente) return existente.id;
 
     const id = nextIdRef.current++;
     const nueva = {

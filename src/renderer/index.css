@@ -64,6 +64,10 @@
   --sidebar-brand:  oklch(0.215 0.040 55);
 }
 
+html {
+  font-size: 120%;
+}
+
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont,

@@ -8,6 +8,7 @@ const configService = require('./configService');
 
 function getApiKey() {
   let key = configService.getJsonConfigValue('api_reniec_key');
+  
   if (!key) {
     try {
       const row = db.prepare('SELECT valor FROM CONFIGURACION WHERE clave = ?').get('api_reniec_key');
@@ -16,7 +17,7 @@ function getApiKey() {
       key = '';
     }
   }
-  return key;
+  return key ? key.trim() : '';
 }
 
 function consultarDni(dni) {
