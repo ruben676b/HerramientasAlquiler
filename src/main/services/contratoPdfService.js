@@ -30,7 +30,7 @@ function generarPdfDesdeDatos(datos) {
   }
   const dias = Math.max(1, Math.ceil(
     (new Date(fechas.devolucion + 'T00:00:00') - new Date(fechas.salida + 'T00:00:00')) / 86400000
-  ));
+  ) + 1);
   const totalItems = items.reduce((a, i) => a + i.precio_dia * dias * i.cantidad, 0);
 
   const nro = numContrato || 'PREVIEW';
@@ -272,7 +272,7 @@ function generarPdf(idContrato) {
 
   const dias = Math.max(1, Math.ceil(
     (new Date(contrato.fecha_devolucion_pactada + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
-  ));
+  ) + 1);
   const totalItems = detalles.reduce((a, d) => a + d.precio_dia_aplicado * dias * d.cantidad, 0);
   const total = totalItems + (contrato.deposito_monto || 0);
 

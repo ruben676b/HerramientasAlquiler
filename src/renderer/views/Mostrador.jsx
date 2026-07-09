@@ -90,7 +90,7 @@ export default function Mostrador() {
       (new Date(fechaDevolucion + 'T00:00:00') -
         new Date(fechaSalida + 'T00:00:00')) /
         (1000 * 60 * 60 * 24)
-    )
+    ) + 1
   );
 
   const subtotalItems = items.reduce(

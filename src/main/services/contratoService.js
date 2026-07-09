@@ -56,8 +56,8 @@ function crearContrato(
     const insertContrato = db.prepare(`
       INSERT INTO CONTRATO (
         id_cliente, id_usuario, fecha_salida, fecha_devolucion_pactada,
-        deposito_monto, deposito_dni
-      ) VALUES (?, ?, ?, ?, ?, ?)
+        deposito_monto, deposito_dni, fecha_modificacion
+      ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
     `);
 
     const insertDetalle = db.prepare(`
@@ -160,10 +160,10 @@ function crearContrato(
     if (pagos && pagos.length > 0) {
       const insertPago = db.prepare(`
         INSERT INTO PAGO (id_contrato, monto, metodo, tipo)
-        VALUES (?, ?, ?, 'saldo')
+        VALUES (?, ?, ?, ?)
       `);
       for (const p of pagos) {
-        insertPago.run(idContrato, p.monto, p.metodo);
+        insertPago.run(idContrato, p.monto, p.metodo, p.tipo || 'saldo');
       }
     }
 
@@ -174,12 +174,15 @@ function crearContrato(
 }
 
 /**
- * Registra la devolución de un contrato, procesando cada ítem según su checklist.
+ * Registra la devolución total o parcial de un contrato.
+ * Cada ítem se procesa individualmente con su propia fecha de devolución.
+ * Si quedan ítems pendientes, el contrato pasa a 'devolución incompleta'.
  *
  * @param {number} idContrato
  * @param {string} fechaDevolucionReal - formato YYYY-MM-DD
- * @param {Array}  itemsDevueltos       - [{ id_detalle, estado_devolucion }]
- * @returns {{ diasAtraso: number, totalMora: number }}
+ * @param {Array}  itemsDevueltos       - [{ id_detalle, estado_devolucion, cantidad_devuelta?, costo_reparacion? }]
+ * @param {object} observaciones        - { [id_detalle]: "texto" }
+ * @returns {{ totalMora: number, completado: boolean, pendientes: number, totalDanos: number }}
  */
 function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, observaciones) {
   if (!itemsDevueltos || itemsDevueltos.length === 0) {
@@ -187,87 +190,102 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
   }
 
   const ejecutar = db.transaction(() => {
-    const contrato = db
-      .prepare('SELECT * FROM CONTRATO WHERE id = ?')
-      .get(idContrato);
-
-    if (!contrato) {
-      throw new Error('Contrato no encontrado.');
-    }
+    const contrato = db.prepare('SELECT * FROM CONTRATO WHERE id = ?').get(idContrato);
+    if (!contrato) throw new Error('Contrato no encontrado.');
     if (contrato.estado === 'devuelto' || contrato.estado === 'cancelado') {
-      throw new Error(
-        'El contrato ya fue ' +
-          contrato.estado +
-          ' y no puede ser procesado nuevamente.'
-      );
+      throw new Error('El contrato ya fue ' + contrato.estado + ' y no puede ser procesado nuevamente.');
     }
 
-    db.prepare(
-      'UPDATE CONTRATO SET fecha_devolucion_real = ?, estado = ? WHERE id = ?'
-    ).run(fechaDevolucionReal, 'devuelto', idContrato);
-
-    const fechaPactada = new Date(
-      contrato.fecha_devolucion_pactada + 'T00:00:00'
-    );
+    const fechaPactada = new Date(contrato.fecha_devolucion_pactada + 'T00:00:00');
     const fechaReal = new Date(fechaDevolucionReal + 'T00:00:00');
-    const diasAtraso = Math.max(
-      0,
-      Math.ceil((fechaReal - fechaPactada) / (1000 * 60 * 60 * 24))
-    );
-
     let totalMora = 0;
+    let totalDanos = 0;
 
     for (const item of itemsDevueltos) {
-      const detalle = db
-        .prepare(
-          'SELECT * FROM DETALLE_CONTRATO WHERE id = ? AND id_contrato = ?'
-        )
-        .get(item.id_detalle, idContrato);
+      const detalle = db.prepare('SELECT * FROM DETALLE_CONTRATO WHERE id = ? AND id_contrato = ?').get(item.id_detalle, idContrato);
+      if (!detalle) throw new Error('Detalle de contrato no encontrado: ' + item.id_detalle);
 
-      if (!detalle) {
-        throw new Error(
-          'Detalle de contrato no encontrado: ' + item.id_detalle
-        );
+      // Saltar ítems ya procesados en devoluciones parciales previas
+      if (detalle.estado_devolucion !== 'pendiente') continue;
+
+      const esDevuelto = item.estado_devolucion === 'bien' || item.estado_devolucion === 'dañado';
+
+      // Actualizar estado del ítem y registrar fecha si fue devuelto
+      if (esDevuelto) {
+        db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ? WHERE id = ?')
+          .run(item.estado_devolucion, fechaDevolucionReal, item.id_detalle);
+      } else {
+        db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ? WHERE id = ?')
+          .run(item.estado_devolucion, item.id_detalle);
       }
 
-      db.prepare(
-        'UPDATE DETALLE_CONTRATO SET estado_devolucion = ? WHERE id = ?'
-      ).run(item.estado_devolucion, item.id_detalle);
-
-      if (
-        item.estado_devolucion === 'bien' ||
-        item.estado_devolucion === 'dañado'
-      ) {
+      if (esDevuelto) {
         if (detalle.tipo_item === 'individual') {
-          const nuevoEstado =
-            item.estado_devolucion === 'dañado' ? 'mantenimiento' : 'disponible';
-          db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(
-            nuevoEstado,
-            detalle.id_herramienta
-          );
+          const nuevoEstado = item.estado_devolucion === 'dañado' ? 'mantenimiento' : 'disponible';
+          db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(nuevoEstado, detalle.id_herramienta);
 
-          // Registrar en MANTENIMIENTO si esta danado y hay observacion
-          if (item.estado_devolucion === 'dañado' && observaciones?.[item.id_detalle]) {
+          if (item.estado_devolucion === 'dañado') {
+            totalDanos += item.costo_reparacion || 0;
             const hoy = new Date().toISOString().slice(0, 10);
-            db.prepare(
-              'INSERT INTO MANTENIMIENTO (id_herramienta, fecha_inicio, descripcion, tipo) VALUES (?, ?, ?, ?)'
-            ).run(detalle.id_herramienta, hoy, 'Devolucion: ' + observaciones[item.id_detalle], 'correctivo');
+            const desc = observaciones?.[item.id_detalle] || 'Dañado en devolución';
+            db.prepare('INSERT INTO MANTENIMIENTO (id_herramienta, fecha_inicio, descripcion, tipo, costo) VALUES (?, ?, ?, ?, ?)')
+              .run(detalle.id_herramienta, hoy, 'Devolucion: ' + desc, 'correctivo', item.costo_reparacion || 0);
           }
         } else if (detalle.tipo_item === 'granel') {
-          db.prepare(
-            'UPDATE ITEM_GRANEL SET cantidad_disponible = cantidad_disponible + ? WHERE id = ?'
-          ).run(detalle.cantidad, detalle.id_item_granel);
-        }
-      }
+          const cantDevuelta = item.cantidad_devuelta || detalle.cantidad;
 
-      if (diasAtraso > 0 && item.estado_devolucion !== 'no devuelto') {
-        const moraItem =
-          diasAtraso * detalle.mora_dia_aplicada * detalle.cantidad;
-        totalMora += moraItem;
+          if (cantDevuelta < detalle.cantidad) {
+            // Split parcial: reducir la fila original y crear nueva fila para la porción devuelta
+            const restante = detalle.cantidad - cantDevuelta;
+            db.prepare('UPDATE DETALLE_CONTRATO SET cantidad = ? WHERE id = ?')
+              .run(restante, detalle.id_detalle);
+
+            db.prepare(`
+              INSERT INTO DETALLE_CONTRATO
+                (id_contrato, tipo_item, id_item_granel, cantidad, precio_dia_aplicado, mora_dia_aplicada, estado_devolucion, fecha_devolucion_real)
+              VALUES (?, 'granel', ?, ?, ?, ?, ?, ?)
+            `).run(idContrato, detalle.id_item_granel, cantDevuelta,
+              detalle.precio_dia_aplicado, detalle.mora_dia_aplicada,
+              item.estado_devolucion, fechaDevolucionReal);
+          } else {
+            // Devolución completa
+            db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ? WHERE id = ?')
+              .run(item.estado_devolucion, fechaDevolucionReal, detalle.id_detalle);
+          }
+
+          db.prepare('UPDATE ITEM_GRANEL SET cantidad_disponible = cantidad_disponible + ? WHERE id = ?')
+            .run(cantDevuelta, detalle.id_item_granel);
+
+          // Mora para la porción devuelta (usando cantDevuelta, no detalle.cantidad)
+          const diasAtrasoItem = Math.max(0, Math.ceil((fechaReal - fechaPactada) / (1000 * 60 * 60 * 24)));
+          if (diasAtrasoItem > 0) {
+            totalMora += diasAtrasoItem * detalle.precio_dia_aplicado * cantDevuelta;
+          }
+        } else {
+          // Ítems individuales
+          const diasAtrasoItem = Math.max(0, Math.ceil((fechaReal - fechaPactada) / (1000 * 60 * 60 * 24)));
+          if (diasAtrasoItem > 0) {
+            totalMora += diasAtrasoItem * detalle.precio_dia_aplicado * detalle.cantidad;
+          }
+        }
       }
     }
 
-    return { diasAtraso, totalMora };
+    // Determinar estado del contrato según ítems pendientes
+    const pendientes = db.prepare(
+      "SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO WHERE id_contrato = ? AND estado_devolucion = 'pendiente'"
+    ).get(idContrato);
+
+    const completado = pendientes.cnt === 0;
+    if (completado) {
+      db.prepare("UPDATE CONTRATO SET estado = ?, fecha_devolucion_real = ?, fecha_modificacion = datetime('now') WHERE id = ?")
+        .run('devuelto', fechaDevolucionReal, idContrato);
+    } else {
+      db.prepare("UPDATE CONTRATO SET estado = ?, fecha_modificacion = datetime('now') WHERE id = ?")
+        .run('devolución incompleta', idContrato);
+    }
+
+    return { totalMora, totalDanos, completado, pendientes: pendientes.cnt };
   });
 
   return ejecutar();
@@ -280,7 +298,8 @@ function getContratos(filtros = {}) {
     SELECT DISTINCT c.*, cl.nombre AS cliente_nombre, cl.dni AS cliente_dni,
            cl.telefono AS cliente_telefono,
       (SELECT COUNT(*) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS total_items,
-      (SELECT SUM(precio_dia_aplicado * cantidad) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS subtotal_diario
+      (SELECT SUM(precio_dia_aplicado * cantidad) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS subtotal_diario,
+      (SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = c.id) AS total_pagado
     FROM CONTRATO c
     JOIN CLIENTE cl ON c.id_cliente = cl.id
     LEFT JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id
@@ -321,13 +340,59 @@ function getContratos(filtros = {}) {
       WHERE d.id_contrato = ?
     `).all(c.id);
 
-    let dias_atraso = 0;
-    if (c.estado === 'atrasado' || (c.estado === 'alquilado' && c.fecha_devolucion_pactada < hoy)) {
-      dias_atraso = Math.ceil((new Date(hoy + 'T00:00:00') - new Date(c.fecha_devolucion_pactada + 'T00:00:00')) / 86400000);
-    }
+    const pagos = db.prepare(`
+      SELECT id, monto, metodo, tipo, fecha_pago
+      FROM PAGO WHERE id_contrato = ?
+      ORDER BY fecha_pago ASC
+    `).all(c.id);
 
-    return { ...c, items, dias_atraso };
+    const fechaPactada = new Date(c.fecha_devolucion_pactada + 'T00:00:00');
+    let total_atraso = 0;
+    let max_dias_atraso = 0;
+
+    const itemsConAtraso = items.map(item => {
+      // Fecha de referencia: si ya tiene devolución real, usar esa; si no, hoy
+      const refDate = item.fecha_devolucion_real
+        ? new Date(item.fecha_devolucion_real + 'T00:00:00')
+        : new Date(hoy + 'T00:00:00');
+      const diasAtrasoItem = Math.max(0, Math.ceil((refDate - fechaPactada) / 86400000));
+      const montoAtrasoItem = diasAtrasoItem * item.precio_dia_aplicado * item.cantidad;
+
+      if (diasAtrasoItem > max_dias_atraso) max_dias_atraso = diasAtrasoItem;
+      total_atraso += montoAtrasoItem;
+
+      return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem };
+    });
+
+    return { ...c, items: itemsConAtraso, pagos, dias_atraso: max_dias_atraso, total_atraso };
   });
 }
 
-module.exports = { crearContrato, registrarDevolucion, getContratos };
+/**
+ * Registra un pago adicional para un contrato existente.
+ *
+ * @param {number} idContrato
+ * @param {number} monto
+ * @param {string} metodo - efectivo | yape | plin
+ * @returns {{ id: number, monto: number, metodo: string }}
+ */
+function registrarPagoAdicional(idContrato, monto, metodo) {
+  if (!idContrato || !monto || monto <= 0) {
+    throw new Error('Datos de pago inválidos.');
+  }
+
+  const contrato = db.prepare('SELECT estado FROM CONTRATO WHERE id = ?').get(idContrato);
+  if (!contrato) throw new Error('Contrato no encontrado.');
+  if (contrato.estado === 'devuelto' || contrato.estado === 'cancelado') {
+    throw new Error('El contrato ya está cerrado. No se pueden registrar pagos adicionales.');
+  }
+
+  const result = db.prepare(`
+    INSERT INTO PAGO (id_contrato, monto, metodo, tipo)
+    VALUES (?, ?, ?, 'saldo')
+  `).run(idContrato, monto, metodo);
+
+  return { id: result.lastInsertRowid, monto, metodo };
+}
+
+module.exports = { crearContrato, registrarDevolucion, getContratos, registrarPagoAdicional };

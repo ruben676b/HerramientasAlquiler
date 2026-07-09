@@ -362,7 +362,7 @@ function SessionForm({ session }) {
 
   const esAlquiler = session.tipo === 'alquiler';
   const accent = esAlquiler ? 'oklch(0.50 0.11 155)' : 'oklch(0.52 0.08 240)';
-  const dias = Math.max(1, Math.ceil((new Date(fechaDevolucion + 'T00:00:00') - new Date(fechaSalida + 'T00:00:00')) / 86400000));
+  const dias = Math.max(1, Math.ceil((new Date(fechaDevolucion + 'T00:00:00') - new Date(fechaSalida + 'T00:00:00')) / 86400000) + 1);
 
   // Sugerencias por DNI
   useEffect(() => {
@@ -450,7 +450,10 @@ function SessionForm({ session }) {
           id_item_granel: item.id_item_granel || undefined,
           cantidad: item.cantidad || 1,
         })),
-        pagos: pagos,
+        pagos: pagos.map(p => ({
+          ...p,
+          tipo: totalPagado >= totalEquipos ? 'saldo' : 'adelanto'
+        })),
       });
 
       const idContrato = resultado.idContrato;

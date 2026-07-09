@@ -89,6 +89,7 @@ function initDatabase() {
       precio_dia_aplicado REAL NOT NULL CHECK (precio_dia_aplicado >= 0),
       mora_dia_aplicada REAL NOT NULL CHECK (mora_dia_aplicada >= 0),
       estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto')),
+      fecha_devolucion_real TEXT,
       FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
       FOREIGN KEY (id_herramienta) REFERENCES HERRAMIENTA(id),
       FOREIGN KEY (id_item_granel) REFERENCES ITEM_GRANEL(id),

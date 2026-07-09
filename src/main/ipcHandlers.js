@@ -5,6 +5,7 @@ const {
   crearContrato,
   registrarDevolucion,
   getContratos,
+  registrarPagoAdicional,
 } = require('./services/contratoService');
 const {
   getHerramientas,
@@ -134,6 +135,11 @@ function registerIpcHandlers() {
 
   ipcMain.handle('get-contratos', (_e, filtros) => {
     return getContratos(filtros || {});
+  });
+
+  ipcMain.handle('registrar-pago', (_e, data) => {
+    const { idContrato, monto, metodo } = data;
+    return registrarPagoAdicional(idContrato, monto, metodo);
   });
 
   // --- Sistema ---
