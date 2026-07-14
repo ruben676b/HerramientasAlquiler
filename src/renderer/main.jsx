@@ -50,6 +50,8 @@ const forceUppercase = (e) => {
   const type = (t.type || 'text').toLowerCase();
   if (!['text', 'search', 'url', 'tel', 'email'].includes(type) && t.tagName !== 'TEXTAREA') return;
   
+  if (t.style.textTransform === 'none') return;
+  
   const upper = t.value.toUpperCase();
   if (t.value !== upper) {
     isUppercasing = true;

@@ -136,7 +136,7 @@ export default function Configuracion() {
             <p className="text-xs" style={{ color: 'var(--muted)' }}>Configuraciones de servicios externos y licencias.</p>
             <Field label="API Key de RENIEC (PeruAPI)">
               <input value={config.api_reniec_key || ''} onChange={e => setConfig(p => ({ ...p, api_reniec_key: e.target.value }))}
-                className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)', textTransform: 'none' }} />
             </Field>
             <div className="flex justify-end pt-2">
               <Button variant="primary" size="sm" onClick={() => guardar('api_reniec_key', config.api_reniec_key || '')}>
