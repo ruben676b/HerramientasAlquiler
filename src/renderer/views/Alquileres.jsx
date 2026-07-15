@@ -24,7 +24,7 @@ const fmtFechaCorta = (iso) => {
 };
 
 export default function Alquileres() {
-  const [contratos, setContratos] = useState([]);
+  const [todosContratos, setTodosContratos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState('');
@@ -42,8 +42,8 @@ export default function Alquileres() {
     if (!window.api) return;
     setCargando(true);
     try {
-      const c = await window.api.getContratos({ busqueda, estado: estadoFiltro });
-      setContratos(c);
+      const c = await window.api.getContratos({ busqueda });
+      setTodosContratos(c);
     } catch (e) { setError(e.message); }
     finally { setCargando(false); }
   };
@@ -51,12 +51,12 @@ export default function Alquileres() {
   const recargar = async () => {
     if (!window.api) return;
     try {
-      const c = await window.api.getContratos({ busqueda, estado: estadoFiltro });
-      setContratos(c);
+      const c = await window.api.getContratos({ busqueda });
+      setTodosContratos(c);
     } catch (e) { setError(e.message); }
   };
 
-  useEffect(() => { cargar(); }, [busqueda, estadoFiltro]);
+  useEffect(() => { cargar(); }, [busqueda]);
 
   useEffect(() => {
     const onKey = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); searchRef.current?.focus(); } };
@@ -67,13 +67,23 @@ export default function Alquileres() {
   const conteo = useMemo(() => {
     const c = {};
     ['atrasado','alquilado','devuelto','devolucion incompleta'].forEach(e => {
-      c[e] = contratos.filter(x => x.estado === e).length;
+      if (e === 'atrasado') {
+        c[e] = todosContratos.filter(x => x.estado === 'atrasado' || x.dias_atraso > 0).length;
+      } else {
+        c[e] = todosContratos.filter(x => x.estado === e).length;
+      }
     });
-    c[''] = contratos.length;
+    c[''] = todosContratos.length;
     return c;
-  }, [contratos]);
+  }, [todosContratos]);
 
-  const atrasados = contratos.filter(c => c.estado === 'atrasado' || c.dias_atraso > 0);
+  const contratosFiltrados = useMemo(() => {
+    if (!estadoFiltro) return todosContratos;
+    if (estadoFiltro === 'atrasado') return todosContratos.filter(c => c.estado === 'atrasado' || c.dias_atraso > 0);
+    return todosContratos.filter(c => c.estado === estadoFiltro);
+  }, [todosContratos, estadoFiltro]);
+
+  const atrasados = todosContratos.filter(c => c.estado === 'atrasado' || c.dias_atraso > 0);
 
   const toggleExpand = (id) => setExpandido(prev => prev === id ? null : id);
 
@@ -139,14 +149,14 @@ export default function Alquileres() {
 
       {cargando ? (
         <p className="text-sm py-12 text-center" style={{ color: 'var(--muted)' }}>Cargando...</p>
-      ) : contratos.length === 0 ? (
+      ) : contratosFiltrados.length === 0 ? (
         <div className="py-16 text-center">
           <Calendar size={36} className="mx-auto mb-3" style={{ color: 'var(--faint)' }} />
           <p className="text-sm" style={{ color: 'var(--muted)' }}>No hay alquileres</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {contratos.map(c => {
+          {contratosFiltrados.map(c => {
             const isOpen = expandido === c.id;
             const dias = Math.max(1, Math.ceil(
               (new Date(c.fecha_devolucion_pactada + 'T00:00:00') - new Date(c.fecha_salida + 'T00:00:00')) / 86400000
