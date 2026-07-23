@@ -1,7 +1,8 @@
-import { X, CheckCircle2, Circle, AlertTriangle, Clock, RotateCcw, CheckCircle, XCircle, Minus, Plus } from 'lucide-react';
+import { X, CheckCircle2, Circle, AlertTriangle, Clock, RotateCcw, CheckCircle, XCircle, Minus, Plus, Star } from 'lucide-react';
 import { useState } from 'react';
 import { useDevoluciones } from '../contexts/DevolucionesContext';
 import { useToast } from './Toast';
+import StarRating from './StarRating';
 
 const ESTADOS_OPCIONES = [
   { id: 'bien', label: 'Bien', icon: CheckCircle, bg: 'oklch(0.50 0.13 155)', ink: '#fff', ligero: 'oklch(0.93 0.05 160)' },
@@ -96,6 +97,8 @@ function DevolucionForm({ devolucion, onCompletada, closeDialog }) {
   const [costosRep, setCostosRep] = useState({});
   const [error, setError] = useState('');
   const [cobrando, setCobrando] = useState(false);
+  const [calificacionEstrellas, setCalificacionEstrellas] = useState(0);
+  const [calificacionComentario, setCalificacionComentario] = useState('');
 
   const setEstado = (idx, e) => setEstados(p => ({ ...p, [idx]: e }));
   const setNota = (idx, v) => setNotas(p => ({ ...p, [idx]: v }));
@@ -180,6 +183,19 @@ function DevolucionForm({ devolucion, onCompletada, closeDialog }) {
       }
 
       onCompletada(devolucion.id);
+
+      // Guardar calificación si se seleccionaron estrellas
+      if (calificacionEstrellas > 0) {
+        try {
+          await window.api.guardarCalificacion(
+            devolucion.contrato_id,
+            calificacionEstrellas,
+            calificacionComentario || null
+          );
+        } catch (calErr) {
+          console.error('Error guardando calificación:', calErr);
+        }
+      }
 
       if (resultado.completado) {
         toast('Devolución completada' + (conCobro ? ' y cobrada' : ''));
@@ -345,6 +361,37 @@ function DevolucionForm({ devolucion, onCompletada, closeDialog }) {
                 S/ {saldoPendiente.toFixed(2)}
               </span>
             </div>
+          </div>
+
+          {/* Calificación del cliente */}
+          <div className="pt-3 mt-1" style={{ borderTop: '1px solid var(--border)' }}>
+            <h3 className="text-[11px] uppercase tracking-wider font-semibold mb-2"
+              style={{ color: 'var(--muted)' }}>Calificar cliente</h3>
+            <div className="flex items-center gap-2 mb-2">
+              <StarRating
+                value={calificacionEstrellas}
+                onChange={setCalificacionEstrellas}
+                size={22}
+              />
+              {calificacionEstrellas > 0 && (
+                <span className="text-[11px] font-medium" style={{ color: 'oklch(0.62 0.17 80)' }}>
+                  {calificacionEstrellas}/5
+                </span>
+              )}
+            </div>
+            <textarea
+              placeholder="Comentario sobre el cliente (opcional)..."
+              value={calificacionComentario}
+              onChange={e => setCalificacionComentario(e.target.value)}
+              rows={2}
+              className="w-full px-2.5 py-1.5 rounded-lg text-xs border resize-none"
+              style={{
+                backgroundColor: 'var(--bg)',
+                color: 'var(--ink)',
+                borderColor: 'var(--border)',
+                textTransform: 'none',
+              }}
+            />
           </div>
 
           {/* Botones de cierre */}

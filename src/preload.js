@@ -54,4 +54,13 @@ contextBridge.exposeInMainWorld('api', {
   leerArchivoBase64: (ruta) => ipcRenderer.invoke('leer-archivo-base64', ruta),
   getAllConfig: () => ipcRenderer.invoke('get-all-config'),
   saveConfig: (clave, valor) => ipcRenderer.invoke('save-config', clave, valor),
+
+  // Calificación de clientes
+  guardarCalificacion: (idContrato, estrellas, comentario) => ipcRenderer.invoke('guardar-calificacion', idContrato, estrellas, comentario),
+
+  // Panel de clientes
+  getClientesPanel: () => ipcRenderer.invoke('get-clientes-panel'),
+  buscarClientesPanel: (termino) => ipcRenderer.invoke('buscar-clientes-panel', termino),
+  getContratosCliente: (id) => ipcRenderer.invoke('get-contratos-cliente', id),
+  getDetalleContrato: (id) => ipcRenderer.invoke('get-detalle-contrato', id),
 });

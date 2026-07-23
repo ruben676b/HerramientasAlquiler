@@ -127,14 +127,29 @@ function initDatabase() {
       valor TEXT NOT NULL,
       descripcion TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS CALIFICACION_CLIENTE (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id_contrato INTEGER NOT NULL UNIQUE,
+      id_cliente INTEGER NOT NULL,
+      estrellas INTEGER NOT NULL CHECK (estrellas >= 1 AND estrellas <= 5),
+      comentario TEXT,
+      FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
+      FOREIGN KEY (id_cliente) REFERENCES CLIENTE(id)
+    );
   `);
 
   // Migración: agregar columnas de precio/mora a CATEGORIA_HERRAMIENTA
   try { db.exec("ALTER TABLE CATEGORIA_HERRAMIENTA ADD COLUMN precio_dia REAL NOT NULL DEFAULT 0"); } catch {}
   try { db.exec("ALTER TABLE CATEGORIA_HERRAMIENTA ADD COLUMN mora_dia REAL NOT NULL DEFAULT 0"); } catch {}
 
-  // Migración: agregar fecha_modificacion a CONTRATO
+  // Migración: agregar fecha_modificacion y fecha_devolucion_real a CONTRATO
   try { db.exec("ALTER TABLE CONTRATO ADD COLUMN fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"); } catch {}
+  try { db.exec("ALTER TABLE CONTRATO ADD COLUMN fecha_devolucion_real TEXT"); } catch {}
+  
+  // Migración: agregar fecha_devolucion_real a DETALLE_CONTRATO
+  try { db.exec("ALTER TABLE DETALLE_CONTRATO ADD COLUMN fecha_devolucion_real TEXT"); } catch {}
+
   try {
     db.exec(`
       CREATE TRIGGER IF NOT EXISTS trg_update_contrato_mod
