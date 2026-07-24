@@ -1,5 +1,6 @@
 const fs = require('fs');
-const { ipcMain, app, shell } = require('electron');
+const path = require('path');
+const { ipcMain, app, shell, dialog } = require('electron');
 const db = require('./db/database');
 const {
   crearContrato,
@@ -333,6 +334,62 @@ function registerIpcHandlers() {
 
   ipcMain.handle('get-detalle-contrato', (_e, idContrato) => {
     return getDetalleContrato(idContrato);
+  });
+
+  // --- Backup ---
+  ipcMain.handle('crear-backup', async () => {
+    try {
+      const dbPath = db.name;
+      const defaultPath = path.join(app.getPath('documents'), `backup_alquiler_${Date.now()}.db`);
+      const result = await dialog.showSaveDialog({
+        title: 'Guardar Backup de la Base de Datos',
+        defaultPath,
+        filters: [{ name: 'SQLite Database', extensions: ['db', 'sqlite'] }]
+      });
+
+      if (result.canceled) return { success: false, cancelado: true };
+
+      // better-sqlite3 provide a .backup() method
+      await db.backup(result.filePath);
+      return { success: true, ruta: result.filePath };
+    } catch (error) {
+      console.error('[Backup Error]', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('restaurar-backup', async () => {
+    try {
+      const result = await dialog.showOpenDialog({
+        title: 'Seleccionar Backup para Restaurar',
+        properties: ['openFile'],
+        filters: [{ name: 'SQLite Database', extensions: ['db', 'sqlite'] }]
+      });
+
+      if (result.canceled || result.filePaths.length === 0) return { success: false, cancelado: true };
+
+      const backupPath = result.filePaths[0];
+      const targetDbPath = db.name;
+
+      // Close current db connection
+      db.close();
+
+      // Overwrite the .db file
+      fs.copyFileSync(backupPath, targetDbPath);
+      
+      // Delete WAL and SHM files to avoid corruption when opening the copied db
+      if (fs.existsSync(targetDbPath + '-wal')) fs.unlinkSync(targetDbPath + '-wal');
+      if (fs.existsSync(targetDbPath + '-shm')) fs.unlinkSync(targetDbPath + '-shm');
+
+      // Restart the application to load the new database
+      app.relaunch();
+      app.exit(0);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('[Restaurar Error]', error);
+      return { success: false, error: error.message };
+    }
   });
 
   console.log('[IPC] Manejadores IPC registrados.');

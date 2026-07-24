@@ -63,4 +63,8 @@ contextBridge.exposeInMainWorld('api', {
   buscarClientesPanel: (termino) => ipcRenderer.invoke('buscar-clientes-panel', termino),
   getContratosCliente: (id) => ipcRenderer.invoke('get-contratos-cliente', id),
   getDetalleContrato: (id) => ipcRenderer.invoke('get-detalle-contrato', id),
+
+  // Backup
+  crearBackup: () => ipcRenderer.invoke('crear-backup'),
+  restaurarBackup: () => ipcRenderer.invoke('restaurar-backup'),
 });
