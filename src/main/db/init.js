@@ -6,7 +6,10 @@ function initDatabase() {
     CREATE TABLE IF NOT EXISTS CATEGORIA_HERRAMIENTA (
       id TEXT PRIMARY KEY NOT NULL,
       nombre TEXT NOT NULL,
-      descripcion TEXT
+      descripcion TEXT,
+      precio_minimo REAL CHECK (precio_minimo >= 0),
+      precio_mes REAL CHECK (precio_mes >= 0),
+      precio_venta REAL CHECK (precio_venta >= 0)
     );
 
     CREATE TABLE IF NOT EXISTS HERRAMIENTA (
@@ -15,6 +18,9 @@ function initDatabase() {
       nombre TEXT NOT NULL,
       descripcion TEXT,
       precio_dia REAL NOT NULL CHECK (precio_dia >= 0),
+      precio_minimo REAL CHECK (precio_minimo >= 0),
+      precio_mes REAL CHECK (precio_mes >= 0),
+      precio_venta REAL CHECK (precio_venta >= 0),
       mora_dia REAL NOT NULL CHECK (mora_dia >= 0),
       valor_reposicion REAL CHECK (valor_reposicion >= 0),
       estado TEXT NOT NULL CHECK (estado IN ('disponible', 'alquilado', 'mantenimiento', 'malogrado')),
@@ -28,6 +34,9 @@ function initDatabase() {
       nombre TEXT NOT NULL,
       condicion TEXT NOT NULL CHECK (condicion IN ('nuevo', 'usado')),
       precio_dia REAL NOT NULL CHECK (precio_dia >= 0),
+      precio_minimo REAL CHECK (precio_minimo >= 0),
+      precio_mes REAL CHECK (precio_mes >= 0),
+      precio_venta REAL CHECK (precio_venta >= 0),
       mora_dia REAL NOT NULL CHECK (mora_dia >= 0),
       cantidad_total INTEGER NOT NULL CHECK (cantidad_total >= 0),
       cantidad_disponible INTEGER NOT NULL CHECK (cantidad_disponible >= 0 AND cantidad_disponible <= cantidad_total),
@@ -90,6 +99,8 @@ function initDatabase() {
       mora_dia_aplicada REAL NOT NULL CHECK (mora_dia_aplicada >= 0),
       estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto')),
       fecha_devolucion_real TEXT,
+      fecha_devolucion_pactada_item TEXT,
+      total_item_snapshot REAL,
       FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
       FOREIGN KEY (id_herramienta) REFERENCES HERRAMIENTA(id),
       FOREIGN KEY (id_item_granel) REFERENCES ITEM_GRANEL(id),

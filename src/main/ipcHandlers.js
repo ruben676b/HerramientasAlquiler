@@ -50,8 +50,8 @@ function registerIpcHandlers() {
   ipcMain.handle('get-granel', () => {
     return db
       .prepare(
-        `SELECT id, nombre, condicion, precio_dia, mora_dia,
-                cantidad_total, cantidad_disponible
+        `SELECT id, nombre, condicion, precio_dia, mora_dia, precio_minimo, precio_mes,
+                 cantidad_total, cantidad_disponible
          FROM ITEM_GRANEL WHERE activo = 1 ORDER BY nombre, condicion`
       )
       .all();
@@ -60,7 +60,7 @@ function registerIpcHandlers() {
   ipcMain.handle('get-herramientas-disponibles', () => {
     return db
       .prepare(
-        `SELECT h.id, h.nombre, h.precio_dia, h.mora_dia,
+        `SELECT h.id, h.nombre, h.precio_dia, h.mora_dia, h.precio_minimo, h.precio_mes,
                 c.nombre AS categoria_nombre, c.id AS categoria_id
          FROM HERRAMIENTA h
          JOIN CATEGORIA_HERRAMIENTA c ON h.id_categoria = c.id

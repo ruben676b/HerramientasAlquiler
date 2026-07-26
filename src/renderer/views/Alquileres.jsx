@@ -151,11 +151,14 @@ export default function Alquileres() {
             const dias = Math.max(1, Math.ceil(
               (new Date(c.fecha_devolucion_pactada + 'T00:00:00') - new Date(c.fecha_salida + 'T00:00:00')) / 86400000
             ) + 1);
-            const montoBase = (c.subtotal_diario || 0) * dias;
+            const montoBase = c.total_contrato ? null : (c.subtotal_diario || 0) * dias; // fallback para contratos viejos
             const montoAtraso = c.total_atraso || 0;
-            const total = montoBase + montoAtraso + (c.deposito_monto || 0);
+            const total = (c.total_contrato || montoBase || 0) + montoAtraso;
             const pagado = c.total_pagado || 0;
+            const garantia = c.garantia_retenida || 0;
             const pendiente = Math.max(0, total - pagado);
+            const montoCobrar = Math.max(0, pendiente - garantia);
+            const montoDevolver = pendiente <= garantia ? Math.abs(pendiente - garantia) : 0;
             const pagos = c.pagos || [];
 
             let borderColor = 'var(--border)';
@@ -233,7 +236,7 @@ export default function Alquileres() {
                               </p>
                               {c.items?.map((item, idx) => {
                                 const esGranel = item.item_condicion;
-                                const sub = item.precio_dia_aplicado * dias * item.cantidad;
+                                const sub = (item.precio_dia_aplicado || 0) * (item.dias_item || dias) * (item.cantidad || 1);
                                 return (
                                   <div key={idx} className="space-y-0.5">
                                     <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
@@ -257,7 +260,7 @@ export default function Alquileres() {
                                     <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
                                       <span />
                                       <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                                        {esGranel ? item.item_condicion + ' \u00b7 ' : ''}S/ {item.precio_dia_aplicado.toFixed(2)}/d&iacute;a{esGranel ? ' c/u' : ''}
+                                        {esGranel ? (item.item_condicion || '') + ' \u00b7 ' : ''}S/ {(item.precio_dia_aplicado || 0).toFixed(2)}/d&iacute;a{esGranel ? ' c/u' : ''}
                                       </span>
                                     </div>
                                     {/* Estado del ítem — siempre visible */}
@@ -269,7 +272,7 @@ export default function Alquileres() {
                                         ),
                                       }}>
                                         {item.dias_atraso_item > 0 ? (
-                                          <>&#9888; Atraso {item.dias_atraso_item} d&iacute;a{item.dias_atraso_item !== 1 ? 's' : ''} (+S/ {item.monto_atraso_item.toFixed(2)})</>
+                                          <>&#9888; Atraso {item.dias_atraso_item || 0} d&iacute;a{(item.dias_atraso_item || 0) !== 1 ? 's' : ''} (+S/ {(item.monto_atraso_item || 0).toFixed(2)})</>
                                         ) : item.estado_devolucion !== 'pendiente' ? (
                                           <>&#10003; Devuelto a tiempo</>
                                         ) : (
@@ -294,7 +297,7 @@ export default function Alquileres() {
                             {/* Alquiler base */}
                             <div className="flex justify-between items-baseline text-xs">
                               <span style={{ color: 'var(--muted)' }}>Alquiler base ({dias} d&iacute;a{dias !== 1 ? 's' : ''})</span>
-                              <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {montoBase.toFixed(2)}</span>
+                              <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {(montoBase || 0).toFixed(2)}</span>
                             </div>
                             {/* Atraso */}
                             {montoAtraso > 0 && (
@@ -331,6 +334,30 @@ export default function Alquileres() {
                                 S/ {pendiente.toFixed(2)}
                               </span>
                             </div>
+                            {/* Garantía retenida */}
+                            {garantia > 0 && (
+                              <div className="flex justify-between items-baseline text-xs">
+                                <span style={{ color: 'var(--muted)' }}>Garant&iacute;a retenida</span>
+                                <span className="font-mono" style={{ color: 'var(--info)' }}>S/ {garantia.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {/* Monto a cobrar hoy */}
+                            {c.estado !== 'devuelto' && c.estado !== 'cancelado' && (
+                              <div className="flex justify-between items-baseline text-xs font-semibold mt-1" style={{ borderTop: '0.5px dashed var(--border)', paddingTop: 4 }}>
+                                <span style={{ color: 'var(--danger)' }}>MONTO A COBRAR HOY</span>
+                                <span className="font-mono tabular-nums" style={{ color: montoCobrar > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                                  S/ {montoCobrar.toFixed(2)}
+                                </span>
+                              </div>
+                            )}
+                            {montoDevolver > 0 && c.estado !== 'devuelto' && c.estado !== 'cancelado' && (
+                              <div className="flex justify-between items-baseline text-xs font-semibold">
+                                <span style={{ color: 'var(--success)' }}>A DEVOLVER DE GARANT&Iacute;A</span>
+                                <span className="font-mono tabular-nums" style={{ color: 'var(--success)' }}>
+                                  S/ {montoDevolver.toFixed(2)}
+                                </span>
+                              </div>
+                            )}
                           </div>
                           {pendiente > 0 && c.estado !== 'devuelto' && c.estado !== 'cancelado' && (
                             <div className="mb-3">

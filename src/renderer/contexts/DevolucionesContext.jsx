@@ -38,6 +38,7 @@ export function DevolucionesProvider({ children }) {
       items: contrato.items || [],
       subtotal_diario: contrato.subtotal_diario || 0,
       total_pagado: contrato.total_pagado || 0,
+      garantia_retenida: contrato.garantia_retenida || 0,
       deposito_monto: contrato.deposito_monto || 0,
       completada: false,
       createdAt: Date.now(),

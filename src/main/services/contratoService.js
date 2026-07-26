@@ -29,7 +29,7 @@ function crearContrato(
     throw new Error('El contrato debe contener al menos un ítem.');
   }
 
-  if (fechaDevolucionPactada <= fechaSalida) {
+  if (fechaDevolucionPactada < fechaSalida) {
     throw new Error('La fecha de devolución debe ser posterior a la fecha de salida.');
   }
 
@@ -63,8 +63,9 @@ function crearContrato(
     const insertDetalle = db.prepare(`
       INSERT INTO DETALLE_CONTRATO (
         id_contrato, tipo_item, id_herramienta, id_item_granel,
-        cantidad, precio_dia_aplicado, mora_dia_aplicada
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        cantidad, precio_dia_aplicado, mora_dia_aplicada,
+        fecha_devolucion_pactada_item, total_item_snapshot
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const resultado = insertContrato.run(
@@ -101,6 +102,7 @@ function crearContrato(
           );
         }
 
+        const fechaDevItem = item.fecha_devolucion_pactada || null;
         insertDetalle.run(
           idContrato,
           'individual',
@@ -108,7 +110,9 @@ function crearContrato(
           null,
           1,
           herramienta.precio_dia,
-          herramienta.mora_dia
+          herramienta.mora_dia,
+          fechaDevItem,
+          item.total_item_snapshot != null ? item.total_item_snapshot : null
         );
 
         db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(
@@ -140,6 +144,7 @@ function crearContrato(
           );
         }
 
+        const fechaDevItemG = item.fecha_devolucion_pactada || null;
         insertDetalle.run(
           idContrato,
           'granel',
@@ -147,7 +152,9 @@ function crearContrato(
           item.id_item_granel,
           item.cantidad,
           granel.precio_dia,
-          granel.mora_dia
+          granel.mora_dia,
+          fechaDevItemG,
+          item.total_item_snapshot != null ? item.total_item_snapshot : null
         );
 
         db.prepare(
@@ -299,7 +306,8 @@ function getContratos(filtros = {}) {
            cl.telefono AS cliente_telefono,
       (SELECT COUNT(*) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS total_items,
       (SELECT SUM(precio_dia_aplicado * cantidad) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS subtotal_diario,
-      (SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = c.id) AS total_pagado
+      (SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = c.id AND tipo NOT IN ('deposito', 'devolucion_deposito')) AS total_pagado,
+      (SELECT COALESCE(SUM(CASE WHEN tipo = 'deposito' THEN monto WHEN tipo = 'devolucion_deposito' THEN -monto END), 0) FROM PAGO WHERE id_contrato = c.id AND tipo IN ('deposito', 'devolucion_deposito')) AS garantia_retenida
     FROM CONTRATO c
     JOIN CLIENTE cl ON c.id_cliente = cl.id
     LEFT JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id
@@ -346,25 +354,33 @@ function getContratos(filtros = {}) {
       ORDER BY fecha_pago ASC
     `).all(c.id);
 
-    const fechaPactada = new Date(c.fecha_devolucion_pactada + 'T00:00:00');
     let total_atraso = 0;
     let max_dias_atraso = 0;
 
     const itemsConAtraso = items.map(item => {
-      // Fecha de referencia: si ya tiene devolución real, usar esa; si no, hoy
+      // Fecha pactada por ítem: si tiene fecha propia, usar esa; si no, la del contrato
+      const fechaDevItem = item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada;
+      const diasItem = Math.max(1, Math.ceil(
+        (new Date(fechaDevItem + 'T00:00:00') - new Date(c.fecha_salida + 'T00:00:00')) / 86400000
+      ) + 1);
+      const totalItem = diasItem * item.precio_dia_aplicado * item.cantidad;
+      // Fecha de referencia para atraso
+      const fechaPactadaItem = new Date(fechaDevItem + 'T00:00:00');
       const refDate = item.fecha_devolucion_real
         ? new Date(item.fecha_devolucion_real + 'T00:00:00')
         : new Date(hoy + 'T00:00:00');
-      const diasAtrasoItem = Math.max(0, Math.ceil((refDate - fechaPactada) / 86400000));
+      const diasAtrasoItem = Math.max(0, Math.ceil((refDate - fechaPactadaItem) / 86400000));
       const montoAtrasoItem = diasAtrasoItem * item.precio_dia_aplicado * item.cantidad;
 
       if (diasAtrasoItem > max_dias_atraso) max_dias_atraso = diasAtrasoItem;
       total_atraso += montoAtrasoItem;
 
-      return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem };
+      return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem, dias_item: diasItem, total_item: totalItem };
     });
 
-    return { ...c, items: itemsConAtraso, pagos, dias_atraso: max_dias_atraso, total_atraso };
+    const totalContrato = itemsConAtraso.reduce((a, i) => a + i.total_item, 0) + (c.deposito_monto || 0);
+
+    return { ...c, items: itemsConAtraso, pagos, dias_atraso: max_dias_atraso, total_atraso, total_contrato: totalContrato };
   });
 }
 

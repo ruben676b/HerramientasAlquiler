@@ -7,6 +7,13 @@ import { cn } from '../lib/utils';
 import SignaturePad from './SignaturePad';
 import Button from './ui/button';
 
+const fmtLocalDate = (d) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function MultiSessionModal() {
   const {
     sessions, isOpen, activeId, closeDialog,
@@ -175,7 +182,7 @@ function SessionForm({ session }) {
     setNombre(nuevoNombre);
     setTelefono(data.telefono || '');
     setFechaSalida(data.fechaSalida || new Date().toISOString().slice(0, 10));
-    setFechaDevolucion(data.fechaDevolucion || new Date(Date.now() + 86400000).toISOString().slice(0, 10));
+    setFechaDevolucionRaw(data.fechaDevolucion || fmtLocalDate(new Date()));
     setClienteSeleccionado(data.clienteSeleccionado || null);
     setItems(data.items || []);
     setStep(data.step || 0);
@@ -197,10 +204,14 @@ function SessionForm({ session }) {
   const [dni, setDni] = useState(saved.dni || '');
   const [nombre, setNombre] = useState(saved.nombre || '');
   const [telefono, setTelefono] = useState(saved.telefono || '');
-  const [fechaSalida, setFechaSalida] = useState(saved.fechaSalida || new Date().toISOString().slice(0, 10));
-  const [fechaDevolucion, setFechaDevolucion] = useState(
-    saved.fechaDevolucion || new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+  const [fechaSalida, setFechaSalida] = useState(saved.fechaSalida || fmtLocalDate(new Date()));
+  const [fechaDevolucion, setFechaDevolucionRaw] = useState(
+    saved.fechaDevolucion || fmtLocalDate(new Date())
   );
+  const setFechaDevolucion = (f) => {
+    setFechaDevolucionRaw(f);
+    setItems(prev => prev.map(item => ({ ...item, total_editado: undefined })));
+  };
   const [sugerenciasDni, setSugerenciasDni] = useState([]);
   const [sugerenciasNombre, setSugerenciasNombre] = useState([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState(saved.clienteSeleccionado || null);
@@ -216,6 +227,12 @@ function SessionForm({ session }) {
   const [equipoFoco, setEquipoFoco] = useState(false);
   const [equipoIndex, setEquipoIndex] = useState(-1);
   const [consultandoReniec, setConsultandoReniec] = useState(false);
+  const sumarDias = (fecha, n) => {
+    const d = new Date(fecha + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return fmtLocalDate(d);
+  };
+
   const [firmaBase64, setFirmaBase64] = useState(saved.firmaBase64 || null);
   const [clausulas, setClausulas] = useState('');
   const [pdfPreviewPath, setPdfPreviewPath] = useState(null);
@@ -225,9 +242,16 @@ function SessionForm({ session }) {
   const [depositoDni, setDepositoDni] = useState(saved.depositoDni || false);
   const [pagoMonto, setPagoMonto] = useState('');
   const [pagoMetodo, setPagoMetodo] = useState('efectivo');
+  const [garantias, setGarantias] = useState([]);
+  const [garantiaMonto, setGarantiaMonto] = useState('');
+  const [garantiaMetodo, setGarantiaMetodo] = useState('efectivo');
   const [todasHerramientas, setTodasHerramientas] = useState([]);
   const [granelCat, setGranelCat] = useState([]);
   const [items, setItems] = useState(saved.items || []);
+  const [totalEditando, setTotalEditando] = useState({});
+  const [cantEditando, setCantEditando] = useState({});
+  const inputTotalRefs = useRef({});
+  const inputCantRefs = useRef({});
 
   // Cargar cláusulas del contrato
   useEffect(() => {
@@ -323,7 +347,7 @@ function SessionForm({ session }) {
       toast(h.id + ' ya está agregada en este alquiler', 'warning');
       return;
     }
-    setItems([...items, { tipo: 'individual', id_herramienta: h.id, nombre: h.nombre, precio_dia: h.precio_dia, cantidad: 1 }]);
+    setItems([...items, { tipo: 'individual', id_herramienta: h.id, nombre: h.nombre, precio_dia: h.precio_dia, precio_minimo: h.precio_minimo, precio_mes: h.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion }]);
   };
 
   const agregarGranel = (g) => {
@@ -332,8 +356,12 @@ function SessionForm({ session }) {
     if (existente) {
       setItems(items.map((i) => i.id_item_granel === g.id ? { ...i, cantidad: i.cantidad + 1 } : i));
     } else {
-      setItems([...items, { tipo: 'granel', id_item_granel: g.id, nombre: g.nombre, condicion: g.condicion, precio_dia: g.precio_dia, cantidad: 1 }]);
+      setItems([...items, { tipo: 'granel', id_item_granel: g.id, nombre: g.nombre, condicion: g.condicion, precio_dia: g.precio_dia, precio_minimo: g.precio_minimo, precio_mes: g.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion }]);
     }
+  };
+
+  const cambiarFechaItem = (idx, fecha) => {
+    setItems(items.map((item, i) => i === idx ? { ...item, fecha_devolucion_item: fecha, total_editado: undefined } : item));
   };
 
   const quitarItem = (idx) => setItems(items.filter((_, i) => i !== idx));
@@ -343,8 +371,24 @@ function SessionForm({ session }) {
       if (i !== idx) return item;
       const max = item._maxDisponible || 999;
       const nueva = Math.max(1, Math.min(max, item.cantidad + delta));
-      return { ...item, cantidad: nueva };
+      return { ...item, cantidad: nueva, total_editado: undefined };
     }));
+  };
+
+  /* --- Inline editing de total --- */
+  const iniciarEdicionTotal = (idx) => {
+    setTotalEditando(p => ({ ...p, [idx]: true }));
+    setTimeout(() => inputTotalRefs.current[idx]?.select(), 60);
+  };
+
+  const finalizarEdicionTotal = (idx, raw) => {
+    const val = parseFloat(raw);
+    if (!isNaN(val) && val > 0) {
+      setItems(items.map((item, i) => i === idx ? { ...item, total_editado: val } : item));
+    } else {
+      setItems(items.map((item, i) => i === idx ? { ...item, total_editado: undefined } : item));
+    }
+    setTotalEditando(p => ({ ...p, [idx]: false }));
   };
 
   // Calcular máximo disponible por ítem granel (considerando otras sesiones)
@@ -394,7 +438,7 @@ function SessionForm({ session }) {
     setClienteSeleccionado(c);
     setDni(c.dni || '');
     setNombre(c.nombre || '');
-    setTelefono(c.telefono ? String(c.telefono) : '');
+    setTelefono(c.telefono && parseInt(c.telefono) > 0 ? String(c.telefono) : '');
     setSugerenciasDni([]);
     setSugerenciasNombre([]);
   };
@@ -404,7 +448,7 @@ function SessionForm({ session }) {
     if (step === 0) {
       if (!dni && !nombre) return setError('Ingrese el DNI o el nombre del cliente.');
       if (dni && dni.length !== 8) return setError('El DNI debe tener 8 dígitos.');
-      if (fechaDevolucion <= fechaSalida) return setError('La devolución debe ser posterior a la salida.');
+      if (fechaDevolucion < fechaSalida) return setError('La devolución debe ser posterior a la salida.');
     }
     if (step === 1 && items.length === 0) return setError('Agregue al menos un ítem al alquiler.');
     setStep(step + 1);
@@ -423,8 +467,31 @@ function SessionForm({ session }) {
 
   const quitarPago = (idx) => setPagos(pagos.filter((_, i) => i !== idx));
 
+  const agregarGarantia = () => {
+    const m = parseFloat(garantiaMonto);
+    if (!m || m <= 0) return setError('Ingrese un monto de garantía válido.');
+    setGarantias([...garantias, { metodo: garantiaMetodo, monto: m }]);
+    setGarantiaMonto('');
+    setError('');
+  };
+
+  const quitarGarantia = (idx) => setGarantias(garantias.filter((_, i) => i !== idx));
+
   const totalPagado = pagos.reduce((a, p) => a + p.monto, 0);
-  const totalEquipos = itemsConMaximo.reduce((a, i) => a + i.precio_dia * dias * i.cantidad, 0);
+  const itemsConDias = useMemo(() => {
+    return itemsConMaximo.map(item => {
+      const devDate = item.fecha_devolucion_item || fechaDevolucion;
+      const diasItem = Math.max(1, Math.ceil(
+        (new Date(devDate + 'T00:00:00') - new Date(fechaSalida + 'T00:00:00')) / 86400000
+      ) + 1);
+      return { ...item, dias_item: diasItem };
+    });
+  }, [itemsConMaximo, fechaSalida, fechaDevolucion]);
+
+  const totalEquipos = itemsConDias.reduce((a, item) => {
+    const usarMes = item.id_item_granel && item.usar_precio_mes && item.precio_mes != null;
+    return a + (usarMes ? item.precio_mes * item.cantidad : item.precio_dia * item.dias_item * item.cantidad);
+  }, 0);
   const pendiente = Math.max(0, totalEquipos - totalPagado);
   const guardar = async () => {
     if (!window.api) return;
@@ -444,16 +511,24 @@ function SessionForm({ session }) {
         fechaDevolucionPactada: fechaDevolucion,
         depositoMonto: 0, // Sin depósito monetario por ahora
         depositoDni: depositoDni ? 1 : 0,
-        items: itemsConMaximo.map(item => ({
+        items: itemsConDias.map(item => ({
           tipo_item: item.tipo,
           id_herramienta: item.id_herramienta || undefined,
           id_item_granel: item.id_item_granel || undefined,
           cantidad: item.cantidad || 1,
+          fecha_devolucion_pactada: item.fecha_devolucion_item || undefined,
+          total_item_snapshot: item.total_editado || undefined,
         })),
-        pagos: pagos.map(p => ({
-          ...p,
-          tipo: totalPagado >= totalEquipos ? 'saldo' : 'adelanto'
-        })),
+        pagos: [
+          ...pagos.map(p => ({
+            ...p,
+            tipo: totalPagado >= totalEquipos ? 'saldo' : 'adelanto'
+          })),
+          ...garantias.map(g => ({
+            ...g,
+            tipo: 'deposito'
+          })),
+        ],
       });
 
       const idContrato = resultado.idContrato;
@@ -546,7 +621,7 @@ function SessionForm({ session }) {
                           style={{ backgroundColor: c.en_lista_negra ? 'oklch(0.95 0.015 25)' : 'transparent' }}>
                           <span style={{ color: 'var(--ink)' }}>{c.nombre}</span>
                           <span className="font-mono" style={{ color: 'var(--muted)' }}>{c.dni}</span>
-                          {c.en_lista_negra && <span className="text-[9px] font-bold ml-1" style={{ color: 'var(--danger)' }}>LISTA NEGRA</span>}
+                          {c.en_lista_negra ? <span className="text-[9px] font-bold ml-1" style={{ color: 'var(--danger)' }}>LISTA NEGRA</span> : null}
                         </button>
                       ))}
                     </div>
@@ -604,13 +679,13 @@ function SessionForm({ session }) {
               )}
             </div>
 
-            {clienteSeleccionado?.en_lista_negra && (
+            {clienteSeleccionado?.en_lista_negra ? (
               <div className="px-3 py-2 rounded-lg text-xs flex items-center gap-2"
                 style={{ backgroundColor: 'oklch(0.95 0.02 25)', color: 'var(--danger)' }}>
                 <AlertTriangle size={13} className="shrink-0" />
                 <span>Este cliente está en lista negra. Verifique antes de continuar.</span>
               </div>
-            )}
+            ) : null}
 
             {/* Teléfono */}
             <div>
@@ -630,16 +705,39 @@ function SessionForm({ session }) {
                     className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
                 </div>
                 <div className="flex-1">
-                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--muted)' }}>Devolución</span>
+                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--muted)' }}>Devoluci&oacute;n sugerida</span>
                   <input type="date" value={fechaDevolucion} onChange={(e) => setFechaDevolucion(e.target.value)}
-                    className={inputCls} style={{ backgroundColor: 'var(--surface)', color: fechaDevolucion <= fechaSalida ? 'var(--danger)' : 'var(--ink)', borderColor: fechaDevolucion <= fechaSalida ? 'var(--danger)' : 'var(--border)' }} />
+                    className={inputCls} style={{ backgroundColor: 'var(--surface)', color: fechaDevolucion < fechaSalida ? 'var(--danger)' : 'var(--ink)', borderColor: fechaDevolucion < fechaSalida ? 'var(--danger)' : 'var(--border)' }} />
                 </div>
                 <div className="shrink-0 pt-5">
-                  <span className="inline-flex px-2.5 py-1.5 rounded-lg text-xs font-bold"
+                  <span className="inline-flex px-2 py-1 rounded-lg text-xs font-bold"
                     style={{ backgroundColor: 'var(--info)', color: '#fff' }}>
-                    {dias} día{dias !== 1 ? 's' : ''}
+                    {dias} d&iacute;a{dias !== 1 ? 's' : ''}
                   </span>
                 </div>
+              </div>
+              {/* Botones rápidos de duración */}
+              <div className="flex gap-1 mt-2">
+                {[
+                  { label: '1d', dias: 0 },
+                  { label: '3d', dias: 2 },
+                  { label: '1sem', dias: 6 },
+                  { label: '15d', dias: 14 },
+                  { label: '1mes', dias: 29 },
+                ].map(b => {
+                  const activo = fechaDevolucion === sumarDias(fechaSalida, b.dias);
+                  return (
+                    <button key={b.label} onClick={() => setFechaDevolucion(sumarDias(fechaSalida, b.dias))}
+                      className="flex-1 h-8 rounded-lg text-xs font-medium transition-all duration-150"
+                      style={{
+                        backgroundColor: activo ? 'var(--primary)' : 'var(--surface)',
+                        color: activo ? 'var(--primary-text)' : 'var(--muted)',
+                        border: !activo ? '0.5px solid var(--border)' : 'none',
+                      }}>
+                      {b.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -752,21 +850,35 @@ function SessionForm({ session }) {
                 </div>
               ) : (
                 <>
-                  {itemsConMaximo.map((item, idx) => {
-                    const sub = item.precio_dia * dias * item.cantidad;
+                  {itemsConDias.map((item, idx) => {
+                    const esGranel = !!item.id_item_granel;
+                    // Cálculo base según tarifa manual o automática
+                    let subCalc, refPrice, refLabel;
+                    const usarMes = esGranel && item.usar_precio_mes && item.precio_mes != null;
+                    if (usarMes) {
+                      refPrice = item.precio_mes;
+                      refLabel = 'mes c/u';
+                      subCalc = refPrice * item.cantidad;
+                    } else {
+                      refPrice = item.precio_dia || 0;
+                      refLabel = esGranel ? 'día c/u' : (item.dias_item >= 30 && item.precio_mes ? 'mes' : 'día');
+                      subCalc = refPrice * item.dias_item * item.cantidad;
+                    }
+                    const sub = item.total_editado != null ? item.total_editado : subCalc;
+                    const bajoMinimo = item.precio_minimo != null && sub < item.precio_minimo * (usarMes ? 1 : item.dias_item) * item.cantidad;
                     return (
-                      <div
+                      <div key={idx}
                         className="px-4 py-3 rounded-xl transition-colors duration-150 group"
                         style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg)' }}>
-                        {/* Línea 1: Identidad + Precio unitario + Total + días */}
-                        <div className="flex items-center gap-3">
+                        {/* Línea 1: Badge + Nombre + Quitar */}
+                        <div className="flex items-center gap-2">
                           {item.id_herramienta ? (
-                            <span className="inline-flex px-2.5 py-1 rounded-lg font-mono text-xs font-bold shrink-0"
+                            <span className="inline-flex px-2 py-0.5 rounded-lg font-mono text-xs font-bold shrink-0"
                               style={{ backgroundColor: 'oklch(0.53 0.135 55 / 0.10)', color: 'var(--primary)' }}>
                               {item.id_herramienta}
                             </span>
                           ) : (
-                            <span className="inline-flex px-2.5 py-1 rounded-lg text-xs font-medium shrink-0"
+                            <span className="inline-flex px-2 py-0.5 rounded-lg text-xs font-medium shrink-0"
                               style={{
                                 backgroundColor: item.condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)',
                                 color: item.condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)'
@@ -774,62 +886,140 @@ function SessionForm({ session }) {
                           )}
                           <span className="flex-1 text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>
                             {item.nombre}
-                            <span className="text-xs font-normal ml-1.5" style={{ color: 'var(--muted)' }}>
-                              · S/ {item.precio_dia.toFixed(2)}/día
-                            </span>
-                          </span>
-                          <span className="text-sm font-mono font-semibold shrink-0" style={{ color: 'var(--ink)' }}>S/ {sub.toFixed(2)}</span>
-                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0"
-                            style={{ backgroundColor: 'var(--info)', color: '#fff' }}>
-                            {dias}d
                           </span>
                           <button onClick={() => quitarItem(idx)}
                             className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-red-50 dark:hover:bg-red-950 shrink-0"
                             style={{ color: 'var(--muted)' }}><X size={14} /></button>
                         </div>
 
-                        {/* Línea 2: Solo para granel — controles de cantidad */}
-                        {item.tipo === 'granel' && (
-                          <div className="flex items-center gap-2 mt-1.5 ml-12 text-xs">
-                            <span className="inline-flex items-center gap-1">
-                              <button onClick={() => cambiarCantidad(idx, -1)}
-                                className="w-5 h-5 rounded flex items-center justify-center text-sm font-bold hover:bg-red-50 dark:hover:bg-red-950"
-                                style={{ color: 'var(--danger)' }}>−</button>
+                        {/* Línea 1b: Cantidad (solo granel) */}
+                        {esGranel && (
+                          <div className="flex items-center gap-2 mt-2 text-xs">
+                            <span style={{ color: 'var(--muted)' }}>Cantidad:</span>
+                            <button onClick={() => cambiarCantidad(idx, -1)}
+                              className="w-5 h-5 rounded flex items-center justify-center text-sm font-bold hover:bg-black/5"
+                              style={{ color: 'var(--muted)' }}>&#8722;</button>
+                            {cantEditando[idx] ? (
                               <input
-                                value={item.cantidad}
-                                onChange={(e) => {
-                                  const raw = e.target.value;
-                                  if (raw === '') {
-                                    setItems(items.map((it, i) => i === idx ? { ...it, cantidad: '' } : it));
-                                    return;
-                                  }
-                                  const v = parseInt(raw, 10);
-                                  if (!isNaN(v) && v > 0) {
-                                    setItems(items.map((it, i) => i === idx ? { ...it, cantidad: v } : it));
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  const v = parseInt(e.target.value, 10);
-                                  const max = item._maxDisponible || 999;
-                                  if (isNaN(v) || v < 1) {
-                                    setItems(items.map((it, i) => i === idx ? { ...it, cantidad: 1 } : it));
-                                  } else if (v > max) {
-                                    setItems(items.map((it, i) => i === idx ? { ...it, cantidad: max } : it));
-                                    toast('Ajustado al máximo disponible: ' + max, 'warning');
-                                  }
-                                }}
-                                className="w-12 h-6 rounded text-xs text-center font-mono border outline-none"
-                                style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
+                                ref={el => inputCantRefs.current[idx] = el}
+                                type="number" min="1"
+                                defaultValue={item.cantidad}
+                                onBlur={e => { const v = parseInt(e.target.value) || 1; setItems(items.map((it, i) => i === idx ? { ...it, cantidad: Math.max(1, v), total_editado: undefined } : it)); setCantEditando(p => ({ ...p, [idx]: false })); }}
+                                onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                                className="w-10 h-5 px-0.5 rounded text-xs text-center font-mono border"
+                                style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }}
+                                autoFocus
                               />
-                              <button
-                                onClick={() => cambiarCantidad(idx, 1)}
-                                disabled={item.cantidad >= (item._maxDisponible || 999)}
-                                className="w-5 h-5 rounded flex items-center justify-center text-sm font-bold hover:bg-green-50 dark:hover:bg-green-950 disabled:opacity-30"
-                                style={{ color: 'var(--success)' }}>+</button>
-                            </span>
-                            <span style={{ color: 'var(--muted)' }}>unidades</span>
+                            ) : (
+                              <span onClick={() => { setCantEditando(p => ({ ...p, [idx]: true })); setTimeout(() => inputCantRefs.current[idx]?.select(), 60); }}
+                                className="w-8 text-center font-mono text-sm font-semibold cursor-pointer px-0.5 rounded hover:bg-black/5"
+                                style={{ color: 'var(--ink)' }}>{item.cantidad}</span>
+                            )}
+                            <button onClick={() => cambiarCantidad(idx, 1)}
+                              className="w-5 h-5 rounded flex items-center justify-center text-sm font-bold hover:bg-black/5"
+                              style={{ color: 'var(--muted)' }}>+</button>
+                            <span className="text-[10px]" style={{ color: 'var(--faint)' }}>unid.</span>
                           </div>
                         )}
+
+                        {/* Línea 2: Fecha por ítem + botones rápidos */}
+                        <div className="flex items-center gap-2 mt-1.5 text-xs" style={{ color: 'var(--muted)' }}>
+                          <span>Desde: {new Date(fechaSalida + 'T00:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          <span style={{ color: 'var(--border)' }}>|</span>
+                          <span className="flex items-center gap-1">
+                            Hasta:
+                            <input type="date" value={item.fecha_devolucion_item || fechaDevolucion}
+                              onChange={(e) => cambiarFechaItem(idx, e.target.value)}
+                              className="h-6 px-1 rounded text-[10px] border"
+                              style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)', width: 120 }} />
+                          </span>
+                          {[
+                            { label: '1d', dias: 0 },
+                            { label: '1sem', dias: 6 },
+                            { label: '1mes', dias: 29 },
+                          ].map(b => {
+                            const fechaItem = item.fecha_devolucion_item || fechaDevolucion;
+                            const activo = fechaItem === sumarDias(fechaSalida, b.dias);
+                            return (
+                              <button key={b.label} onClick={() => cambiarFechaItem(idx, sumarDias(fechaSalida, b.dias))}
+                                className="h-5 px-1.5 rounded text-[9px] font-medium transition-all duration-150"
+                                style={{
+                                  backgroundColor: activo ? 'oklch(0.53 0.135 55)' : 'var(--surface)',
+                                  color: activo ? '#fff' : 'var(--muted)',
+                                  border: !activo ? '0.5px solid var(--border)' : 'none',
+                                }}>
+                                {b.label}
+                              </button>
+                            );
+                          })}
+                          <span className="font-medium" style={{ color: 'var(--info)' }}>
+                            ({item.dias_item} d&iacute;a{item.dias_item !== 1 ? 's' : ''})
+                          </span>
+                        </div>
+
+                        {/* Línea 3: Precio ref + toggle tarifa + Total editable */}
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                            Ref: S/ {refPrice.toFixed(2)}/{refLabel}
+                            {item.precio_minimo != null && (
+                              <> (Min: <span style={{ color: bajoMinimo ? 'var(--danger)' : 'var(--muted)' }}>S/ {(usarMes ? (item.precio_minimo || 0) * item.cantidad : (item.precio_minimo || 0) * item.dias_item * item.cantidad).toFixed(0)}</span>)</>
+                            )}
+                          </span>
+                          {/* Toggle día/mes solo para granel con precio_mes */}
+                          {esGranel && item.precio_mes != null && (
+                            <span className="flex gap-px rounded overflow-hidden border ml-1" style={{ borderColor: 'var(--border)' }}>
+                              <button onClick={() => { setItems(items.map((it, i) => i === idx ? { ...it, usar_precio_mes: false, total_editado: undefined } : it)); }}
+                                className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
+                                style={{
+                                  backgroundColor: !usarMes ? 'oklch(0.53 0.135 55)' : 'var(--bg)',
+                                  color: !usarMes ? '#fff' : 'var(--muted)',
+                                }}>día</button>
+                              <button onClick={() => { setItems(items.map((it, i) => i === idx ? { ...it, usar_precio_mes: true, total_editado: undefined } : it)); }}
+                                className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
+                                style={{
+                                  backgroundColor: usarMes ? 'oklch(0.53 0.135 55)' : 'var(--bg)',
+                                  color: usarMes ? '#fff' : 'var(--muted)',
+                                }}>mes</button>
+                            </span>
+                          )}
+                          <span style={{ color: 'var(--border)' }}>|</span>
+                          <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Total:</span>
+                          {totalEditando[idx] ? (
+                            <input
+                              ref={el => inputTotalRefs.current[idx] = el}
+                              type="number" step="0.01" min="0"
+                              defaultValue={sub}
+                              onBlur={e => finalizarEdicionTotal(idx, e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') finalizarEdicionTotal(idx, e.target.value); }}
+                              className="w-24 h-6 px-1 rounded text-xs border font-mono text-center"
+                              style={{
+                                backgroundColor: 'var(--surface)',
+                                color: 'var(--ink)',
+                                borderColor: bajoMinimo ? 'var(--danger)' : 'var(--success)',
+                                outline: `2px solid ${bajoMinimo ? 'var(--danger)' : 'var(--success)'}`,
+                              }}
+                              autoFocus
+                            />
+                          ) : (
+                            <span
+                              onClick={() => iniciarEdicionTotal(idx)}
+                              className="font-mono font-bold text-sm cursor-pointer px-1.5 py-0.5 rounded hover:bg-black/5"
+                              style={{ color: 'var(--ink)' }}>
+                              S/ {sub.toFixed(2)}
+                            </span>
+                          )}
+                          {item.total_editado != null && (() => {
+                            const baseCalc = (item.id_item_granel && item.usar_precio_mes && item.precio_mes != null)
+                              ? item.precio_mes * item.cantidad
+                              : item.precio_dia * item.dias_item * item.cantidad;
+                            const diff = item.total_editado - baseCalc;
+                            return diff !== 0 ? (
+                              <span className="text-[9px]" style={{ color: 'var(--danger)' }}>
+                                ({diff < 0 ? '\u2013S/ ' + Math.abs(diff).toFixed(0) : '+S/ ' + diff.toFixed(0)})
+                              </span>
+                            ) : null;
+                          })()}
+                        </div>
                       </div>
                     );
                   })}
@@ -838,10 +1028,13 @@ function SessionForm({ session }) {
                   <div className="flex items-center justify-between px-3 py-2 rounded-lg"
                     style={{ borderTop: '2px solid var(--border)', backgroundColor: 'transparent' }}>
                     <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
-                      {itemsConMaximo.length} ítem{itemsConMaximo.length !== 1 ? 's' : ''} por {dias} día{dias !== 1 ? 's' : ''} de alquiler
+                      {itemsConMaximo.length} ítem{itemsConMaximo.length !== 1 ? 's' : ''} (cada uno con su fecha)
                     </span>
                     <span className="text-sm font-mono font-bold" style={{ color: 'var(--ink)' }}>
-                      S/ {itemsConMaximo.reduce((a, i) => a + i.precio_dia * dias * i.cantidad, 0).toFixed(2)}
+                      S/ {itemsConDias.reduce((a, item) => {
+                        const usarMes = item.id_item_granel && item.usar_precio_mes && item.precio_mes != null;
+                        return a + (usarMes ? item.precio_mes * item.cantidad : item.precio_dia * item.dias_item * item.cantidad);
+                      }, 0).toFixed(2)}
                     </span>
                   </div>
                 </>
@@ -866,7 +1059,10 @@ function SessionForm({ session }) {
                       .replaceAll('[CLIENTE_NOMBRE]', nombre || '—')
                       .replaceAll('[CLIENTE_DNI]', dni || '—')
                       .replaceAll('[CLIENTE_DIRECCION]', '—')
-                      .replaceAll('[TOTAL]', 'S/ ' + itemsConMaximo.reduce((a, i) => a + i.precio_dia * dias * i.cantidad, 0).toFixed(2))
+                      .replaceAll('[TOTAL]', 'S/ ' + itemsConDias.reduce((a, item) => {
+                        const usarMes = item.id_item_granel && item.usar_precio_mes && item.precio_mes != null;
+                        return a + (usarMes ? item.precio_mes * item.cantidad : item.precio_dia * item.dias_item * item.cantidad);
+                      }, 0).toFixed(2))
                       .replaceAll('[FECHA_INICIO]', fechaSalida)
                       .replaceAll('[FECHA_DEVOLUCION]', fechaDevolucion)
                       .replaceAll('[DEPOSITO_TEXTO]', '')
@@ -893,11 +1089,14 @@ function SessionForm({ session }) {
                   onClick={async () => {
                     if (!window.api) return;
                     try {
-                      const total = itemsConMaximo.reduce((a, i) => a + i.precio_dia * dias * i.cantidad, 0);
+                      const total = itemsConDias.reduce((a, item) => {
+                        const usarMes = item.id_item_granel && item.usar_precio_mes && item.precio_mes != null;
+                        return a + (usarMes ? item.precio_mes * item.cantidad : item.precio_dia * item.dias_item * item.cantidad);
+                      }, 0);
                       const pdfPath = await window.api.generarPdfPreview({
                         arrendadora: { nombre: 'SOLEDAD SUPANTA QUISPE', dni: '72094861', ruc: '10720948619', direccion: 'Av. Los Pinos N° 348', telefono: '985618849' },
                         cliente: { nombre: nombre || '—', dni: dni || '—', telefono: telefono || '—', direccion: '' },
-                        items: itemsConMaximo.map(item => ({ codigo: item.id_herramienta || (item.nombre + ' (' + item.condicion + ')'), nombre: item.nombre, cantidad: item.cantidad, precio_dia: item.precio_dia, mora_dia: 0 })),
+                        items: itemsConDias.map(item => ({ codigo: item.id_herramienta || (item.nombre + ' (' + item.condicion + ')'), nombre: item.nombre, cantidad: item.cantidad, precio_dia: item.precio_dia, mora_dia: 0, fecha_devolucion_pactada: item.fecha_devolucion_item || fechaDevolucion })),
                         fechas: { salida: fechaSalida, devolucion: fechaDevolucion },
                         total, firmaBase64: firmaBase64 || null,
                       });
@@ -937,55 +1136,37 @@ function SessionForm({ session }) {
                       {telefono && <>Tel: {telefono}</>}
                     </p>
                   )}
-                  <hr style={{ borderColor: 'var(--border)', marginTop: 14, marginBottom: 14 }} />
-                  <div className="flex items-center justify-between">
-                    <span style={{ color: 'var(--ink)' }}>
-                      {(() => {
-                        const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-                        const fmt = (f) => { const p = f.split('-'); return p.length === 3 ? parseInt(p[2]) + ' ' + meses[parseInt(p[1])-1] + ' ' + p[0] : f; };
-                        return fmt(fechaSalida) + ' → ' + fmt(fechaDevolucion);
-                      })()}
-                    </span>
-                    <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold"
-                      style={{ backgroundColor: 'var(--info)', color: '#fff' }}>
-                      {dias} día{dias !== 1 ? 's' : ''}
-                    </span>
-                  </div>
                   <hr style={{ borderColor: 'var(--border)', marginTop: 14, marginBottom: 10 }} />
-                  <p className="text-[10px] uppercase tracking-wider font-medium mt-1 mb-3" style={{ color: 'var(--muted)' }}>Equipos y materiales</p>
-                  {itemsConMaximo.map((item, idx) => (
-                    <div key={idx}>
+                  <p className="text-[10px] uppercase tracking-wider font-medium mb-3" style={{ color: 'var(--muted)' }}>Equipos y materiales</p>
+                  {itemsConDias.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
                       {item.id_herramienta ? (
-                        <div className="flex items-start gap-2">
-                          <span className="w-[50px] shrink-0 flex justify-end">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
-                              style={{ backgroundColor: 'oklch(0.93 0.04 240)', color: 'var(--info)' }}>{item.id_herramienta}</span>
-                          </span>
-                          <span className="flex-1 text-[13px]" style={{ color: 'var(--ink)' }}>{item.nombre}</span>
-                          <span className="font-mono shrink-0 text-[13px]" style={{ color: 'var(--ink)' }}>S/ {(item.precio_dia * dias * item.cantidad).toFixed(2)}</span>
-                        </div>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
+                          style={{ backgroundColor: 'oklch(0.93 0.04 240)', color: 'var(--info)' }}>{item.id_herramienta}</span>
                       ) : (
-                        <div>
-                          <div className="flex items-start gap-2">
-                            <span className="w-[50px] shrink-0 flex justify-end">
-                              <span className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                                style={{ backgroundColor: item.condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)', color: item.condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)' }}>{item.condicion}</span>
-                            </span>
-                            <span className="flex-1 text-[13px]" style={{ color: 'var(--ink)' }}>{item.nombre} {item.condicion}</span>
-                            <span className="font-mono shrink-0 text-[13px]" style={{ color: 'var(--ink)' }}>S/ {(item.precio_dia * dias * item.cantidad).toFixed(2)}</span>
-                          </div>
-                          <div className="flex gap-2 mt-0.5">
-                            <span className="w-[50px] shrink-0" />
-                            <span className="flex-1 text-[11px]" style={{ color: 'var(--faint)' }}>×{item.cantidad} · S/ {item.precio_dia.toFixed(2)}/día</span>
-                          </div>
-                        </div>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                          style={{ backgroundColor: item.condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)', color: item.condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)' }}>{item.condicion}</span>
                       )}
+                      <span className="flex-1 text-[13px] truncate" style={{ color: 'var(--ink)' }}>
+                        {item.nombre}{item.id_item_granel ? ` x${item.cantidad}` : ''}
+                      </span>
+                      <span className="text-[10px] shrink-0" style={{ color: 'var(--info)' }}>
+                        ({item.dias_item} d&iacute;a{item.dias_item !== 1 ? 's' : ''})
+                      </span>
+                      <span className="font-mono shrink-0 text-[13px]" style={{ color: 'var(--ink)' }}>
+                        S/ {(item.total_editado || ((item.id_item_granel && item.usar_precio_mes && item.precio_mes != null)
+                          ? item.precio_mes * item.cantidad
+                          : item.precio_dia * item.dias_item * item.cantidad)).toFixed(2)}
+                      </span>
                     </div>
                   ))}
                   <hr style={{ borderColor: 'var(--border)', marginTop: 14, marginBottom: 10 }} />
                   <div className="flex justify-between items-baseline pt-1">
                     <span className="font-medium text-sm" style={{ color: 'var(--ink)' }}>Total</span>
-                    <span className="font-mono font-bold text-base" style={{ color: 'var(--success)' }}>S/ {itemsConMaximo.reduce((a, i) => a + i.precio_dia * dias * i.cantidad, 0).toFixed(2)}</span>
+                    <span className="font-mono font-bold text-base" style={{ color: 'var(--success)' }}>S/ {itemsConDias.reduce((a, item) => {
+                      const usarMes = item.id_item_granel && item.usar_precio_mes && item.precio_mes != null;
+                      return a + (usarMes ? item.precio_mes * item.cantidad : item.precio_dia * item.dias_item * item.cantidad);
+                    }, 0).toFixed(2)}</span>
                   </div>
                 </div>
                 {/* Sección de pago */}
@@ -1031,6 +1212,43 @@ function SessionForm({ session }) {
                       </div>
                     </div>
                   )}
+                  {/* Garantía monetaria */}
+                  <div className="rounded-lg border p-3 text-xs space-y-2" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}>
+                    <p className="font-medium" style={{ color: 'var(--ink)' }}>Garantía (opcional)</p>
+                    <div className="flex gap-1">
+                      {[
+                        { id: 'efectivo', color: 'oklch(0.55 0.13 155)', label: 'Efectivo' },
+                        { id: 'yape', color: 'oklch(0.48 0.14 330)', label: 'Yape' },
+                        { id: 'plin', color: 'oklch(0.55 0.12 240)', label: 'Plin' },
+                      ].map(m => (
+                        <button key={m.id} onClick={() => setGarantiaMetodo(m.id)}
+                          className="flex-1 h-7 rounded-lg text-[10px] font-medium transition-all duration-150"
+                          style={{ backgroundColor: garantiaMetodo === m.id ? m.color : 'var(--surface)', color: garantiaMetodo === m.id ? '#fff' : 'var(--muted)' }}>{m.label}</button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <label className="text-[10px] mb-0.5 block" style={{ color: 'var(--muted)' }}>Monto S/</label>
+                        <input type="number" step="0.01" min="0" value={garantiaMonto}
+                          onChange={e => setGarantiaMonto(e.target.value)}
+                          className="w-full h-7 px-2 rounded text-[11px] border" style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                      </div>
+                      <Button variant="secondary" size="sm" onClick={agregarGarantia} className="h-7 text-[10px]">Retener</Button>
+                    </div>
+                    {garantias.length > 0 && (
+                      <div className="space-y-0.5">
+                        {garantias.map((g, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-[11px] py-1 px-2 rounded" style={{ backgroundColor: 'var(--surface)' }}>
+                            <span className="capitalize" style={{ color: 'var(--ink)' }}>{g.metodo}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono" style={{ color: 'var(--ink)' }}>S/ {g.monto.toFixed(2)}</span>
+                              <button onClick={() => quitarGarantia(idx)} className="text-red-500 hover:text-red-700">✕</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

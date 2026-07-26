@@ -157,17 +157,25 @@ function getGranelAgrupado() {
   return Object.values(mapa);
 }
 
-function crearMaterial({ nombre, precio_nuevo, mora_nuevo, precio_usado, mora_usado }) {
+function crearMaterial({ nombre, precio_nuevo, precio_minimo_nuevo, precio_mes_nuevo, precio_venta_nuevo, mora_nuevo, precio_usado, precio_minimo_usado, precio_mes_usado, precio_venta_usado, mora_usado }) {
   if (!nombre) throw new Error('El nombre del material es obligatorio.');
 
   const insert = db.prepare(`
-    INSERT INTO ITEM_GRANEL (nombre, condicion, precio_dia, mora_dia, cantidad_total, cantidad_disponible)
-    VALUES (?, ?, ?, ?, 0, 0)
+    INSERT INTO ITEM_GRANEL (nombre, condicion, precio_dia, precio_minimo, precio_mes, precio_venta, mora_dia, cantidad_total, cantidad_disponible)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
   `);
 
   const tx = db.transaction(() => {
-    insert.run(nombre, 'nuevo', precio_nuevo || 0, mora_nuevo || 0);
-    insert.run(nombre, 'usado', precio_usado || 0, mora_usado || 0);
+    insert.run(nombre, 'nuevo', precio_nuevo || 0,
+      precio_minimo_nuevo != null ? precio_minimo_nuevo : null,
+      precio_mes_nuevo != null ? precio_mes_nuevo : null,
+      precio_venta_nuevo != null ? precio_venta_nuevo : null,
+      mora_nuevo || 0);
+    insert.run(nombre, 'usado', precio_usado || 0,
+      precio_minimo_usado != null ? precio_minimo_usado : null,
+      precio_mes_usado != null ? precio_mes_usado : null,
+      precio_venta_usado != null ? precio_venta_usado : null,
+      mora_usado || 0);
   });
   tx();
 
@@ -188,25 +196,35 @@ function agregarStockGranel(id, cantidad) {
   return { id, agregado: cantidad };
 }
 
-function editarGranelFull(nombreOriginal, { nombre, precio_nuevo, mora_nuevo, precio_usado, mora_usado }) {
+function editarGranelFull(nombreOriginal, { nombre, precio_nuevo, precio_minimo_nuevo, precio_mes_nuevo, precio_venta_nuevo, mora_nuevo, precio_usado, precio_minimo_usado, precio_mes_usado, precio_venta_usado, mora_usado }) {
   if (!nombre) throw new Error('El nombre es obligatorio.');
 
   const tx = db.transaction(() => {
     if (nombre !== nombreOriginal) {
       db.prepare('UPDATE ITEM_GRANEL SET nombre = ? WHERE nombre = ? AND activo = 1').run(nombre, nombreOriginal);
     }
-    if (precio_nuevo !== undefined) {
-      db.prepare('UPDATE ITEM_GRANEL SET precio_dia = ? WHERE nombre = ? AND condicion = ? AND activo = 1').run(precio_nuevo || 0, nombre, 'nuevo');
-    }
-    if (mora_nuevo !== undefined) {
-      db.prepare('UPDATE ITEM_GRANEL SET mora_dia = ? WHERE nombre = ? AND condicion = ? AND activo = 1').run(mora_nuevo || 0, nombre, 'nuevo');
-    }
-    if (precio_usado !== undefined) {
-      db.prepare('UPDATE ITEM_GRANEL SET precio_dia = ? WHERE nombre = ? AND condicion = ? AND activo = 1').run(precio_usado || 0, nombre, 'usado');
-    }
-    if (mora_usado !== undefined) {
-      db.prepare('UPDATE ITEM_GRANEL SET mora_dia = ? WHERE nombre = ? AND condicion = ? AND activo = 1').run(mora_usado || 0, nombre, 'usado');
-    }
+    const updateCond = (cond, fields) => {
+      const entries = Object.entries(fields).filter(([k, v]) => v !== undefined);
+      if (entries.length === 0) return;
+      const sql = 'UPDATE ITEM_GRANEL SET ' + entries.map(([k]) => k + ' = ?').join(', ') + ' WHERE nombre = ? AND condicion = ? AND activo = 1';
+      const params = entries.map(([, v]) => (v != null ? v : null));
+      params.push(nombre, cond);
+      db.prepare(sql).run(...params);
+    };
+    updateCond('nuevo', {
+      precio_dia: precio_nuevo,
+      precio_minimo: precio_minimo_nuevo,
+      precio_mes: precio_mes_nuevo,
+      precio_venta: precio_venta_nuevo,
+      mora_dia: mora_nuevo,
+    });
+    updateCond('usado', {
+      precio_dia: precio_usado,
+      precio_minimo: precio_minimo_usado,
+      precio_mes: precio_mes_usado,
+      precio_venta: precio_venta_usado,
+      mora_dia: mora_usado,
+    });
   });
   tx();
 
@@ -296,7 +314,7 @@ function crearCategoria({ nombre, descripcion }) {
    FAMILIAS — lote, unidades, edición masiva
    ================================================================ */
 
-function crearLote({ id_categoria, nombre, precio_dia, mora_dia, cantidad, descripcion }) {
+function crearLote({ id_categoria, nombre, precio_dia, precio_minimo, precio_mes, precio_venta, mora_dia, cantidad, descripcion }) {
   if (!id_categoria || !nombre || !cantidad || cantidad < 1) {
     throw new Error('Categoría, nombre y cantidad son obligatorios.');
   }
@@ -305,8 +323,15 @@ function crearLote({ id_categoria, nombre, precio_dia, mora_dia, cantidad, descr
   if (!cat) throw new Error('Categoría no encontrada: ' + id_categoria);
 
   // Guardar precios en la categoría para persistencia
-  db.prepare('UPDATE CATEGORIA_HERRAMIENTA SET nombre = ?, precio_dia = ?, mora_dia = ? WHERE id = ?')
-    .run(nombre, precio_dia || 0, mora_dia || 0, id_categoria);
+  db.prepare(`
+    UPDATE CATEGORIA_HERRAMIENTA
+    SET nombre = ?, precio_dia = ?, mora_dia = ?, precio_minimo = ?, precio_mes = ?, precio_venta = ?
+    WHERE id = ?
+  `).run(nombre, precio_dia || 0, mora_dia || 0,
+    precio_minimo != null ? precio_minimo : null,
+    precio_mes != null ? precio_mes : null,
+    precio_venta != null ? precio_venta : null,
+    id_categoria);
 
   const existentes = db
     .prepare("SELECT id FROM HERRAMIENTA WHERE id_categoria = ? AND id LIKE ? ORDER BY CAST(SUBSTR(id, INSTR(id, '-') + 1) AS INTEGER) DESC LIMIT 1")
@@ -319,8 +344,8 @@ function crearLote({ id_categoria, nombre, precio_dia, mora_dia, cantidad, descr
   }
 
   const insert = db.prepare(`
-    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, mora_dia, estado)
-    VALUES (?, ?, ?, ?, ?, ?, 'disponible')
+    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, precio_minimo, precio_mes, precio_venta, mora_dia, estado)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'disponible')
   `);
 
   const creadas = [];
@@ -328,7 +353,12 @@ function crearLote({ id_categoria, nombre, precio_dia, mora_dia, cantidad, descr
     for (let i = 0; i < cantidad; i++) {
       const num = String(inicio + i);
       const id = id_categoria + '-' + num;
-      insert.run(id, id_categoria, nombre, descripcion || null, precio_dia || 0, mora_dia || 0);
+      insert.run(id, id_categoria, nombre, descripcion || null,
+        precio_dia || 0,
+        precio_minimo != null ? precio_minimo : null,
+        precio_mes != null ? precio_mes : null,
+        precio_venta != null ? precio_venta : null,
+        mora_dia || 0);
       creadas.push(id);
     }
   });
@@ -375,42 +405,36 @@ function agregarUnidades(id_categoria, cantidad) {
   return { creadas, cantidad: creadas.length };
 }
 
-function editarFamilia(id_categoria, { nombre, precio_dia, mora_dia, descripcion, valor_reposicion }) {
+function editarFamilia(id_categoria, { nombre, precio_dia, precio_minimo, precio_mes, precio_venta, mora_dia, descripcion, valor_reposicion }) {
   const cat = db.prepare('SELECT * FROM CATEGORIA_HERRAMIENTA WHERE id = ?').get(id_categoria);
   if (!cat) throw new Error('Categoría no encontrada.');
 
-  const fields = [];
-  const params = [];
-  for (const [k, v] of Object.entries({ nombre, precio_dia, mora_dia, descripcion, valor_reposicion })) {
-    if (v !== undefined && v !== null && v !== '') {
-      fields.push(k + ' = ?');
-      params.push(v);
+  // Todos los campos editables, incluyendo nullables
+  const updates = {};
+  const POSSIBLE = ['nombre', 'precio_dia', 'precio_minimo', 'precio_mes', 'precio_venta', 'mora_dia', 'descripcion', 'valor_reposicion'];
+  for (const k of POSSIBLE) {
+    if (arguments[1][k] !== undefined) {
+      updates[k] = arguments[1][k];
     }
   }
 
-  if (fields.length > 0) {
+  if (Object.keys(updates).length > 0) {
     // Actualizar herramientas existentes
-    params.push(id_categoria);
-    db.prepare('UPDATE HERRAMIENTA SET ' + fields.join(', ') + ' WHERE id_categoria = ? AND activo = 1').run(...params);
+    const hFields = Object.keys(updates).map(k => k + ' = ?').join(', ');
+    const hParams = Object.values(updates);
+    hParams.push(id_categoria);
+    db.prepare('UPDATE HERRAMIENTA SET ' + hFields + ' WHERE id_categoria = ? AND activo = 1').run(...hParams);
 
-    // También actualizar la categoría (para cuando no hay unidades)
-    const catFields = [];
-    const catParams = [];
-    if (nombre !== undefined && nombre !== null && nombre !== '') {
-      catFields.push('nombre = ?');
-      catParams.push(nombre);
+    // Actualizar categoría (solo campos que aplican a categoría)
+    const catValues = {};
+    for (const k of ['nombre', 'precio_dia', 'mora_dia', 'precio_minimo', 'precio_mes', 'precio_venta']) {
+      if (updates[k] !== undefined) catValues[k] = updates[k];
     }
-    if (precio_dia !== undefined && precio_dia !== null) {
-      catFields.push('precio_dia = ?');
-      catParams.push(precio_dia);
-    }
-    if (mora_dia !== undefined && mora_dia !== null) {
-      catFields.push('mora_dia = ?');
-      catParams.push(mora_dia);
-    }
-    if (catFields.length > 0) {
-      catParams.push(id_categoria);
-      db.prepare('UPDATE CATEGORIA_HERRAMIENTA SET ' + catFields.join(', ') + ' WHERE id = ?').run(...catParams);
+    if (Object.keys(catValues).length > 0) {
+      const cFields = Object.keys(catValues).map(k => k + ' = ?').join(', ');
+      const cParams = Object.values(catValues);
+      cParams.push(id_categoria);
+      db.prepare('UPDATE CATEGORIA_HERRAMIENTA SET ' + cFields + ' WHERE id = ?').run(...cParams);
     }
   }
 
@@ -559,8 +583,11 @@ function getHerramientasPorCategoria() {
       total: herramientas.length,
       conteo,
       herramientas,
-      precio_dia: herramientas[0]?.precio_dia || cat.precio_dia || 0,
-      mora_dia: herramientas[0]?.mora_dia || cat.mora_dia || 0,
+      precio_dia: herramientas[0]?.precio_dia ?? cat.precio_dia ?? 0,
+      mora_dia: herramientas[0]?.mora_dia ?? cat.mora_dia ?? 0,
+      precio_minimo: herramientas[0]?.precio_minimo ?? cat.precio_minimo ?? null,
+      precio_mes: herramientas[0]?.precio_mes ?? cat.precio_mes ?? null,
+      precio_venta: herramientas[0]?.precio_venta ?? cat.precio_venta ?? null,
       nombre: herramientas[0]?.nombre || cat.nombre,
     };
   });

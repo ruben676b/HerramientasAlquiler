@@ -170,13 +170,32 @@ function DevolucionForm({ devolucion, onCompletada, closeDialog }) {
       });
 
       // Si se eligió "Cobrar y cerrar", registrar el pago automático
-      if (conCobro && saldoPendiente > 0) {
-        await window.api.registrarPago({
-          idContrato: devolucion.contrato_id,
-          monto: saldoPendiente,
-          metodo: 'efectivo',
-        });
-        toast('Pago de S/ ' + saldoPendiente.toFixed(2) + ' registrado automáticamente');
+      if (conCobro) {
+        const garantia = devolucion.garantia_retenida || 0;
+        const montoCobrar = Math.max(0, saldoPendiente - garantia);
+        const usarGarantia = Math.min(saldoPendiente, garantia);
+
+        if (usarGarantia > 0) {
+          // Registrar consumo de garantía como pago
+          await window.api.registrarPago({
+            idContrato: devolucion.contrato_id,
+            monto: usarGarantia,
+            metodo: 'efectivo',
+          });
+          // Registrar devolución de garantía usada
+          // (no se necesita, con registrar el pago tipo 'saldo' basta)
+        }
+
+        if (montoCobrar > 0) {
+          await window.api.registrarPago({
+            idContrato: devolucion.contrato_id,
+            monto: montoCobrar,
+            metodo: 'efectivo',
+          });
+          toast('Cobrado: S/ ' + montoCobrar.toFixed(2) + (usarGarantia > 0 ? ' (+ S/ ' + usarGarantia.toFixed(2) + ' de garantía)' : ''));
+        } else {
+          toast('Cubierto con garantía. Devolver S/ ' + Math.abs(saldoPendiente - garantia).toFixed(0) + ' al cliente.');
+        }
       }
 
       onCompletada(devolucion.id);
