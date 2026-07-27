@@ -43,6 +43,7 @@ const {
   getContratosCliente,
   getDetalleContrato,
 } = require('./services/clienteService');
+const { getResumenCaja } = require('./services/cajaService');
 
 function registerIpcHandlers() {
   // --- Catálogo ---
@@ -334,6 +335,11 @@ function registerIpcHandlers() {
 
   ipcMain.handle('get-detalle-contrato', (_e, idContrato) => {
     return getDetalleContrato(idContrato);
+  });
+
+  // --- Caja ---
+  ipcMain.handle('get-resumen-caja', (_e, fecha) => {
+    return getResumenCaja(fecha);
   });
 
   // --- Backup ---

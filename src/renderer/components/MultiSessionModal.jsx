@@ -317,7 +317,7 @@ function SessionForm({ session }) {
     if (!busquedaEquipo) return [];
     const q = busquedaEquipo.toLowerCase();
     const herr = todasHerramientas
-      .filter(h => h.id.toLowerCase().includes(q) || h.nombre.toLowerCase().includes(q) || h.id.replace('-', '').toLowerCase().includes(q))
+      .filter(h => (h.id || '').toLowerCase().includes(q) || (h.nombre || '').toLowerCase().includes(q) || (h.id || '').replace('-', '').toLowerCase().includes(q))
       .sort((a, b) => {
         if (a.estado === 'disponible' && b.estado !== 'disponible') return -1;
         if (b.estado === 'disponible' && a.estado !== 'disponible') return 1;
@@ -326,7 +326,7 @@ function SessionForm({ session }) {
       .slice(0, 8)
       .map(h => ({ ...h, _tipo: 'herramienta', _enLista: items.some(i => i.id_herramienta === h.id) }));
     const gran = granelCat
-      .filter(g => g.nombre.toLowerCase().includes(q))
+      .filter(g => (g.nombre || '').toLowerCase().includes(q))
       .slice(0, 8)
       .map(g => {
         const enLista = items.find(i => i.id_item_granel === g.id);
