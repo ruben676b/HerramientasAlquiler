@@ -35,6 +35,13 @@ const {
 } = require('./services/inventarioService');
 const { consultarDni } = require('./services/reniecService');
 const { generarPdf, guardarFirma, generarPdfDesdeDatos } = require('./services/contratoPdfService');
+const { guardarCalificacion } = require('./services/calificacionService');
+const {
+  getClientesConCalificacion,
+  buscarClientesConCalificacion,
+  getContratosCliente,
+  getDetalleContrato,
+} = require('./services/clienteService');
 
 function registerIpcHandlers() {
   // --- Catálogo ---
@@ -304,6 +311,28 @@ function registerIpcHandlers() {
 
   ipcMain.handle('get-herramientas-por-categoria', () => {
     return getHerramientasPorCategoria();
+  });
+
+  // --- Calificación de clientes ---
+  ipcMain.handle('guardar-calificacion', (_e, idContrato, estrellas, comentario) => {
+    return guardarCalificacion(idContrato, estrellas, comentario);
+  });
+
+  // --- Panel de clientes ---
+  ipcMain.handle('get-clientes-panel', () => {
+    return getClientesConCalificacion();
+  });
+
+  ipcMain.handle('buscar-clientes-panel', (_e, termino) => {
+    return buscarClientesConCalificacion(termino);
+  });
+
+  ipcMain.handle('get-contratos-cliente', (_e, idCliente) => {
+    return getContratosCliente(idCliente);
+  });
+
+  ipcMain.handle('get-detalle-contrato', (_e, idContrato) => {
+    return getDetalleContrato(idContrato);
   });
 
   console.log('[IPC] Manejadores IPC registrados.');

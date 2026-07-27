@@ -64,7 +64,7 @@ function consultarDni(dni) {
           } else if (json.code === '429') {
             reject(new Error('Límite de consultas excedido. Intente más tarde.'));
           } else if (json.code === '401') {
-            reject(new Error('Error de autenticación con RENIEC.'));
+            reject(new Error(`Error de autenticación con RENIEC. Servidor responde: ${json.mensaje || 'Token inválido o IP no autorizada'}`));
           } else {
             reject(new Error(json.mensaje || 'Error al consultar RENIEC.'));
           }
