@@ -169,7 +169,7 @@ const PASOS = [
 ];
 
 function SessionForm({ session }) {
-  const { updateSession, closeDialog, markSaved, loadFormData, saveFormData, sessions } = useSessions();
+  const { updateSession, closeDialog, markSaved, loadFormData, saveFormData, sessions, removeSession, setActiveId } = useSessions();
   const toast = useToast();
   const saved = loadFormData(session.id) || {};
 
@@ -546,9 +546,16 @@ function SessionForm({ session }) {
         toast('Contrato #' + idContrato + ' creado (sin PDF).', 'warning');
       }
 
-      markSaved(session.id);
+      removeSession(session.id);
       toast('Alquiler #' + idContrato + ' guardado correctamente');
       window.dispatchEvent(new CustomEvent('contrato-creado'));
+      
+      const remainingSessions = sessions.filter(s => !s.saved && s.id !== session.id);
+      if (remainingSessions.length === 0) {
+        closeDialog();
+      } else {
+        setActiveId(remainingSessions[0].id);
+      }
     } catch (e) {
       setError(e.message || 'Error al guardar contrato.');
     }
