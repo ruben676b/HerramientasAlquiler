@@ -548,6 +548,7 @@ function SessionForm({ session }) {
 
       markSaved(session.id);
       toast('Alquiler #' + idContrato + ' guardado correctamente');
+      window.dispatchEvent(new CustomEvent('contrato-creado'));
     } catch (e) {
       setError(e.message || 'Error al guardar contrato.');
     }

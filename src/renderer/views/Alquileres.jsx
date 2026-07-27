@@ -35,6 +35,7 @@ export default function Alquileres() {
   const [historialAbierto, setHistorialAbierto] = useState(null);
   const [devolucionActiva, setDevolucionActiva] = useState(null);
   const [addGarantiaId, setAddGarantiaId] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [garantiaMonto, setGarantiaMonto] = useState('');
   const [garantiaMetodo, setGarantiaMetodo] = useState('efectivo');
   const searchRef = useRef(null);
@@ -77,12 +78,19 @@ export default function Alquileres() {
     } catch (e) { setError(e.message); }
   };
 
-  useEffect(() => { cargar(); }, [busqueda, estadoFiltro]);
+  useEffect(() => { cargar(); }, [busqueda, estadoFiltro, refreshTrigger]);
 
   useEffect(() => {
+    const onContratoCreado = () => setRefreshTrigger(prev => prev + 1);
+    window.addEventListener('contrato-creado', onContratoCreado);
+    
     const onKey = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); searchRef.current?.focus(); } };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('contrato-creado', onContratoCreado);
+    };
   }, []);
 
   const conteo = useMemo(() => {
@@ -129,10 +137,12 @@ export default function Alquileres() {
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-medium" style={{ color: 'var(--ink)' }}>Alquileres</h1>
         <div className="flex gap-2">
-          <Button variant="primary" size="sm" style={{ backgroundColor: 'var(--success)', border: 'none' }}
-            onClick={() => openDialog('alquiler')}><Plus size={14} /> Alquilar</Button>
-          <Button variant="primary" size="sm" style={{ backgroundColor: 'var(--info)', border: 'none' }}
-            onClick={() => openDialog('reserva')}><Clock size={14} /> Reservar</Button>
+          <Button variant="success" size="sm" onClick={() => openDialog('alquiler')}>
+            <Plus size={14} /> Alquilar
+          </Button>
+          <Button variant="info" size="sm" onClick={() => openDialog('reserva')}>
+            <Clock size={14} /> Reservar
+          </Button>
         </div>
       </div>
 

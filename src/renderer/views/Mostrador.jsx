@@ -162,6 +162,7 @@ export default function Mostrador() {
       });
 
       setExito('Contrato #' + r.idContrato + ' emitido. Total: S/ ' + total.toFixed(2));
+      window.dispatchEvent(new CustomEvent('contrato-creado'));
 
       // Reset
       setCliente(null);

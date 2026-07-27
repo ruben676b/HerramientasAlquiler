@@ -26,6 +26,18 @@ const variants = {
     hoverBg: 'oklch(0.94 0.03 25)',
     hoverColor: 'var(--danger)',
   },
+  success: {
+    bg: 'var(--success)',
+    color: 'var(--primary-text)',
+    border: 'transparent',
+    hoverBg: 'color-mix(in srgb, var(--success), black 10%)',
+  },
+  info: {
+    bg: 'var(--info)',
+    color: 'var(--primary-text)',
+    border: 'transparent',
+    hoverBg: 'color-mix(in srgb, var(--info), black 10%)',
+  },
 };
 
 export default function Button({
