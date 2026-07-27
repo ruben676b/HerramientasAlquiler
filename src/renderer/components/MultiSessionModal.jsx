@@ -34,13 +34,16 @@ export default function MultiSessionModal() {
       onClick={closeDialog}
     >
       <div
-        className="m-auto w-[98vw] max-w-[1400px] h-[92vh] rounded-2xl flex overflow-hidden shadow-2xl"
+        className="m-auto w-[98vw] max-w-[1400px] h-[92vh] rounded-2xl flex overflow-hidden shadow-2xl relative"
         style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border)' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Botón cerrar global */}
-        <button onClick={closeDialog} className="absolute top-3 right-3 z-50 p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5"
-          style={{ color: 'var(--muted)' }}><X size={18} /></button>
+        <button onClick={closeDialog} 
+          className="absolute top-4 right-4 z-50 flex items-center justify-center w-8 h-8 rounded-full shadow-sm transition-all hover:scale-105"
+          style={{ backgroundColor: 'oklch(0.95 0.02 25)', color: 'var(--danger)', border: '1px solid oklch(0.90 0.03 25)' }}>
+          <X size={18} strokeWidth={2.5} />
+        </button>
 
         {/* ===== SIDEBAR DE SESIONES ===== */}
         <div
