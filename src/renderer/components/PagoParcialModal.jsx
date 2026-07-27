@@ -9,11 +9,15 @@ export default function PagoParcialModal({ contrato, onClose, onPagoRegistrado }
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
 
+  const garantia = contrato.garantia_retenida || 0;
   const METODOS = [
     { id: 'efectivo', label: 'Efectivo', color: 'oklch(0.55 0.13 155)' },
     { id: 'yape', label: 'Yape', color: 'oklch(0.48 0.14 330)' },
     { id: 'plin', label: 'Plin', color: 'oklch(0.55 0.12 240)' },
   ];
+  if (garantia > 0) {
+    METODOS.push({ id: 'garantia', label: 'Garant\u00eda (S/ ' + garantia.toFixed(0) + ')', color: 'oklch(0.53 0.135 55)' });
+  }
 
   const dias = Math.max(1, Math.ceil(
     (new Date(contrato.fecha_devolucion_pactada + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
@@ -33,12 +37,14 @@ export default function PagoParcialModal({ contrato, onClose, onPagoRegistrado }
     setGuardando(true);
     setError('');
     try {
+      const esGarantia = metodo === 'garantia';
       await window.api.registrarPago({
         idContrato: contrato.id,
         monto: m,
-        metodo,
+        metodo: esGarantia ? 'efectivo' : metodo,
+        tipo: esGarantia ? 'devolucion_deposito' : undefined,
       });
-      toast('Pago registrado: S/ ' + m.toFixed(2) + ' por ' + metodo);
+      toast('Pago registrado: S/ ' + m.toFixed(2) + (esGarantia ? ' (descontado de garantía)' : ' por ' + metodo));
       onPagoRegistrado();
     } catch (e) {
       setError(e.message || 'Error al registrar pago.');
@@ -106,12 +112,19 @@ export default function PagoParcialModal({ contrato, onClose, onPagoRegistrado }
 
           {pendiente > 0 && (
             <>
+              {/* Garantía info */}
+              {garantia > 0 && (
+                <div className="flex justify-between text-[11px] px-1">
+                  <span style={{ color: 'var(--muted)' }}>Garant&iacute;a disponible</span>
+                  <span className="font-mono" style={{ color: 'var(--info)' }}>S/ {garantia.toFixed(2)}</span>
+                </div>
+              )}
               {/* Metodo de pago */}
               <div>
                 <label className="text-[11px] font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>M&eacute;todo de pago</label>
                 <div className="flex gap-1">
                   {METODOS.map((m) => (
-                    <button key={m.id} onClick={() => setMetodo(m.id)}
+                    <button key={m.id} onClick={() => { setMetodo(m.id); if (m.id === 'garantia') setMonto(pendiente.toFixed(2)); }}
                       className="flex-1 h-9 rounded-lg text-xs font-medium transition-all duration-150"
                       style={{
                         backgroundColor: metodo === m.id ? m.color : 'var(--surface)',

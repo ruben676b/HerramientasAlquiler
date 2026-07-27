@@ -306,7 +306,7 @@ function getContratos(filtros = {}) {
            cl.telefono AS cliente_telefono,
       (SELECT COUNT(*) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS total_items,
       (SELECT SUM(precio_dia_aplicado * cantidad) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS subtotal_diario,
-      (SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = c.id AND tipo NOT IN ('deposito', 'devolucion_deposito')) AS total_pagado,
+      (SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = c.id AND tipo != 'deposito') AS total_pagado,
       (SELECT COALESCE(SUM(CASE WHEN tipo = 'deposito' THEN monto WHEN tipo = 'devolucion_deposito' THEN -monto END), 0) FROM PAGO WHERE id_contrato = c.id AND tipo IN ('deposito', 'devolucion_deposito')) AS garantia_retenida
     FROM CONTRATO c
     JOIN CLIENTE cl ON c.id_cliente = cl.id
@@ -392,7 +392,7 @@ function getContratos(filtros = {}) {
  * @param {string} metodo - efectivo | yape | plin
  * @returns {{ id: number, monto: number, metodo: string }}
  */
-function registrarPagoAdicional(idContrato, monto, metodo) {
+function registrarPagoAdicional(idContrato, monto, metodo, tipo) {
   if (!idContrato || !monto || monto <= 0) {
     throw new Error('Datos de pago inválidos.');
   }
@@ -405,8 +405,8 @@ function registrarPagoAdicional(idContrato, monto, metodo) {
 
   const result = db.prepare(`
     INSERT INTO PAGO (id_contrato, monto, metodo, tipo)
-    VALUES (?, ?, ?, 'saldo')
-  `).run(idContrato, monto, metodo);
+    VALUES (?, ?, ?, ?)
+  `).run(idContrato, monto, metodo, tipo || 'saldo');
 
   return { id: result.lastInsertRowid, monto, metodo };
 }

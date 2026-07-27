@@ -6,9 +6,9 @@ import {
 import { SEMANTIC } from '../lib/constants';
 import Button from '../components/ui/button';
 import { useSessions } from '../contexts/SessionsContext';
-import { useDevoluciones } from '../contexts/DevolucionesContext';
 import { useToast } from '../components/Toast';
 import PagoParcialModal from '../components/PagoParcialModal';
+import DevolucionInline from '../components/DevolucionInline';
 
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 
@@ -33,9 +33,12 @@ export default function Alquileres() {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
   const [pagoModalContrato, setPagoModalContrato] = useState(null);
   const [historialAbierto, setHistorialAbierto] = useState(null);
+  const [devolucionActiva, setDevolucionActiva] = useState(null);
+  const [addGarantiaId, setAddGarantiaId] = useState(null);
+  const [garantiaMonto, setGarantiaMonto] = useState('');
+  const [garantiaMetodo, setGarantiaMetodo] = useState('efectivo');
   const searchRef = useRef(null);
   const { openDialog } = useSessions();
-  const { openDialog: openDevolucion } = useDevoluciones();
   const toast = useToast();
 
   const cargar = async () => {
@@ -53,6 +56,24 @@ export default function Alquileres() {
     try {
       const c = await window.api.getContratos({ busqueda, estado: estadoFiltro });
       setContratos(c);
+    } catch (e) { setError(e.message); }
+  };
+
+  const handleAddGarantia = async () => {
+    if (!window.api || !addGarantiaId) return;
+    const m = parseFloat(garantiaMonto);
+    if (!m || m <= 0) return;
+    try {
+      await window.api.registrarPago({
+        idContrato: addGarantiaId,
+        monto: m,
+        metodo: garantiaMetodo,
+        tipo: 'deposito',
+      });
+      setAddGarantiaId(null);
+      setGarantiaMonto('');
+      toast('Garantía registrada: S/ ' + m.toFixed(2));
+      recargar();
     } catch (e) { setError(e.message); }
   };
 
@@ -78,6 +99,14 @@ export default function Alquileres() {
   const toggleExpand = (id) => setExpandido(prev => prev === id ? null : id);
 
   return (
+    <><style>{`
+      .dev-nospin::-webkit-inner-spin-button,
+      .dev-nospin::-webkit-outer-spin-button {
+        -webkit-appearance: none !important;
+        margin: 0 !important;
+      }
+      .dev-nospin { -moz-appearance: textfield !important; }
+    `}</style>
     <div className="p-6 max-w-5xl mx-auto space-y-4">
       {atrasados.length > 0 && (
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm"
@@ -151,9 +180,9 @@ export default function Alquileres() {
             const dias = Math.max(1, Math.ceil(
               (new Date(c.fecha_devolucion_pactada + 'T00:00:00') - new Date(c.fecha_salida + 'T00:00:00')) / 86400000
             ) + 1);
-            const montoBase = c.total_contrato ? null : (c.subtotal_diario || 0) * dias; // fallback para contratos viejos
+            const montoBase = c.total_contrato ? c.total_contrato : (c.subtotal_diario || 0) * dias; // fallback para contratos viejos
             const montoAtraso = c.total_atraso || 0;
-            const total = (c.total_contrato || montoBase || 0) + montoAtraso;
+            const total = montoBase + montoAtraso;
             const pagado = c.total_pagado || 0;
             const garantia = c.garantia_retenida || 0;
             const pendiente = Math.max(0, total - pagado);
@@ -174,7 +203,7 @@ export default function Alquileres() {
                     <div className="flex items-baseline gap-2 min-w-0">
                       <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>{c.cliente_nombre}</p>
                       {c.cliente_telefono && (
-                        <span className="text-[11px] shrink-0" style={{ color: 'var(--faint)' }}>{c.cliente_telefono}</span>
+                        <span className="text-[11px] shrink-0" style={{ color: 'var(--muted)' }}>{c.cliente_telefono}</span>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 text-xs mt-1 flex-wrap">
@@ -184,10 +213,6 @@ export default function Alquileres() {
                           DNI {c.cliente_dni}
                         </span>
                       )}
-                      <span className="px-2 py-0.5 rounded-[10px] text-[11px] font-semibold"
-                        style={{ backgroundColor: 'oklch(0.53 0.135 55)', color: '#fff' }}>
-                        {dias} d&iacute;a{dias !== 1 ? 's' : ''}
-                      </span>
                       <span className="px-1.5 py-0.5 rounded text-[11px]"
                         style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)' }}>
                         {fmtFechaCorta(c.fecha_salida)} &mdash; {fmtFecha(c.fecha_devolucion_pactada)}
@@ -217,7 +242,10 @@ export default function Alquileres() {
                 <div style={{ display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', transition: 'grid-template-rows 0.25s ease' }}>
                   <div style={{ overflow: 'hidden' }}>
                     <div style={{ borderTop: '0.5px solid var(--border)', backgroundColor: 'var(--surface)' }}>
-
+                      {devolucionActiva === c.id ? (
+                        <DevolucionInline contrato={c} onClose={() => setDevolucionActiva(null)} onRecargar={recargar} />
+                      ) : (
+                      <>
                       {/* ===== FILA: EQUIPOS + CAJA ===== */}
                       <div className="grid grid-cols-[3fr_2fr] min-h-0">
 
@@ -263,7 +291,7 @@ export default function Alquileres() {
                                         {esGranel ? (item.item_condicion || '') + ' \u00b7 ' : ''}S/ {(item.precio_dia_aplicado || 0).toFixed(2)}/d&iacute;a{esGranel ? ' c/u' : ''}
                                       </span>
                                     </div>
-                                    {/* Estado del ítem — siempre visible */}
+                                     {/* Estado del ítem — siempre visible */}
                                     <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
                                       <span />
                                       <span className="text-[11px] flex items-center gap-1" style={{
@@ -273,10 +301,11 @@ export default function Alquileres() {
                                       }}>
                                         {item.dias_atraso_item > 0 ? (
                                           <>&#9888; Atraso {item.dias_atraso_item || 0} d&iacute;a{(item.dias_atraso_item || 0) !== 1 ? 's' : ''} (+S/ {(item.monto_atraso_item || 0).toFixed(2)})</>
-                                        ) : item.estado_devolucion !== 'pendiente' ? (
-                                          <>&#10003; Devuelto a tiempo</>
                                         ) : (
-                                          <>En plazo</>
+                                          <>{item.estado_devolucion !== 'pendiente' ? '\u2713' : ''} {item.dias_item || 0} d&iacute;a{(item.dias_item || 0) !== 1 ? 's' : ''} de alquiler</>
+                                        )}
+                                        {item.estado_devolucion !== 'pendiente' && item.dias_atraso_item <= 0 && (
+                                          <>&nbsp;\u2014 Devuelto</>
                                         )}
                                       </span>
                                     </div>
@@ -334,28 +363,41 @@ export default function Alquileres() {
                                 S/ {pendiente.toFixed(2)}
                               </span>
                             </div>
-                            {/* Garantía retenida */}
-                            {garantia > 0 && (
-                              <div className="flex justify-between items-baseline text-xs">
-                                <span style={{ color: 'var(--muted)' }}>Garant&iacute;a retenida</span>
-                                <span className="font-mono" style={{ color: 'var(--info)' }}>S/ {garantia.toFixed(2)}</span>
+                            {/* Garantía + botón añadir */}
+                            <div className="flex justify-between items-baseline text-xs">
+                              <span style={{ color: 'var(--muted)' }}>
+                                {garantia > 0 ? 'Garantía disponible' : 'Sin garantía'}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                {garantia > 0 && <span className="font-mono" style={{ color: 'var(--info)' }}>S/ {garantia.toFixed(2)}</span>}
+                                <button onClick={() => setAddGarantiaId(addGarantiaId === c.id ? null : c.id)}
+                                  className="text-[11px] underline font-medium hover:opacity-70 shrink-0"
+                                  style={{ color: 'var(--muted)' }}>
+                                  + {garantia > 0 ? 'Añadir' : 'Registrar garantía'}
+                                </button>
                               </div>
-                            )}
-                            {/* Monto a cobrar hoy */}
-                            {c.estado !== 'devuelto' && c.estado !== 'cancelado' && (
-                              <div className="flex justify-between items-baseline text-xs font-semibold mt-1" style={{ borderTop: '0.5px dashed var(--border)', paddingTop: 4 }}>
-                                <span style={{ color: 'var(--danger)' }}>MONTO A COBRAR HOY</span>
-                                <span className="font-mono tabular-nums" style={{ color: montoCobrar > 0 ? 'var(--danger)' : 'var(--success)' }}>
-                                  S/ {montoCobrar.toFixed(2)}
-                                </span>
-                              </div>
-                            )}
-                            {montoDevolver > 0 && c.estado !== 'devuelto' && c.estado !== 'cancelado' && (
-                              <div className="flex justify-between items-baseline text-xs font-semibold">
-                                <span style={{ color: 'var(--success)' }}>A DEVOLVER DE GARANT&Iacute;A</span>
-                                <span className="font-mono tabular-nums" style={{ color: 'var(--success)' }}>
-                                  S/ {montoDevolver.toFixed(2)}
-                                </span>
+                            </div>
+                            {/* Formulario inline */}
+                            {addGarantiaId === c.id && (
+                              <div className="flex items-center gap-1 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
+                                {['efectivo','yape','plin'].map(m => (
+                                  <button key={m} onClick={() => setGarantiaMetodo(m)}
+                                    className="h-6 px-1.5 rounded text-[9px] font-medium transition-all duration-150"
+                                    style={{
+                                      backgroundColor: garantiaMetodo === m ? 'oklch(0.55 0.13 155)' : 'var(--surface)',
+                                      color: garantiaMetodo === m ? '#fff' : 'var(--muted)',
+                                      border: '0.5px solid var(--border)',
+                                    }}>{m}</button>
+                                ))}
+                                <input type="number" step="1" min="1" value={garantiaMonto}
+                                  placeholder="S/"
+                                  onChange={e => setGarantiaMonto(e.target.value)}
+                                  onKeyDown={e => { if (e.key === 'Enter') handleAddGarantia(); }}
+                                  className="w-16 h-6 px-1 rounded text-[10px] border font-mono text-center dev-nospin"
+                                  style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                                <button onClick={handleAddGarantia}
+                                  className="h-6 px-2 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97]"
+                                  style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}>+</button>
                               </div>
                             )}
                           </div>
@@ -392,8 +434,15 @@ export default function Alquileres() {
                                   <p className="pt-1.5 text-[11px]" style={{ color: 'var(--faint)' }}>Sin pagos registrados</p>
                                 ) : (
                                   pagos.map((p, idx) => {
-                                    const colorMetodo = p.metodo === 'efectivo' ? 'oklch(0.55 0.13 155)' :
+                                    const esDeposito = p.tipo === 'deposito';
+                                    const esDevolucionDeposito = p.tipo === 'devolucion_deposito';
+                                    const colorMetodo = esDeposito ? 'oklch(0.55 0.12 70)' :
+                                      esDevolucionDeposito ? 'var(--danger)' :
+                                      p.metodo === 'efectivo' ? 'oklch(0.55 0.13 155)' :
                                       p.metodo === 'yape' ? 'oklch(0.48 0.14 330)' : 'oklch(0.55 0.12 240)';
+                                    const labelMetodo = esDeposito ? 'Garantía +' :
+                                      esDevolucionDeposito ? 'Garantía −' :
+                                      p.metodo;
                                     return (
                                       <div key={idx} className="flex items-center gap-2 pt-1.5 text-[11px]">
                                         <span className="shrink-0" style={{ color: 'var(--faint)' }}>{p.fecha_pago?.slice(5, 10) || '—'}</span>
@@ -402,7 +451,7 @@ export default function Alquileres() {
                                         </span>
                                         <span className="px-1.5 py-0.5 rounded-[10px] text-[9px] font-medium capitalize"
                                           style={{ backgroundColor: colorMetodo + '20', color: colorMetodo }}>
-                                          {p.metodo}
+                                          {labelMetodo}
                                         </span>
                                       </div>
                                     );
@@ -436,17 +485,17 @@ export default function Alquileres() {
                           <FileText size={12} /> Ver contrato
                         </button>
                         <button
-                          onClick={() => openDevolucion(c)}
+                          onClick={() => setDevolucionActiva(devolucionActiva === c.id ? null : c.id)}
                           className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
-                          style={{ backgroundColor: 'oklch(0.53 0.135 55)', color: '#fff', border: 'none' }}
-                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.43 0.14 55)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.53 0.135 55)'; }}
+                          style={{ backgroundColor: devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)', color: '#fff', border: 'none' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = devolucionActiva === c.id ? 'oklch(0.40 0.14 25)' : 'oklch(0.43 0.14 55)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)'; }}
                         >
-                          {pendiente > 0 && <AlertTriangle size={12} />}
-                          Devolucion{pendiente > 0 ? ' (con deuda)' : ''} <ArrowRight size={12} />
+                          {devolucionActiva === c.id ? <X size={12} /> : (pendiente > 0 && <AlertTriangle size={12} />)}
+                          {devolucionActiva === c.id ? 'Cancelar devolución' : 'Devolución' + (pendiente > 0 ? ' (con deuda)' : '')} <ArrowRight size={12} />
                         </button>
                       </div>
-
+                      </>)}
                     </div>
                   </div>
                 </div>
@@ -481,5 +530,6 @@ export default function Alquileres() {
         </div>
       )}
     </div>
+    </>
   );
 }

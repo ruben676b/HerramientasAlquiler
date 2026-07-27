@@ -1125,129 +1125,168 @@ function SessionForm({ session }) {
                 </div>
               </div>
 
-              {/* COLUMNA DERECHA: Resumen + Firma */}
+              {/* COLUMNA DERECHA: Recibo + Dinero */}
               <div className="flex flex-col space-y-2 overflow-y-auto">
-                <div className="rounded-lg border p-3 text-xs space-y-1" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
-                  <p className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{nombre || 'Cliente'}</p>
-                  {(dni || telefono) && (
-                    <p style={{ color: 'var(--muted)' }}>
-                      {dni && <>DNI {dni}</>}
-                      {dni && telefono && ' · '}
-                      {telefono && <>Tel: {telefono}</>}
-                    </p>
-                  )}
-                  <hr style={{ borderColor: 'var(--border)', marginTop: 14, marginBottom: 10 }} />
-                  <p className="text-[10px] uppercase tracking-wider font-medium mb-3" style={{ color: 'var(--muted)' }}>Equipos y materiales</p>
-                  {itemsConDias.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      {item.id_herramienta ? (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
-                          style={{ backgroundColor: 'oklch(0.93 0.04 240)', color: 'var(--info)' }}>{item.id_herramienta}</span>
-                      ) : (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                          style={{ backgroundColor: item.condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)', color: item.condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)' }}>{item.condicion}</span>
-                      )}
-                      <span className="flex-1 text-[13px] truncate" style={{ color: 'var(--ink)' }}>
-                        {item.nombre}{item.id_item_granel ? ` x${item.cantidad}` : ''}
-                      </span>
-                      <span className="text-[10px] shrink-0" style={{ color: 'var(--info)' }}>
-                        ({item.dias_item} d&iacute;a{item.dias_item !== 1 ? 's' : ''})
-                      </span>
-                      <span className="font-mono shrink-0 text-[13px]" style={{ color: 'var(--ink)' }}>
-                        S/ {(item.total_editado || ((item.id_item_granel && item.usar_precio_mes && item.precio_mes != null)
+                {/* Bloque 1: Cliente compacto */}
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-lg shrink-0">&#128100;</span>
+                  <div>
+                    <p className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{nombre || 'Cliente'}</p>
+                    {dni && <p className="text-[11px]" style={{ color: 'var(--muted)' }}>DNI {dni}</p>}
+                  </div>
+                </div>
+
+                {/* Bloque 2: El Recibo */}
+                <div className="rounded-lg border p-3 text-xs" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
+                  {itemsConDias.length === 0 ? (
+                    <p style={{ color: 'var(--faint)' }}>Sin equipos</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {itemsConDias.map((item, idx) => {
+                        const subItem = item.total_editado || ((item.id_item_granel && item.usar_precio_mes && item.precio_mes != null)
                           ? item.precio_mes * item.cantidad
-                          : item.precio_dia * item.dias_item * item.cantidad)).toFixed(2)}
-                      </span>
+                          : item.precio_dia * item.dias_item * item.cantidad);
+                        return (
+                          <div key={idx} className="flex items-center gap-2">
+                            <span className="font-mono text-[9px] shrink-0" style={{ color: 'var(--info)' }}>
+                              {item.id_herramienta || item.condicion}
+                            </span>
+                            <span className="flex-1 truncate text-[12px]" style={{ color: 'var(--ink)' }}>
+                              {item.nombre}{item.id_item_granel ? ` x${item.cantidad}` : ''}
+                              <span className="text-[10px] ml-1" style={{ color: 'var(--info)' }}>
+                                ({item.dias_item} d&iacute;a{item.dias_item !== 1 ? 's' : ''})
+                              </span>
+                            </span>
+                            <span className="font-mono shrink-0 text-[12px]" style={{ color: 'var(--ink)' }}>
+                              S/ {subItem.toFixed(2)}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                  <hr style={{ borderColor: 'var(--border)', marginTop: 14, marginBottom: 10 }} />
-                  <div className="flex justify-between items-baseline pt-1">
-                    <span className="font-medium text-sm" style={{ color: 'var(--ink)' }}>Total</span>
-                    <span className="font-mono font-bold text-base" style={{ color: 'var(--success)' }}>S/ {itemsConDias.reduce((a, item) => {
+                  )}
+                  <hr style={{ borderColor: 'var(--border)', marginTop: 8, marginBottom: 6 }} />
+                  <div className="flex justify-between items-baseline">
+                    <span className="font-bold text-sm" style={{ color: 'var(--ink)' }}>TOTAL</span>
+                    <span className="font-mono font-bold text-sm" style={{ color: 'var(--success)' }}>S/ {itemsConDias.reduce((a, item) => {
                       const usarMes = item.id_item_granel && item.usar_precio_mes && item.precio_mes != null;
                       return a + (usarMes ? item.precio_mes * item.cantidad : item.precio_dia * item.dias_item * item.cantidad);
                     }, 0).toFixed(2)}</span>
                   </div>
                 </div>
-                {/* Sección de pago */}
-                <div className="rounded-lg border p-3 text-xs space-y-2" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}>
-                  <p className="font-medium" style={{ color: 'var(--ink)' }}>Registrar pago</p>
-                  <div className="flex gap-1">
-                    {[
-                      { id: 'efectivo', color: 'oklch(0.55 0.13 155)', label: 'Efectivo' },
-                      { id: 'yape', color: 'oklch(0.48 0.14 330)', label: 'Yape' },
-                      { id: 'plin', color: 'oklch(0.55 0.12 240)', label: 'Plin' },
-                    ].map(m => (
-                      <button key={m.id} onClick={() => setPagoMetodo(m.id)}
-                        className="flex-1 h-8 rounded-lg text-xs font-medium transition-all duration-150"
-                        style={{ backgroundColor: pagoMetodo === m.id ? m.color : 'var(--surface)', color: pagoMetodo === m.id ? '#fff' : 'var(--muted)' }}>{m.label}</button>
-                    ))}
-                  </div>
-                  <div className="flex gap-2 items-end">
-                    <div className="flex-1">
-                      <label className="text-[11px] mb-0.5 block" style={{ color: 'var(--muted)' }}>Monto S/</label>
-                      <input type="number" step="0.01" min="0"                       value={pagoMonto}
-                      placeholder={pendiente > 0 ? pendiente : ''}
-                        onChange={e => setPagoMonto(e.target.value)}
-                        className="w-full h-8 px-2 rounded text-xs border" style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
-                    </div>
-                    <Button variant="primary" size="sm" onClick={agregarPago} className="h-8 text-xs">Agregar</Button>
-                  </div>
-                  {pagos.length > 0 && (
-                    <div className="space-y-1">
-                      {pagos.map((p, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-[11px] py-1 px-2 rounded" style={{ backgroundColor: 'var(--surface)' }}>
-                          <span className="capitalize" style={{ color: 'var(--ink)' }}>{p.metodo}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono" style={{ color: 'var(--ink)' }}>S/ {p.monto.toFixed(2)}</span>
-                            <button onClick={() => quitarPago(idx)} className="text-red-500 hover:text-red-700">✕</button>
-                          </div>
-                        </div>
+
+                {/* Bloque 3: Acciones de dinero */}
+                <div className="rounded-lg border p-3 text-xs space-y-3" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}>
+                  {/* Fila: Cobrar adelanto */}
+                  <div>
+                    <p className="text-[11px] font-semibold mb-1.5" style={{ color: 'var(--ink)' }}>Cobrar adelanto</p>
+                    <div className="flex items-center gap-1.5">
+                      {[
+                        { id: 'efectivo', color: 'oklch(0.55 0.13 155)', label: 'Efectivo' },
+                        { id: 'yape', color: 'oklch(0.48 0.14 330)', label: 'Yape' },
+                        { id: 'plin', color: 'oklch(0.55 0.12 240)', label: 'Plin' },
+                      ].map(m => (
+                        <button key={m.id} onClick={() => setPagoMetodo(m.id)}
+                          className="h-7 px-2.5 rounded text-[11px] font-medium transition-all duration-150"
+                          style={{
+                            backgroundColor: pagoMetodo === m.id ? m.color : 'var(--surface)',
+                            color: pagoMetodo === m.id ? '#fff' : 'var(--muted)',
+                            border: pagoMetodo === m.id ? 'none' : '0.5px solid var(--border)',
+                          }}>{m.label}</button>
                       ))}
-                      <div className="flex justify-between text-xs font-medium pt-2" style={{ borderTop: '1px solid var(--border)' }}>
-                        <span style={{ color: 'var(--muted)' }}>Pagado: S/ {totalPagado.toFixed(2)}</span>
-                        <span style={{ color: pendiente > 0 ? 'var(--danger)' : 'var(--success)' }}>
-                          {pendiente > 0 ? `Pendiente: S/ ${pendiente.toFixed(2)}` : 'Completado'}
-                        </span>
-                      </div>
+                      <input type="number" step="1" min="0" value={pagoMonto}
+                        placeholder={pendiente > 0 ? pendiente.toFixed(0) : '0'}
+                        onChange={e => setPagoMonto(e.target.value)}
+                        className="w-24 h-7 px-1 rounded text-[11px] border font-mono text-center"
+                        style={{
+                          backgroundColor: 'var(--surface)',
+                          color: 'var(--ink)',
+                          borderColor: 'var(--border)',
+                          MozAppearance: 'textfield',
+                        }}
+                        onFocus={e => e.target.addEventListener('wheel', e => e.preventDefault(), { passive: false })} />
+                      <button onClick={agregarPago}
+                        className="h-7 px-3 rounded text-[11px] font-semibold transition-all duration-150 active:scale-[0.97]"
+                        style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}>+</button>
                     </div>
-                  )}
-                  {/* Garantía monetaria */}
-                  <div className="rounded-lg border p-3 text-xs space-y-2" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}>
-                    <p className="font-medium" style={{ color: 'var(--ink)' }}>Garantía (opcional)</p>
-                    <div className="flex gap-1">
+                    {pagos.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {pagos.map((p, idx) => (
+                          <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] capitalize"
+                            style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)' }}>
+                            {p.metodo} S/ {p.monto.toFixed(2)}
+                            <button onClick={() => quitarPago(idx)} className="hover:text-red-500">&#10005;</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {/* Fila: Garantía */}
+                  <div>
+                    <p className="text-[11px] font-semibold mb-1.5" style={{ color: 'oklch(0.55 0.12 70)' }}>Retener garant&iacute;a (opcional)</p>
+                    <div className="flex items-center gap-1.5">
                       {[
                         { id: 'efectivo', color: 'oklch(0.55 0.13 155)', label: 'Efectivo' },
                         { id: 'yape', color: 'oklch(0.48 0.14 330)', label: 'Yape' },
                         { id: 'plin', color: 'oklch(0.55 0.12 240)', label: 'Plin' },
                       ].map(m => (
                         <button key={m.id} onClick={() => setGarantiaMetodo(m.id)}
-                          className="flex-1 h-7 rounded-lg text-[10px] font-medium transition-all duration-150"
-                          style={{ backgroundColor: garantiaMetodo === m.id ? m.color : 'var(--surface)', color: garantiaMetodo === m.id ? '#fff' : 'var(--muted)' }}>{m.label}</button>
+                          className="h-7 px-2.5 rounded text-[11px] font-medium transition-all duration-150"
+                          style={{
+                            backgroundColor: garantiaMetodo === m.id ? m.color : 'var(--surface)',
+                            color: garantiaMetodo === m.id ? '#fff' : 'var(--muted)',
+                            border: garantiaMetodo === m.id ? 'none' : '0.5px solid var(--border)',
+                          }}>{m.label}</button>
                       ))}
-                    </div>
-                    <div className="flex gap-2 items-end">
-                      <div className="flex-1">
-                        <label className="text-[10px] mb-0.5 block" style={{ color: 'var(--muted)' }}>Monto S/</label>
-                        <input type="number" step="0.01" min="0" value={garantiaMonto}
-                          onChange={e => setGarantiaMonto(e.target.value)}
-                          className="w-full h-7 px-2 rounded text-[11px] border" style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
-                      </div>
-                      <Button variant="secondary" size="sm" onClick={agregarGarantia} className="h-7 text-[10px]">Retener</Button>
+                      <input type="number" step="1" min="0" value={garantiaMonto}
+                        placeholder="0"
+                        onChange={e => setGarantiaMonto(e.target.value)}
+                        className="w-24 h-7 px-1 rounded text-[11px] border font-mono text-center"
+                        style={{
+                          backgroundColor: 'var(--surface)',
+                          color: 'var(--ink)',
+                          borderColor: 'var(--border)',
+                          MozAppearance: 'textfield',
+                        }}
+                        onFocus={e => e.target.addEventListener('wheel', e => e.preventDefault(), { passive: false })} />
+                      <button onClick={agregarGarantia}
+                        className="h-7 px-3 rounded text-[11px] font-semibold transition-all duration-150 active:scale-[0.97]"
+                        style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}>+</button>
                     </div>
                     {garantias.length > 0 && (
-                      <div className="space-y-0.5">
+                      <div className="flex flex-wrap gap-1 mt-1.5">
                         {garantias.map((g, idx) => (
-                          <div key={idx} className="flex items-center justify-between text-[11px] py-1 px-2 rounded" style={{ backgroundColor: 'var(--surface)' }}>
-                            <span className="capitalize" style={{ color: 'var(--ink)' }}>{g.metodo}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono" style={{ color: 'var(--ink)' }}>S/ {g.monto.toFixed(2)}</span>
-                              <button onClick={() => quitarGarantia(idx)} className="text-red-500 hover:text-red-700">✕</button>
-                            </div>
-                          </div>
+                          <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] capitalize"
+                            style={{ backgroundColor: 'oklch(0.95 0.06 75 / 0.3)', color: 'oklch(0.55 0.12 70)' }}>
+                            {g.metodo} S/ {g.monto.toFixed(2)}
+                            <button onClick={() => quitarGarantia(idx)} className="hover:text-red-500">&#10005;</button>
+                          </span>
                         ))}
                       </div>
                     )}
+                  </div>
+                </div>
+
+                {/* Bloque 4: Estado de cuenta */}
+                <div className="rounded-lg border p-2.5 text-xs space-y-1" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
+                  <div className="flex justify-between">
+                    <span style={{ color: 'var(--muted)' }}>Pagado</span>
+                    <span className="font-mono" style={{ color: 'var(--success)' }}>S/ {totalPagado.toFixed(2)}</span>
+                  </div>
+                  {garantias.length > 0 && (
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--muted)' }}>Garant&iacute;a</span>
+                      <span className="font-mono" style={{ color: 'var(--info)' }}>S/ {garantias.reduce((a, g) => a + g.monto, 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <hr style={{ borderColor: 'var(--border)', marginTop: 2, marginBottom: 2 }} />
+                  <div className="flex justify-between font-semibold">
+                    <span style={{ color: pendiente > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                      {pendiente > 0 ? 'SALDO PENDIENTE' : 'COMPLETADO'}
+                    </span>
+                    <span className="font-mono tabular-nums" style={{ color: pendiente > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                      S/ {pendiente.toFixed(2)}
+                    </span>
                   </div>
                 </div>
               </div>
