@@ -697,7 +697,7 @@ function ModalShell({ title, onClose, children, onSubmit, error }) {
 }
 
 function ModalCrearFamilia({ onSave, onClose }) {
-  const [f, setF] = useState({ nombre: '', precio_dia: '', mora_dia: '', cantidad: '1' });
+  const [f, setF] = useState({ nombre: '', precio_dia: '', precio_minimo: '', precio_mes: '', precio_venta: '', cantidad: '1' });
   const [err, setErr] = useState('');
   const set = (k, v) => { setF((p) => ({ ...p, [k]: v })); setErr(''); };
 
@@ -707,6 +707,9 @@ function ModalCrearFamilia({ onSave, onClose }) {
     onSave({
       nombre: f.nombre.trim(),
       precio_dia: parseFloat(f.precio_dia) || 0,
+      precio_minimo: f.precio_minimo !== '' ? parseFloat(f.precio_minimo) : undefined,
+      precio_mes: f.precio_mes !== '' ? parseFloat(f.precio_mes) : undefined,
+      precio_venta: f.precio_venta !== '' ? parseFloat(f.precio_venta) : undefined,
       mora_dia: parseFloat(f.precio_dia) || 0,
       cantidad: parseInt(f.cantidad, 10) || 1,
     });
@@ -724,6 +727,18 @@ function ModalCrearFamilia({ onSave, onClose }) {
         </Field>
         <Field label="Cantidad" req>
           <input type="number" min="1" value={f.cantidad} onChange={(e) => set('cantidad', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+        </Field>
+      </div>
+      <div className="text-[10px] uppercase tracking-wider font-semibold mt-3 mb-2" style={{ color: 'var(--muted)' }}>Precios adicionales (opcional)</div>
+      <div className="grid grid-cols-3 gap-2">
+        <Field label="Mínimo S/">
+          <input type="number" step="0.01" min="0" value={f.precio_minimo} onChange={(e) => set('precio_minimo', e.target.value)} className={inputCls} placeholder="Casero" style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+        </Field>
+        <Field label="Mensual S/">
+          <input type="number" step="0.01" min="0" value={f.precio_mes} onChange={(e) => set('precio_mes', e.target.value)} className={inputCls} placeholder="30 días" style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+        </Field>
+        <Field label="Venta S/">
+          <input type="number" step="0.01" min="0" value={f.precio_venta} onChange={(e) => set('precio_venta', e.target.value)} className={inputCls} placeholder="Vender" style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
         </Field>
       </div>
     </ModalShell>
@@ -748,17 +763,39 @@ function ModalAgregarUnidades({ familia, onSave, onClose }) {
 }
 
 function ModalEditarFamilia({ familia, onSave, onClose }) {
-  const [f, setF] = useState({ nombre: familia.nombre || '', precio_dia: familia.precio_dia ?? '', mora_dia: familia.mora_dia ?? '' });
+  const [f, setF] = useState({
+    nombre: familia.nombre || '',
+    precio_dia: familia.precio_dia ?? '',
+    precio_minimo: familia.precio_minimo ?? '',
+    precio_mes: familia.precio_mes ?? '',
+    precio_venta: familia.precio_venta ?? '',
+  });
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
-  const submit = () => onSave(familia.id_categoria, { ...f, precio_dia: parseFloat(f.precio_dia) || 0, mora_dia: parseFloat(f.precio_dia) || 0 }, familia.nombre);
+  const submit = () => onSave(familia.id_categoria, {
+    ...f,
+    precio_dia: parseFloat(f.precio_dia) || 0,
+    precio_minimo: f.precio_minimo !== '' ? parseFloat(f.precio_minimo) : undefined,
+    precio_mes: f.precio_mes !== '' ? parseFloat(f.precio_mes) : undefined,
+    precio_venta: f.precio_venta !== '' ? parseFloat(f.precio_venta) : undefined,
+    mora_dia: parseFloat(f.precio_dia) || 0,
+  }, familia.nombre);
   return (
     <ModalShell title={'Editar ' + familia.nombre} onClose={onClose} onSubmit={submit}>
       <Field label="Nombre">
         <input value={f.nombre} onChange={(e) => set('nombre', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} autoFocus />
       </Field>
-      <div className="grid grid-cols-1 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         <Field label="Precio/día S/">
           <input type="number" step="0.01" min="0" value={f.precio_dia} onChange={(e) => set('precio_dia', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+        </Field>
+        <Field label="Mínimo S/">
+          <input type="number" step="0.01" min="0" value={f.precio_minimo} onChange={(e) => set('precio_minimo', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+        </Field>
+        <Field label="Mensual S/">
+          <input type="number" step="0.01" min="0" value={f.precio_mes} onChange={(e) => set('precio_mes', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+        </Field>
+        <Field label="Venta S/">
+          <input type="number" step="0.01" min="0" value={f.precio_venta} onChange={(e) => set('precio_venta', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
         </Field>
       </div>
       {familia.total > 0 ? (
@@ -771,11 +808,23 @@ function ModalEditarFamilia({ familia, onSave, onClose }) {
 }
 
 function ModalCrearGranel({ onSave, onClose }) {
-  const [f, setF] = useState({ nombre: '', precio_nuevo: '', mora_nuevo: '', precio_usado: '', mora_usado: '' });
+  const [f, setF] = useState({ nombre: '', precio_nuevo: '', precio_minimo_nuevo: '', precio_mes_nuevo: '', precio_venta_nuevo: '', precio_usado: '', precio_minimo_usado: '', precio_mes_usado: '', precio_venta_usado: '' });
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const submit = () => {
     if (!f.nombre.trim()) return;
-    onSave({ nombre: f.nombre.trim(), precio_nuevo: parseFloat(f.precio_nuevo) || 0, mora_nuevo: parseFloat(f.precio_nuevo) || 0, precio_usado: parseFloat(f.precio_usado) || 0, mora_usado: parseFloat(f.precio_usado) || 0 });
+    onSave({
+      nombre: f.nombre.trim(),
+      precio_nuevo: parseFloat(f.precio_nuevo) || 0,
+      precio_minimo_nuevo: f.precio_minimo_nuevo !== '' ? parseFloat(f.precio_minimo_nuevo) : undefined,
+      precio_mes_nuevo: f.precio_mes_nuevo !== '' ? parseFloat(f.precio_mes_nuevo) : undefined,
+      precio_venta_nuevo: f.precio_venta_nuevo !== '' ? parseFloat(f.precio_venta_nuevo) : undefined,
+      mora_nuevo: parseFloat(f.precio_nuevo) || 0,
+      precio_usado: parseFloat(f.precio_usado) || 0,
+      precio_minimo_usado: f.precio_minimo_usado !== '' ? parseFloat(f.precio_minimo_usado) : undefined,
+      precio_mes_usado: f.precio_mes_usado !== '' ? parseFloat(f.precio_mes_usado) : undefined,
+      precio_venta_usado: f.precio_venta_usado !== '' ? parseFloat(f.precio_venta_usado) : undefined,
+      mora_usado: parseFloat(f.precio_usado) || 0,
+    });
   };
   return (
     <ModalShell title="Nuevo material" onClose={onClose} onSubmit={submit}>
@@ -784,10 +833,16 @@ function ModalCrearGranel({ onSave, onClose }) {
         <div>
           <label className="text-[11px] font-medium mb-1 block" style={{ color: 'var(--success)' }}>Nuevo</label>
           <Field label="Precio/día"><input type="number" step="0.01" min="0" value={f.precio_nuevo} onChange={(e) => set('precio_nuevo', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
+          <Field label="Mínimo S/"><input type="number" step="0.01" min="0" value={f.precio_minimo_nuevo} onChange={(e) => set('precio_minimo_nuevo', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
+          <Field label="Mensual S/"><input type="number" step="0.01" min="0" value={f.precio_mes_nuevo} onChange={(e) => set('precio_mes_nuevo', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
+          <Field label="Venta S/"><input type="number" step="0.01" min="0" value={f.precio_venta_nuevo} onChange={(e) => set('precio_venta_nuevo', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
         </div>
         <div>
           <label className="text-[11px] font-medium mb-1 block" style={{ color: 'var(--warning)' }}>Usado</label>
           <Field label="Precio/día"><input type="number" step="0.01" min="0" value={f.precio_usado} onChange={(e) => set('precio_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
+          <Field label="Mínimo S/"><input type="number" step="0.01" min="0" value={f.precio_minimo_usado} onChange={(e) => set('precio_minimo_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
+          <Field label="Mensual S/"><input type="number" step="0.01" min="0" value={f.precio_mes_usado} onChange={(e) => set('precio_mes_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
+          <Field label="Venta S/"><input type="number" step="0.01" min="0" value={f.precio_venta_usado} onChange={(e) => set('precio_venta_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
         </div>
       </div>
     </ModalShell>
@@ -800,16 +855,26 @@ function ModalEditarGranel({ data, onSave, onClose }) {
   const [f, setF] = useState({
     nombre: data.nombre || '',
     precio_nuevo: nuevo.precio_dia ?? '',
-    mora_nuevo: nuevo.mora_dia ?? '',
+    precio_minimo_nuevo: nuevo.precio_minimo ?? '',
+    precio_mes_nuevo: nuevo.precio_mes ?? '',
+    precio_venta_nuevo: nuevo.precio_venta ?? '',
     precio_usado: usado.precio_dia ?? '',
-    mora_usado: usado.mora_dia ?? '',
+    precio_minimo_usado: usado.precio_minimo ?? '',
+    precio_mes_usado: usado.precio_mes ?? '',
+    precio_venta_usado: usado.precio_venta ?? '',
   });
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const submit = () => onSave(data.nombre, {
     nombre: f.nombre.trim(),
     precio_nuevo: parseFloat(f.precio_nuevo) || 0,
+    precio_minimo_nuevo: f.precio_minimo_nuevo !== '' ? parseFloat(f.precio_minimo_nuevo) : undefined,
+    precio_mes_nuevo: f.precio_mes_nuevo !== '' ? parseFloat(f.precio_mes_nuevo) : undefined,
+    precio_venta_nuevo: f.precio_venta_nuevo !== '' ? parseFloat(f.precio_venta_nuevo) : undefined,
     mora_nuevo: parseFloat(f.precio_nuevo) || 0,
     precio_usado: parseFloat(f.precio_usado) || 0,
+    precio_minimo_usado: f.precio_minimo_usado !== '' ? parseFloat(f.precio_minimo_usado) : undefined,
+    precio_mes_usado: f.precio_mes_usado !== '' ? parseFloat(f.precio_mes_usado) : undefined,
+    precio_venta_usado: f.precio_venta_usado !== '' ? parseFloat(f.precio_venta_usado) : undefined,
     mora_usado: parseFloat(f.precio_usado) || 0,
   });
   return (
@@ -819,10 +884,16 @@ function ModalEditarGranel({ data, onSave, onClose }) {
         <div>
           <label className="text-[11px] font-medium mb-1 block" style={{ color: 'var(--success)' }}>Nuevo</label>
           <Field label="Precio/día"><input type="number" step="0.01" min="0" value={f.precio_nuevo} onChange={(e) => set('precio_nuevo', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
+          <Field label="Mínimo S/"><input type="number" step="0.01" min="0" value={f.precio_minimo_nuevo} onChange={(e) => set('precio_minimo_nuevo', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
+          <Field label="Mensual S/"><input type="number" step="0.01" min="0" value={f.precio_mes_nuevo} onChange={(e) => set('precio_mes_nuevo', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
+          <Field label="Venta S/"><input type="number" step="0.01" min="0" value={f.precio_venta_nuevo} onChange={(e) => set('precio_venta_nuevo', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
         </div>
         <div>
           <label className="text-[11px] font-medium mb-1 block" style={{ color: 'var(--warning)' }}>Usado</label>
           <Field label="Precio/día"><input type="number" step="0.01" min="0" value={f.precio_usado} onChange={(e) => set('precio_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
+          <Field label="Mínimo S/"><input type="number" step="0.01" min="0" value={f.precio_minimo_usado} onChange={(e) => set('precio_minimo_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
+          <Field label="Mensual S/"><input type="number" step="0.01" min="0" value={f.precio_mes_usado} onChange={(e) => set('precio_mes_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
+          <Field label="Venta S/"><input type="number" step="0.01" min="0" value={f.precio_venta_usado} onChange={(e) => set('precio_venta_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
         </div>
       </div>
     </ModalShell>

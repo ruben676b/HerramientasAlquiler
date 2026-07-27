@@ -31,7 +31,13 @@ function generarPdfDesdeDatos(datos) {
   const dias = Math.max(1, Math.ceil(
     (new Date(fechas.devolucion + 'T00:00:00') - new Date(fechas.salida + 'T00:00:00')) / 86400000
   ) + 1);
-  const totalItems = items.reduce((a, i) => a + i.precio_dia * dias * i.cantidad, 0);
+  const totalItems = items.reduce((a, i) => {
+    const fechaDevItem = i.fecha_devolucion_pactada || fechas.devolucion;
+    const diasItem = Math.max(1, Math.ceil(
+      (new Date(fechaDevItem + 'T00:00:00') - new Date(fechas.salida + 'T00:00:00')) / 86400000
+    ) + 1);
+    return a + i.precio_dia * diasItem * i.cantidad;
+  }, 0);
 
   const nro = numContrato || 'PREVIEW';
   const filePath = numContrato
@@ -128,7 +134,11 @@ function generarPdfDesdeDatos(datos) {
   let y = doc.y;
   items.forEach((item) => {
     if (y > 720) { doc.addPage(); y = 45; }
-    const sub = item.precio_dia * dias * item.cantidad;
+    const fechaDevItem = item.fecha_devolucion_pactada || fechas.devolucion;
+    const diasItem = Math.max(1, Math.ceil(
+      (new Date(fechaDevItem + 'T00:00:00') - new Date(fechas.salida + 'T00:00:00')) / 86400000
+    ) + 1);
+    const sub = item.precio_dia * diasItem * item.cantidad;
     const esGranel = item.codigo && item.codigo.includes('(') && !/^[A-Z]+-\d/.test(item.codigo);
     const codigo = esGranel ? 'Material' : (item.codigo || '—');
     doc.text(codigo, colX[0], y, { width: colWidths[0] });
@@ -273,7 +283,13 @@ function generarPdf(idContrato) {
   const dias = Math.max(1, Math.ceil(
     (new Date(contrato.fecha_devolucion_pactada + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
   ) + 1);
-  const totalItems = detalles.reduce((a, d) => a + d.precio_dia_aplicado * dias * d.cantidad, 0);
+  const totalItems = detalles.reduce((a, d) => {
+    const fechaDevItem = d.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;
+    const diasItem = Math.max(1, Math.ceil(
+      (new Date(fechaDevItem + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
+    ) + 1);
+    return a + d.precio_dia_aplicado * diasItem * d.cantidad;
+  }, 0);
   const total = totalItems + (contrato.deposito_monto || 0);
 
   return generarPdfDesdeDatos({
@@ -284,13 +300,17 @@ function generarPdf(idContrato) {
       telefono: contrato.cliente_telefono,
       direccion: contrato.cliente_direccion,
     },
-    items: detalles.map(d => ({
-      codigo: d.item_codigo,
-      nombre: d.item_nombre,
-      cantidad: d.cantidad,
-      precio_dia: d.precio_dia_aplicado,
-      mora_dia: d.item_mora || d.mora_dia_aplicada || 0,
-    })),
+    items: detalles.map(d => {
+      const fechaDevItem = d.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;
+      return {
+        codigo: d.item_codigo,
+        nombre: d.item_nombre,
+        cantidad: d.cantidad,
+        precio_dia: d.precio_dia_aplicado,
+        mora_dia: d.item_mora || d.mora_dia_aplicada || 0,
+        fecha_devolucion_pactada: fechaDevItem,
+      };
+    }),
     fechas: { salida: contrato.fecha_salida, devolucion: contrato.fecha_devolucion_pactada },
     total,
     deposito: {

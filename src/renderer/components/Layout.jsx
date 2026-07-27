@@ -1,8 +1,6 @@
 import { useState, useCallback, lazy, Suspense } from 'react';
 import Sidebar from './Sidebar';
 import MultiSessionModal from './MultiSessionModal';
-import MultiDevolucionModal from './MultiDevolucionModal';
-
 const Alquileres = lazy(() => import('../views/Alquileres'));
 const Mostrador = lazy(() => import('../views/Mostrador'));
 const Inventario = lazy(() => import('../views/Inventario'));
@@ -56,7 +54,6 @@ export default function Layout() {
       </main>
 
       <MultiSessionModal />
-      <MultiDevolucionModal />
     </div>
   );
 }
