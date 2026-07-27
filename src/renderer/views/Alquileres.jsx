@@ -301,6 +301,14 @@ export default function Alquileres() {
                                         {esGranel ? (item.item_condicion || '') + ' \u00b7 ' : ''}S/ {(item.precio_dia_aplicado || 0).toFixed(2)}/d&iacute;a{esGranel ? ' c/u' : ''}
                                       </span>
                                     </div>
+                                    {/* Fila: fechas del ítem */}
+                                    <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
+                                      <span />
+                                      <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                                        Salida: {fmtFechaCorta(c.fecha_salida)} &middot; Pactada: {fmtFechaCorta(item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada)}
+                                        &middot; {item.dias_item || 0} d&iacute;a{(item.dias_item || 0) !== 1 ? 's' : ''}
+                                      </span>
+                                    </div>
                                      {/* Estado del ítem — siempre visible */}
                                     <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
                                       <span />

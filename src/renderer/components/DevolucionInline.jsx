@@ -1,11 +1,17 @@
 import { useState, useRef } from 'react';
-import { X, CheckCircle, AlertTriangle, XCircle, Minus, Plus } from 'lucide-react';
+import { X, CheckCircle, AlertTriangle, Minus, Plus } from 'lucide-react';
 import { useToast } from './Toast';
+
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const fmtFecha = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso + 'T00:00:00');
+  return d.getDate() + ' ' + MESES[d.getMonth()];
+};
 
 const ESTADOS_OPC = [
   { id: 'bien', label: 'Bien', icon: CheckCircle, bg: 'oklch(0.50 0.13 155)', ink: '#fff' },
   { id: 'dañado', label: 'Dañado', icon: AlertTriangle, bg: 'oklch(0.55 0.13 70)', ink: '#fff' },
-  { id: 'no devuelto', label: 'No devuelto', icon: XCircle, bg: 'oklch(0.40 0 0)', ink: '#fff' },
 ];
 
 export default function DevolucionInline({ contrato, onClose, onRecargar }) {
@@ -35,10 +41,8 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   ) + 1);
   const montoBase = c.total_contrato ? c.total_contrato : ((c.subtotal_diario || 0) * dias);
   
-  // Sumar mora por ítem (solo ítems que NO estén marcados como "no devuelto")
+  // Sumar mora sugerida de todos los ítems (usando mora editada si existe)
   const montoAtraso = items.reduce((sum, item, idx) => {
-    if (estados[idx] === 'no devuelto') return sum;
-    const est = estados[idx];
     const cantidad = parseInt(cantidades[idx]) || item.cantidad || 1;
     const sugerida = (item.dias_atraso_item || 0) * (item.precio_dia_aplicado || 0) * cantidad;
     return sum + (morasEditadas[idx] != null ? morasEditadas[idx] : sugerida);
@@ -167,32 +171,41 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
             items.map((item, idx) => {
               const est = estados[idx] || null;
               const esGranel = !!item.id_item_granel;
+              const fechaPactadaItem = item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada;
+              const diasItem = item.dias_item || 0;
+              const baseItem = (item.precio_dia_aplicado || 0) * diasItem * (item.cantidad || 1);
+              const moraCalc = (item.dias_atraso_item || 0) * (item.precio_dia_aplicado || 0) * (item.cantidad || 1);
+              const moraActual = morasEditadas[idx] != null ? morasEditadas[idx] : moraCalc;
               return (
                 <div key={idx}
                   className="rounded-lg border px-3 py-2 text-xs transition-all duration-150"
                   style={{
                     borderColor: est ? ESTADOS_OPC.find(o => o.id === est)?.bg + '60' : 'var(--border)',
-                    backgroundColor: est === 'no devuelto' ? 'oklch(0.97 0 0)' : 'var(--surface)',
-                    opacity: est === 'no devuelto' ? 0.6 : 1,
+                    backgroundColor: 'var(--surface)',
                   }}>
-                  {/* Cabecera: badge + nombre + atraso */}
-                  <div className="flex items-center gap-2 mb-1.5">
+                  {/* Fila 1: Badge + nombre + atraso badge */}
+                  <div className="flex items-center gap-2 mb-1">
                     <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
                       style={{ backgroundColor: 'oklch(0.40 0.12 240)', color: '#fff' }}>
                       {esGranel ? 'x' + (item.cantidad || 1) : item.item_codigo || item.id}
                     </span>
-                    <span className="font-medium text-[13px] truncate" style={{ color: 'var(--ink)' }}>{item.item_nombre || item.nombre}</span>
+                    <span className="font-medium text-[13px] truncate flex-1" style={{ color: 'var(--ink)' }}>{item.item_nombre || item.nombre}</span>
                     <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
                       S/ {item.precio_dia_aplicado?.toFixed(2)}/día{esGranel ? ' c/u' : ''}
                     </span>
                     {(item.dias_atraso_item || 0) > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
                         style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>
                         &#9888; +{item.dias_atraso_item} día{item.dias_atraso_item !== 1 ? 's' : ''}
                       </span>
                     )}
                   </div>
-                  {/* Cantidad para granel */}
+                  {/* Fila 2: Fechas del ítem */}
+                  <div className="text-[10px] mb-1" style={{ color: 'var(--muted)' }}>
+                    Salida: {fmtFecha(c.fecha_salida)} &middot; Pactada: {fmtFecha(fechaPactadaItem)}
+                    <span style={{ color: 'var(--muted)' }}> &middot; Base: {diasItem} día{diasItem !== 1 ? 's' : ''}</span>
+                  </div>
+                  {/* Fila 3: Cantidad para granel */}
                   {esGranel && (
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <span className="text-[10px]" style={{ color: 'var(--muted)' }}>Devolver:</span>
@@ -223,8 +236,41 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                       <span className="text-[9px]" style={{ color: 'var(--faint)' }}>de {item.cantidad}</span>
                     </div>
                   )}
-                  {/* Botones de estado */}
-                  <div className="flex gap-1">
+                  {/* Fila 4: Base + Mora + Total */}
+                  <hr style={{ borderColor: 'var(--border)', marginTop: 2, marginBottom: 4 }} />
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-baseline gap-3">
+                      <span style={{ color: 'var(--muted)' }}>Base <span className="font-mono" style={{ color: 'var(--ink)' }}>S/ {baseItem.toFixed(2)}</span></span>
+                      {item.dias_atraso_item > 0 && (
+                        <span className="flex items-center gap-1">
+                          <span style={{ color: 'var(--danger)' }}>Mora </span>
+                          {editandoMora[idx] ? (
+                            <input type="number" step="0.01" min="0"
+                              defaultValue={moraCalc}
+                              onBlur={e => { setMora(idx, parseFloat(e.target.value) || 0); setEditandoMora(p => ({ ...p, [idx]: false })); }}
+                              onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                              className="w-20 h-6 px-1 rounded text-xs border font-mono text-right dev-nospin"
+                              style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--danger)' }}
+                              autoFocus
+                            />
+                          ) : (
+                            <span onClick={() => setEditandoMora(p => ({ ...p, [idx]: true }))}
+                              className="font-mono cursor-pointer px-1 rounded hover:bg-black/5"
+                              style={{ color: 'var(--danger)' }}>
+                              S/ {moraActual.toFixed(2)}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono font-bold text-sm tabular-nums" style={{ color: 'var(--ink)' }}>
+                        S/ {(baseItem + moraActual).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Fila 5: Botones de estado */}
+                  <div className="flex gap-1 mt-2 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
                     {ESTADOS_OPC.map(op => {
                       const sel = est === op.id;
                       return (
@@ -240,28 +286,6 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                       );
                     })}
                   </div>
-                  {/* Mora por ítem (solo si hay atraso y no es "no devuelto") */}
-                  {(item.dias_atraso_item || 0) > 0 && (estados[idx] || 'pendiente') !== 'no devuelto' && (
-                    <div className="flex items-center gap-2 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
-                      <span className="text-[10px] shrink-0" style={{ color: 'var(--danger)' }}>Mora sugerida:</span>
-                      {editandoMora[idx] ? (
-                        <input type="number" step="0.01" min="0"
-                          defaultValue={morasEditadas[idx] ?? ((item.dias_atraso_item || 0) * (item.precio_dia_aplicado || 0) * (item.cantidad || 1))}
-                          onBlur={e => { setMora(idx, parseFloat(e.target.value) || 0); setEditandoMora(p => ({ ...p, [idx]: false })); }}
-                          onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-                          className="w-20 h-6 px-1 rounded text-xs border font-mono text-center dev-nospin"
-                          style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--danger)' }}
-                          autoFocus
-                        />
-                      ) : (
-                        <span onClick={() => setEditandoMora(p => ({ ...p, [idx]: true }))}
-                          className="font-mono cursor-pointer px-1 rounded hover:bg-black/5"
-                          style={{ color: 'var(--danger)' }}>
-                          S/ {(morasEditadas[idx] != null ? morasEditadas[idx] : ((item.dias_atraso_item || 0) * (item.precio_dia_aplicado || 0) * (item.cantidad || 1))).toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-                  )}
                   {/* Dañado: costo + nota */}
                   {est === 'dañado' && (
                     <div className="flex items-center gap-2 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
