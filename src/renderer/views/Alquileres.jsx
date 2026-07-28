@@ -7,7 +7,7 @@ import { SEMANTIC } from '../lib/constants';
 import Button from '../components/ui/button';
 import { useSessions } from '../contexts/SessionsContext';
 import { useToast } from '../components/Toast';
-import PagoParcialModal from '../components/PagoParcialModal';
+import UnifiedPaymentModal from '../components/UnifiedPaymentModal';
 import DevolucionInline from '../components/DevolucionInline';
 
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -37,6 +37,9 @@ export default function Alquileres() {
   const [addGarantiaId, setAddGarantiaId] = useState(null);
   const [garantiaMonto, setGarantiaMonto] = useState('');
   const [garantiaMetodo, setGarantiaMetodo] = useState('efectivo');
+  const [devolverGarantiaId, setDevolverGarantiaId] = useState(null);
+  const [devGarantiaMonto, setDevGarantiaMonto] = useState('');
+  const [devGarantiaMetodo, setDevGarantiaMetodo] = useState('efectivo');
   const searchRef = useRef(null);
   const { openDialog } = useSessions();
   const toast = useToast();
@@ -73,6 +76,24 @@ export default function Alquileres() {
       setAddGarantiaId(null);
       setGarantiaMonto('');
       toast('Garantía registrada: S/ ' + m.toFixed(2));
+      recargar();
+    } catch (e) { setError(e.message); }
+  };
+
+  const handleDevolverGarantia = async () => {
+    if (!window.api || !devolverGarantiaId) return;
+    const m = parseFloat(devGarantiaMonto);
+    if (!m || m <= 0) return;
+    try {
+      await window.api.registrarPago({
+        idContrato: devolverGarantiaId,
+        monto: m,
+        metodo: devGarantiaMetodo,
+        tipo: 'devolucion_deposito',
+      });
+      setDevolverGarantiaId(null);
+      setDevGarantiaMonto('');
+      toast('Garantía devuelta: S/ ' + m.toFixed(2));
       recargar();
     } catch (e) { setError(e.message); }
   };
@@ -274,57 +295,53 @@ export default function Alquileres() {
                               </p>
                               {c.items?.map((item, idx) => {
                                 const esGranel = item.item_condicion;
-                                const sub = (item.precio_dia_aplicado || 0) * (item.dias_item || dias) * (item.cantidad || 1);
+                                const sub = ((item.precio_dia_aplicado || 0) * (item.dias_item || dias) * (item.cantidad || 1)) + (item.monto_atraso_item || 0);
                                 return (
                                   <div key={idx} className="space-y-0.5">
-                                    <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
+                                    {/* Fila 1: Badge + Nombre + Tarifa + Atraso badge */}
+                                    <div className="flex items-center gap-1 flex-wrap">
                                       {!esGranel ? (
-                                        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold text-center justify-self-end"
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
                                           style={{ backgroundColor: 'oklch(0.40 0.12 240)', color: '#fff' }}>
                                           {item.item_codigo}
                                         </span>
                                       ) : (
-                                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium text-center justify-self-end"
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
                                           style={{
                                             backgroundColor: item.item_condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)',
                                             color: item.item_condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)',
                                           }}>x{item.cantidad}</span>
                                       )}
                                       <span className="text-[13px] leading-tight font-semibold" style={{ color: 'var(--ink)' }}>{item.item_nombre}</span>
-                                      <span className="font-mono tabular-nums text-[13px] text-right leading-tight font-semibold" style={{ color: 'var(--ink)' }}>
-                                        S/ {sub.toFixed(2)}
+                                      <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
+                                        S/ {(item.precio_dia_aplicado || 0).toFixed(2)}/d&iacute;a{esGranel ? ' c/u' : ''}
                                       </span>
+                                      {(item.dias_atraso_item || 0) > 0 && (
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                                          style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>
+                                          &#9888; +{item.dias_atraso_item} d&iacute;a{item.dias_atraso_item !== 1 ? 's' : ''}
+                                        </span>
+                                      )}
                                     </div>
-                                    <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
-                                      <span />
-                                      <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                                        {esGranel ? (item.item_condicion || '') + ' \u00b7 ' : ''}S/ {(item.precio_dia_aplicado || 0).toFixed(2)}/d&iacute;a{esGranel ? ' c/u' : ''}
-                                      </span>
-                                    </div>
-                                    {/* Fila: fechas del ítem */}
+                                    {/* Fila 2: Fechas */}
                                     <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
                                       <span />
                                       <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
                                         Salida: {fmtFechaCorta(c.fecha_salida)} &middot; Pactada: {fmtFechaCorta(item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada)}
-                                        &middot; {item.dias_item || 0} d&iacute;a{(item.dias_item || 0) !== 1 ? 's' : ''}
+                                        &middot; Base: {item.dias_item || 0} d&iacute;a{(item.dias_item || 0) !== 1 ? 's' : ''}
                                       </span>
                                     </div>
-                                     {/* Estado del ítem — siempre visible */}
+                                    {/* Fila 3: Base S/ + Mora + Total */}
                                     <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
                                       <span />
-                                      <span className="text-[11px] flex items-center gap-1" style={{
-                                        color: item.dias_atraso_item > 0 ? 'var(--danger)' : (
-                                          item.estado_devolucion !== 'pendiente' ? 'var(--success)' : 'var(--muted)'
-                                        ),
-                                      }}>
-                                        {item.dias_atraso_item > 0 ? (
-                                          <>&#9888; Atraso {item.dias_atraso_item || 0} d&iacute;a{(item.dias_atraso_item || 0) !== 1 ? 's' : ''} (+S/ {(item.monto_atraso_item || 0).toFixed(2)})</>
-                                        ) : (
-                                          <>{item.estado_devolucion !== 'pendiente' ? '\u2713' : ''} {item.dias_item || 0} d&iacute;a{(item.dias_item || 0) !== 1 ? 's' : ''} de alquiler</>
+                                      <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                                        Base S/ {(item.total_item || (item.precio_dia_aplicado || 0) * (item.dias_item || 1) * (item.cantidad || 1)).toFixed(0)}
+                                        {(item.dias_atraso_item || 0) > 0 && (
+                                           <span style={{ color: 'var(--danger)' }}> + Mora S/ {(item.monto_atraso_item || 0).toFixed(0)}</span>
                                         )}
-                                        {item.estado_devolucion !== 'pendiente' && item.dias_atraso_item <= 0 && (
-                                          <>&nbsp;\u2014 Devuelto</>
-                                        )}
+                                      </span>
+                                      <span className="font-mono tabular-nums text-[12px] font-bold" style={{ color: 'var(--ink)' }}>
+                                        S/ {sub.toFixed(2)}
                                       </span>
                                     </div>
                                   </div>
@@ -381,21 +398,28 @@ export default function Alquileres() {
                                 S/ {pendiente.toFixed(2)}
                               </span>
                             </div>
-                            {/* Garantía + botón añadir */}
+                            {/* Garantía + botón añadir + botón devolver */}
                             <div className="flex justify-between items-baseline text-xs">
                               <span style={{ color: 'var(--muted)' }}>
                                 {garantia > 0 ? 'Garantía disponible' : 'Sin garantía'}
                               </span>
                               <div className="flex items-center gap-1">
                                 {garantia > 0 && <span className="font-mono" style={{ color: 'var(--info)' }}>S/ {garantia.toFixed(2)}</span>}
+                                {garantia > 0 && (
+                                  <button onClick={() => setDevolverGarantiaId(devolverGarantiaId === c.id ? null : c.id)}
+                                    className="text-[11px] underline font-medium hover:opacity-70 shrink-0"
+                                    style={{ color: 'var(--danger)' }}>
+                                    Devolver
+                                  </button>
+                                )}
                                 <button onClick={() => setAddGarantiaId(addGarantiaId === c.id ? null : c.id)}
                                   className="text-[11px] underline font-medium hover:opacity-70 shrink-0"
-                                  style={{ color: 'var(--muted)' }}>
+                                  style={{ color: 'var(--success)' }}>
                                   + {garantia > 0 ? 'Añadir' : 'Registrar garantía'}
                                 </button>
                               </div>
                             </div>
-                            {/* Formulario inline */}
+                            {/* Formulario añadir garantía */}
                             {addGarantiaId === c.id && (
                               <div className="flex items-center gap-1 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
                                 {['efectivo','yape','plin'].map(m => (
@@ -416,6 +440,30 @@ export default function Alquileres() {
                                 <button onClick={handleAddGarantia}
                                   className="h-6 px-2 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97]"
                                   style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}>+</button>
+                              </div>
+                            )}
+                            {/* Panel devolver garantía */}
+                            {devolverGarantiaId === c.id && (
+                              <div className="flex items-center gap-1 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
+                                <span className="text-[10px]" style={{ color: 'var(--danger)' }}>Devolver S/</span>
+                                <input type="number" step="1" min="1" max={garantia} value={devGarantiaMonto}
+                                  placeholder={garantia.toFixed(0)}
+                                  onChange={e => setDevGarantiaMonto(e.target.value)}
+                                  onKeyDown={e => { if (e.key === 'Enter') handleDevolverGarantia(); }}
+                                  className="w-16 h-6 px-1 rounded text-[10px] border font-mono text-center dev-nospin"
+                                  style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--danger)' }} />
+                                {['efectivo','yape','plin'].map(m => (
+                                  <button key={m} onClick={() => setDevGarantiaMetodo(m)}
+                                    className="h-6 px-1.5 rounded text-[9px] font-medium transition-all duration-150"
+                                    style={{
+                                      backgroundColor: devGarantiaMetodo === m ? 'oklch(0.55 0.13 155)' : 'var(--surface)',
+                                      color: devGarantiaMetodo === m ? '#fff' : 'var(--muted)',
+                                      border: '0.5px solid var(--border)',
+                                    }}>{m}</button>
+                                ))}
+                                <button onClick={handleDevolverGarantia}
+                                  className="h-6 px-2 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97]"
+                                  style={{ backgroundColor: 'var(--danger)', color: '#fff', border: 'none' }}>&#10003;</button>
                               </div>
                             )}
                           </div>
@@ -524,10 +572,11 @@ export default function Alquileres() {
       )}
 
       {pagoModalContrato && (
-        <PagoParcialModal
+        <UnifiedPaymentModal
+          tipo="total"
           contrato={pagoModalContrato}
           onClose={() => setPagoModalContrato(null)}
-           onPagoRegistrado={() => { setPagoModalContrato(null); recargar(); }}
+          onConfirm={() => { setPagoModalContrato(null); recargar(); }}
         />
       )}
 

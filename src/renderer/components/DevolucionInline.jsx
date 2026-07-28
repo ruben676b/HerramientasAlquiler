@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { X, CheckCircle, AlertTriangle, Minus, Plus } from 'lucide-react';
 import { useToast } from './Toast';
+import UnifiedPaymentModal from './UnifiedPaymentModal';
 
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const fmtFecha = (iso) => {
@@ -29,6 +30,11 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [pagoMonto, setPagoMonto] = useState('');
   const [error, setError] = useState('');
   const [cobrando, setCobrando] = useState(false);
+  const [guardados, setGuardados] = useState({});
+  const [pagoItemState, setPagoItemState] = useState(null);
+  const [devolviendoGarantia, setDevolviendoGarantia] = useState(false);
+  const [devGarMonto, setDevGarMonto] = useState('');
+  const [devGarMetodo, setDevGarMetodo] = useState('efectivo');
 
   const c = contrato;
   const items = c.items || [];
@@ -58,82 +64,80 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const montoCobrar = Math.max(0, pendiente - garantia);
   const montoDevolver = pendiente <= garantia ? Math.abs(pendiente - garantia) : 0;
 
-  const setEstado = (idx, e) => setEstados(p => ({ ...p, [idx]: e }));
+  const handleDevolverGarantia = async () => {
+    if (!window.api) return;
+    const m = parseFloat(devGarMonto);
+    if (!m || m <= 0) return;
+    setCobrando(true);
+    try {
+      await window.api.registrarPago({
+        idContrato: c.id,
+        monto: m,
+        metodo: devGarMetodo,
+        tipo: 'devolucion_deposito',
+      });
+      setDevolviendoGarantia(false);
+      setDevGarMonto('');
+      toast('Garantía devuelta: S/ ' + m.toFixed(2));
+      onRecargar();
+    } catch (e) { toast(e.message || 'Error', 'error'); }
+    finally { setCobrando(false); }
+  };
+
+  const setEstado = async (idx, e) => {
+    if (!window.api || guardados[idx]) return;
+    setEstados(p => ({ ...p, [idx]: e }));
+    if (!e) {
+      // Desmarcar: revertir a pendiente en backend
+      try {
+        const hoy = new Date().toISOString().slice(0, 10);
+        await window.api.registrarDevolucion({
+          idContrato: c.id,
+          fechaDevolucionReal: hoy,
+          itemsDevueltos: [{ id_detalle: items[idx].id, estado_devolucion: 'bien' }],
+        });
+      } catch {}
+      return;
+    }
+    // Guardar automáticamente marca Bien o Dañado
+    const item = items[idx];
+    try {
+      const hoy = new Date().toISOString().slice(0, 10);
+      await window.api.registrarDevolucion({
+        idContrato: c.id,
+        fechaDevolucionReal: hoy,
+        itemsDevueltos: [{
+          id_detalle: item.id,
+          estado_devolucion: e,
+          cantidad_devuelta: item.id_item_granel
+            ? (parseInt(cantidades[idx]) || item.cantidad)
+            : undefined,
+          costo_reparacion: e === 'dañado' ? (parseFloat(costosRep[idx]) || 0) : undefined,
+        }],
+        observaciones: notas[idx] ? { [item.id]: notas[idx] } : {},
+      });
+      setGuardados(p => ({ ...p, [idx]: true }));
+      toast(item.item_nombre || item.nombre + ' devuelta');
+      onRecargar();
+    } catch (err) {
+      toast('Error al guardar: ' + (err.message || err), 'error');
+      setEstados(p => { const n = { ...p }; delete n[idx]; return n; });
+    }
+  };
+
   const setNota = (idx, v) => setNotas(p => ({ ...p, [idx]: v }));
   const setCosto = (idx, v) => setCostosRep(p => ({ ...p, [idx]: v }));
   const setCantidad = (idx, v) => setCantidades(p => ({ ...p, [idx]: v }));
   const setMora = (idx, v) => setMoraEditadas(p => ({ ...p, [idx]: v }));
 
-  const prepararItems = () => {
-    const itemsDevueltos = [];
-    const observaciones = {};
-    Object.entries(estados).forEach(([idx, estado]) => {
-      if (!estado) return;
-      const item = items[idx];
-      if (!item) return;
-      itemsDevueltos.push({
-        id_detalle: item.id,
-        estado_devolucion: estado,
-        cantidad_devuelta: item.id_item_granel
-          ? (parseInt(cantidades[idx]) || item.cantidad)
-          : undefined,
-        costo_reparacion: estado === 'dañado' ? (parseFloat(costosRep[idx]) || 0) : undefined,
-      });
-      if (notas[idx]) observaciones[item.id] = notas[idx];
-    });
-    return { itemsDevueltos, observaciones };
-  };
-
-  const confirmar = async (conCobro, montoCobro) => {
-    if (!window.api) return;
+  const closeDevMode = () => {
     setError('');
-
-    const { itemsDevueltos, observaciones } = prepararItems();
-    if (itemsDevueltos.length === 0) return setError('Seleccione al menos un ítem para devolver.');
-
-    setCobrando(true);
-    try {
-      const hoy = new Date().toISOString().slice(0, 10);
-      const resultado = await window.api.registrarDevolucion({
-        idContrato: c.id,
-        fechaDevolucionReal: hoy,
-        itemsDevueltos,
-        observaciones,
-      });
-
-      // Cobro opcional
-      if (conCobro && montoCobro > 0) {
-        await window.api.registrarPago({
-          idContrato: c.id,
-          monto: montoCobro,
-          metodo: metodoPago,
-        });
-      }
-
-      // Usar garantía si aplica
-      if (conCobro && garantia > 0 && pendiente > 0) {
-        const usarGarantia = Math.min(pendiente, garantia);
-        if (usarGarantia > 0) {
-          toast('Garantía aplicada: S/ ' + usarGarantia.toFixed(2));
-        }
-      }
-
-      if (conCobro) toast('Devolución completada' + (montoCobro > 0 ? ' y cobrada' : ''));
-      else toast('Devolución registrada (sin cobro)', 'warning');
-
-      onClose();
-      onRecargar();
-    } catch (e) {
-      setError(e.message || 'Error al registrar devolución.');
-    } finally {
-      setCobrando(false);
+    const pendientes = items.some((item, idx) => !guardados[idx] && item.estado_devolucion === 'pendiente');
+    if (pendientes) {
+      toast('Quedan ítems sin devolver. El contrato continúa activo.', 'warning');
     }
-  };
-
-  const confirmarConPago = () => {
-    const m = parseFloat(pagoMonto) || montoCobrar;
-    if (m > montoCobrar + garantia + totalDanos) return setError('El monto excede lo debido.');
-    confirmar(true, m);
+    onClose();
+    onRecargar();
   };
 
   return (
@@ -149,12 +153,12 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
       {/* Encabezado con botón cancelar */}
       <div className="flex items-center justify-between px-1">
         <p className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: 'var(--danger)' }}>Modo devolución</p>
-        <button onClick={onClose}
+        <button onClick={closeDevMode}
           className="flex items-center gap-1 px-2 h-6 rounded text-[10px] font-medium transition-all duration-150"
           style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)', border: '0.5px solid var(--border)' }}
           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}>
-          <X size={12} /> Cancelar
+          <X size={12} /> Salir
         </button>
       </div>
 
@@ -171,6 +175,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
             items.map((item, idx) => {
               const est = estados[idx] || null;
               const esGranel = !!item.id_item_granel;
+              const yaGuardado = guardados[idx];
               const fechaPactadaItem = item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada;
               const diasItem = item.dias_item || 0;
               const baseItem = (item.precio_dia_aplicado || 0) * diasItem * (item.cantidad || 1);
@@ -180,8 +185,8 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                 <div key={idx}
                   className="rounded-lg border px-3 py-2 text-xs transition-all duration-150"
                   style={{
-                    borderColor: est ? ESTADOS_OPC.find(o => o.id === est)?.bg + '60' : 'var(--border)',
-                    backgroundColor: 'var(--surface)',
+                    borderColor: yaGuardado ? 'oklch(0.50 0.13 155)' : (est ? ESTADOS_OPC.find(o => o.id === est)?.bg + '60' : 'var(--border)'),
+                    backgroundColor: yaGuardado ? 'oklch(0.95 0.05 155)' : 'var(--surface)',
                   }}>
                   {/* Fila 1: Badge + nombre + atraso badge */}
                   <div className="flex items-center gap-2 mb-1">
@@ -197,6 +202,12 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                       <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
                         style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>
                         &#9888; +{item.dias_atraso_item} día{item.dias_atraso_item !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {yaGuardado && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                        style={{ backgroundColor: 'oklch(0.50 0.13 155)', color: '#fff' }}>
+                        Devuelto
                       </span>
                     )}
                   </div>
@@ -270,22 +281,28 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                     </div>
                   </div>
                   {/* Fila 5: Botones de estado */}
-                  <div className="flex gap-1 mt-2 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
-                    {ESTADOS_OPC.map(op => {
-                      const sel = est === op.id;
-                      return (
-                        <button key={op.id} onClick={() => setEstado(idx, op.id === est ? null : op.id)}
-                          className="flex items-center gap-1 px-2.5 h-7 rounded text-[10px] font-medium transition-all duration-150"
-                          style={{
-                            backgroundColor: sel ? op.bg : 'var(--bg)',
-                            color: sel ? op.ink : 'var(--muted)',
-                            border: sel ? 'none' : '0.5px solid var(--border)',
-                          }}>
-                          <op.icon size={11} /> {op.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {yaGuardado ? (
+                    <div className="flex items-center gap-1 mt-2 pt-1.5 text-[10px] font-medium" style={{ borderTop: '0.5px solid var(--border)', color: 'var(--success)' }}>
+                      <CheckCircle size={12} /> Devuelto correctamente
+                    </div>
+                  ) : (
+                    <div className="flex gap-1 mt-2 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
+                      {ESTADOS_OPC.map(op => {
+                        const sel = est === op.id;
+                        return (
+                          <button key={op.id} onClick={() => setEstado(idx, op.id === est ? null : op.id)}
+                            className="flex items-center gap-1 px-2.5 h-7 rounded text-[10px] font-medium transition-all duration-150"
+                            style={{
+                              backgroundColor: sel ? op.bg : 'var(--bg)',
+                              color: sel ? op.ink : 'var(--muted)',
+                              border: sel ? 'none' : '0.5px solid var(--border)',
+                            }}>
+                            <op.icon size={11} /> {op.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                   {/* Dañado: costo + nota */}
                   {est === 'dañado' && (
                     <div className="flex items-center gap-2 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
@@ -300,12 +317,22 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                         style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
                     </div>
                   )}
+                  {/* Pagar por ítem (solo si está marcado como devuelto y tiene pendiente > 0) */}
+                  {est && (baseItem + moraActual) > 0 && (
+                    <button onClick={() => setPagoItemState({ item, pendiente: baseItem + moraActual })}
+                      className="w-full mt-1.5 h-6 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-1"
+                      style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}>
+                      Pagar S/ {(baseItem + moraActual).toFixed(2)}
+                    </button>
+                  )}
                 </div>
               );
             })
           )}
         </div>
-
+        
         {/* COLUMNA DERECHA: Caja en devolución */}
         <div className="px-4 py-2 space-y-3" style={{ borderLeft: '0.5px solid var(--border)' }}>
           <p className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: 'var(--muted)' }}>Cierre de devolución</p>
@@ -355,75 +382,67 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
             </div>
             
             {garantia > 0 && (
-              <div className="flex justify-between text-[11px]">
-                <span style={{ color: 'var(--muted)' }}>Garant&iacute;a disponible</span>
-                <span className="font-mono" style={{ color: 'var(--info)' }}>S/ {garantia.toFixed(2)}</span>
-              </div>
+              <>
+                <div className="flex justify-between text-[11px]">
+                  <span style={{ color: 'var(--muted)' }}>Garant&iacute;a disponible</span>
+                  <span className="flex items-center gap-1">
+                    <span className="font-mono" style={{ color: 'var(--info)' }}>S/ {garantia.toFixed(2)}</span>
+                    <button onClick={() => setDevolviendoGarantia(!devolviendoGarantia)}
+                      className="text-[10px] underline font-medium hover:opacity-70"
+                      style={{ color: 'var(--danger)' }}>Devolver</button>
+                  </span>
+                </div>
+                {devolviendoGarantia && (
+                  <div className="flex items-center gap-1 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
+                    <span className="text-[10px]" style={{ color: 'var(--danger)' }}>Devolver S/</span>
+                    <input type="number" step="1" min="1" max={garantia} value={devGarMonto}
+                      placeholder={garantia.toFixed(0)}
+                      onChange={e => setDevGarMonto(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleDevolverGarantia(); }}
+                      className="w-16 h-6 px-1 rounded text-[10px] border font-mono text-center dev-nospin"
+                      style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--danger)' }} />
+                    {['efectivo','yape','plin'].map(m => (
+                      <button key={m} onClick={() => setDevGarMetodo(m)}
+                        className="h-6 px-1.5 rounded text-[9px] font-medium transition-all duration-150"
+                        style={{
+                          backgroundColor: devGarMetodo === m ? 'oklch(0.55 0.13 155)' : 'var(--surface)',
+                          color: devGarMetodo === m ? '#fff' : 'var(--muted)',
+                          border: '0.5px solid var(--border)',
+                        }}>{m}</button>
+                    ))}
+                    <button onClick={handleDevolverGarantia} disabled={cobrando}
+                      className="h-6 px-2 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97]"
+                      style={{ backgroundColor: 'var(--danger)', color: '#fff', border: 'none' }}>&#10003;</button>
+                  </div>
+                )}
+              </>
             )}
           </div>
           
           {/* Botones de acción */}
           <div className="space-y-2 pt-1">
-            <button onClick={() => setMostrarPago(!mostrarPago)}
-              disabled={cobrando || pendiente <= 0}
-              className="w-full h-9 rounded-lg text-sm font-semibold transition-all duration-150 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+            <button onClick={() => setPagoItemState({ item: null, pendiente: pendiente, esTotal: true })}
+              disabled={pendiente <= 0}
+              className="w-full h-9 rounded-lg text-sm font-semibold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}
-              onMouseEnter={(e) => { if (!cobrando) e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
+              onMouseEnter={(e) => { if (pendiente > 0) e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}>
-              {pendiente <= 0 ? 'Sin deuda pendiente' : (mostrarPago ? 'Cancelar pago' : 'Cobrar y cerrar devolución')}
-            </button>
-            
-            {mostrarPago && pendiente > 0 && (
-              <div className="rounded-lg border p-2.5 text-xs space-y-2" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
-                <div className="flex gap-1">
-                  {[
-                    { id: 'efectivo', color: 'oklch(0.55 0.13 155)', label: 'Efectivo' },
-                    { id: 'yape', color: 'oklch(0.48 0.14 330)', label: 'Yape' },
-                    { id: 'plin', color: 'oklch(0.55 0.12 240)', label: 'Plin' },
-                  ].map(m => (
-                    <button key={m.id} onClick={() => setMetodoPago(m.id)}
-                      className="flex-1 h-7 rounded text-[10px] font-medium transition-all duration-150"
-                      style={{
-                        backgroundColor: metodoPago === m.id ? m.color : 'var(--bg)',
-                        color: metodoPago === m.id ? '#fff' : 'var(--muted)',
-                        border: metodoPago === m.id ? 'none' : '0.5px solid var(--border)',
-                      }}>{m.label}</button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span style={{ color: 'var(--muted)' }}>Recibido S/</span>
-                  <input type="number" step="1" min="0" value={pagoMonto}
-                    placeholder={montoCobrar.toFixed(0)}
-                    onChange={e => setPagoMonto(e.target.value)}
-                    className="w-24 h-7 px-1 rounded text-[11px] border font-mono text-center"
-                    style={{
-                      backgroundColor: 'var(--bg)',
-                      color: 'var(--ink)',
-                      borderColor: 'var(--border)',
-                      MozAppearance: 'textfield',
-                    }} />
-                  <button onClick={confirmarConPago}
-                    disabled={cobrando}
-                    className="flex-1 h-7 rounded text-[11px] font-semibold transition-all duration-150 disabled:opacity-40"
-                    style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}>
-                    {cobrando ? 'Procesando...' : 'Confirmar'}
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            <button onClick={() => confirmar(false, 0)}
-              disabled={cobrando}
-              className="w-full h-7 rounded text-[10px] font-medium transition-all duration-150 disabled:opacity-40"
-              style={{ backgroundColor: 'transparent', color: 'var(--muted)', border: '0.5px solid var(--border)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}>
-              Solo registrar devolución (sin cobro)
+              {pendiente > 0 ? 'Pagar saldo pendiente S/ ' + pendiente.toFixed(2) : 'Sin deuda pendiente'}
             </button>
           </div>
         </div>
       </div>
     </div>
+    {pagoItemState && (
+      <UnifiedPaymentModal
+        tipo={pagoItemState.esTotal ? 'total' : 'item'}
+        contrato={c}
+        item={pagoItemState.item}
+        itemPendiente={pagoItemState.pendiente}
+        onClose={() => setPagoItemState(null)}
+        onConfirm={() => { setPagoItemState(null); onRecargar(); }}
+      />
+    )}
     </>
   );
 }
