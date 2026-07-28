@@ -146,8 +146,8 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('registrar-pago', (_e, data) => {
-    const { idContrato, monto, metodo, tipo } = data;
-    return registrarPagoAdicional(idContrato, monto, metodo, tipo);
+    const { idContrato, monto, metodo, tipo, idDetalle } = data;
+    return registrarPagoAdicional(idContrato, monto, metodo, tipo, idDetalle);
   });
 
   ipcMain.handle('revertir-devolucion', (_e, data) => {

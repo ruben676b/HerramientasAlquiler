@@ -375,7 +375,13 @@ function getContratos(filtros = {}) {
       if (diasAtrasoItem > max_dias_atraso) max_dias_atraso = diasAtrasoItem;
       total_atraso += montoAtrasoItem;
 
-      return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem, dias_item: diasItem, total_item: totalItem };
+      // Pagos aplicados a este ítem específico
+      const pagadoItem = db.prepare(
+        "SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = ? AND id_detalle = ?"
+      ).get(c.id, item.id)['COALESCE(SUM(monto), 0)'];
+      const saldoItem = Math.max(0, totalItem + montoAtrasoItem - pagadoItem);
+
+      return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem, dias_item: diasItem, total_item: totalItem, pagado_item: pagadoItem, saldo_item: saldoItem };
     });
 
     const totalContrato = itemsConAtraso.reduce((a, i) => a + i.total_item, 0) + (c.deposito_monto || 0);
@@ -392,7 +398,7 @@ function getContratos(filtros = {}) {
  * @param {string} metodo - efectivo | yape | plin
  * @returns {{ id: number, monto: number, metodo: string }}
  */
-function registrarPagoAdicional(idContrato, monto, metodo, tipo) {
+function registrarPagoAdicional(idContrato, monto, metodo, tipo, idDetalle) {
   if (!idContrato || !monto || monto <= 0) {
     throw new Error('Datos de pago inválidos.');
   }
@@ -404,9 +410,9 @@ function registrarPagoAdicional(idContrato, monto, metodo, tipo) {
   }
 
   const result = db.prepare(`
-    INSERT INTO PAGO (id_contrato, monto, metodo, tipo)
-    VALUES (?, ?, ?, ?)
-  `).run(idContrato, monto, metodo, tipo || 'saldo');
+    INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(idContrato, monto, metodo, tipo || 'saldo', idDetalle || null);
 
   return { id: result.lastInsertRowid, monto, metodo };
 }

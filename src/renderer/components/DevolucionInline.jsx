@@ -260,7 +260,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                       <span className="text-[9px]" style={{ color: 'var(--faint)' }}>de {item.cantidad}</span>
                     </div>
                   )}
-                  {/* Fila 4: Base + Mora + Total */}
+                  {/* Fila 4: Base + Mora + Pagado + Total */}
                   <hr style={{ borderColor: 'var(--border)', marginTop: 2, marginBottom: 4 }} />
                   <div className="flex justify-between items-center">
                     <div className="flex items-baseline gap-3">
@@ -286,10 +286,15 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                           )}
                         </span>
                       )}
+                      {(item.pagado_item || 0) > 0 && (
+                        <span style={{ color: 'var(--success)' }}>
+                          Pagado <span className="font-mono">&minus;S/ {item.pagado_item.toFixed(2)}</span>
+                        </span>
+                      )}
                     </div>
                     <div className="text-right">
                       <div className="font-mono font-bold text-sm tabular-nums" style={{ color: 'var(--ink)' }}>
-                        S/ {(baseItem + moraActual).toFixed(2)}
+                        S/ {(baseItem + moraActual - (item.pagado_item || 0)).toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -337,15 +342,17 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                         style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
                     </div>
                   )}
-                  {/* Pagar por ítem (solo si está marcado como devuelto y tiene pendiente > 0) */}
-                  {est && (baseItem + moraActual) > 0 && (
-                      <button onClick={() => setPagoItemState({ item, pendiente: baseItem + moraActual, baseItem, moraItem: moraActual })}
-                        className="w-full mt-1.5 h-6 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-1"
-                      style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}>
-                      Pagar S/ {(baseItem + moraActual).toFixed(2)}
-                    </button>
+                  {/* Pagar por ítem */}
+                  {item.saldo_item > 0 && (
+                    <div className="mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
+                      <button onClick={() => setPagoItemState({ item, pendiente: item.saldo_item, baseItem, moraItem: moraActual, idDetalle: item.id })}
+                        className="w-full h-6 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-1"
+                        style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}>
+                        Pagar S/ {item.saldo_item.toFixed(2)}
+                      </button>
+                    </div>
                   )}
                 </div>
               );
@@ -461,6 +468,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
         itemPendiente={pagoItemState.pendiente}
         itemBase={pagoItemState.baseItem}
         itemMora={pagoItemState.moraItem}
+        idDetalle={pagoItemState.idDetalle}
         onClose={() => setPagoItemState(null)}
         onConfirm={() => { setPagoItemState(null); onRecargar(); }}
       />

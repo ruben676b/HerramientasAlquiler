@@ -2,31 +2,37 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useToast } from './Toast';
 
-export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendiente, itemBase, itemMora, onClose, onConfirm }) {
+export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendiente, itemBase, itemMora, idDetalle, onClose, onConfirm }) {
   const toast = useToast();
   const isItem = tipo === 'item';
   const garantia = contrato.garantia_retenida || 0;
-  const pendiente = isItem ? (itemPendiente || 0) : Math.max(0, (contrato.total_pagado ? 0 : 0));
-
-  // Recalcular pendiente para modo total
-  let total, pagado, saldoPendiente, montoBase, montoAtraso;
-  if (!isItem) {
-    const dias = Math.max(1, Math.ceil(
-      (new Date(contrato.fecha_devolucion_pactada + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
-    ) + 1);
-    montoBase = contrato.total_contrato ? contrato.total_contrato : ((contrato.subtotal_diario || 0) * dias);
-    montoAtraso = contrato.total_atraso || 0;
-    total = montoBase + montoAtraso + (contrato.deposito_monto || 0);
-    pagado = contrato.total_pagado || 0;
-    saldoPendiente = Math.max(0, total - pagado);
-  }
-
-  const montoMaximo = isItem ? pendiente : saldoPendiente;
 
   const [monto, setMonto] = useState('');
   const [metodo, setMetodo] = useState('efectivo');
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
+  const [moraEditada, setMoraEditada] = useState(itemMora || 0);
+  const [atrasoEditado, setAtrasoEditado] = useState(contrato.total_atraso || 0);
+
+  const diasTotal = !isItem ? Math.max(1, Math.ceil(
+    (new Date(contrato.fecha_devolucion_pactada + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
+  ) + 1) : 0;
+
+  const [baseEditada, setBaseEditada] = useState(
+    isItem ? (itemBase || 0) : ((contrato.total_contrato ? contrato.total_contrato : ((contrato.subtotal_diario || 0) * diasTotal)) || 0)
+  );
+
+  const pagadoItem = isItem ? (item?.pagado_item || 0) : 0;
+  const pendienteItem = Math.max(0, baseEditada + moraEditada - pagadoItem);
+
+  let total, pagado, saldoPendiente;
+  if (!isItem) {
+    pagado = contrato.total_pagado || 0;
+    total = baseEditada + atrasoEditado + (contrato.deposito_monto || 0);
+    saldoPendiente = Math.max(0, total - pagado);
+  }
+
+  const montoMaximo = isItem ? pendienteItem : saldoPendiente;
 
   const METODOS = [
     { id: 'efectivo', label: 'Efectivo', color: 'oklch(0.55 0.13 155)' },
@@ -51,6 +57,7 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
         monto: m,
         metodo: esGarantia ? 'efectivo' : metodo,
         tipo: esGarantia ? 'devolucion_deposito' : undefined,
+        idDetalle: idDetalle || undefined,
       });
       toast('Pago registrado: S/ ' + m.toFixed(2) + (esGarantia ? ' (descontado de garantía)' : ' por ' + metodo));
       onConfirm();
@@ -89,22 +96,42 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
                 </p>
                 <p style={{ color: 'var(--muted)' }}>S/ {(item?.precio_dia_aplicado || 0).toFixed(2)}/día</p>
                 <hr style={{ borderColor: 'var(--border)', marginTop: 4, marginBottom: 4 }} />
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span style={{ color: 'var(--muted)' }}>Base ({item?.dias_item || 0} d&iacute;a{(item?.dias_item || 0) !== 1 ? 's' : ''})</span>
-                  <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>
-                    S/ {(itemBase || 0).toFixed(2)}
-                  </span>
+                  <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                    <span className="text-[10px]" style={{ color: 'var(--muted)' }}>S/</span>
+                    <input type="number" step="0.01" min="0"
+                      value={baseEditada}
+                      onChange={e => setBaseEditada(Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="w-20 h-6 px-1 rounded text-xs border font-mono text-right dev-nospin"
+                      style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
+                    />
+                  </div>
                 </div>
                 {(itemMora || 0) > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span style={{ color: 'var(--danger)' }}>Mora</span>
+                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                      <span className="text-[10px]" style={{ color: 'var(--muted)' }}>S/</span>
+                      <input type="number" step="0.01" min="0"
+                        value={moraEditada}
+                        onChange={e => setMoraEditada(Math.max(0, parseFloat(e.target.value) || 0))}
+                        className="w-20 h-6 px-1 rounded text-xs border font-mono text-right dev-nospin"
+                        style={{ backgroundColor: 'var(--bg)', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                      />
+                    </div>
+                  </div>
+                )}
+                {(item?.pagado_item || 0) > 0 && (
                   <div className="flex justify-between">
-                    <span style={{ color: 'var(--danger)' }}>Mora ({item?.dias_atraso_item || 0} d&iacute;a{(item?.dias_atraso_item || 0) !== 1 ? 's' : ''})</span>
-                    <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {(itemMora || 0).toFixed(2)}</span>
+                    <span style={{ color: 'var(--success)' }}>Pagado</span>
+                    <span className="font-mono tabular-nums" style={{ color: 'var(--success)' }}>&minus; S/ {item.pagado_item.toFixed(2)}</span>
                   </div>
                 )}
                 <hr style={{ borderColor: 'var(--border)', marginTop: 4, marginBottom: 2 }} />
                 <div className="flex justify-between font-semibold">
-                  <span style={{ color: 'var(--ink)' }}>Total a cobrar</span>
-                  <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {pendiente.toFixed(2)}</span>
+                  <span style={{ color: 'var(--ink)' }}>Saldo a cobrar</span>
+                  <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {pendienteItem.toFixed(2)}</span>
                 </div>
               </>
             ) : (
@@ -112,14 +139,30 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
                 <p className="font-medium" style={{ color: 'var(--ink)' }}>{contrato.cliente_nombre}</p>
                 <p style={{ color: 'var(--muted)' }}>Contrato #{contrato.id}</p>
                 <hr style={{ borderColor: 'var(--border)', marginTop: 6, marginBottom: 4 }} />
-                <div className="flex justify-between">
-                  <span style={{ color: 'var(--muted)' }}>Alquiler base ({Math.max(1, Math.ceil((new Date(contrato.fecha_devolucion_pactada + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000) + 1)} d&iacute;a{Math.max(1, Math.ceil((new Date(contrato.fecha_devolucion_pactada + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000) + 1) !== 1 ? 's' : ''})</span>
-                  <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {montoBase.toFixed(2)}</span>
+                <div className="flex justify-between items-center">
+                  <span style={{ color: 'var(--muted)' }}>Alquiler base ({diasTotal} d&iacute;a{diasTotal !== 1 ? 's' : ''})</span>
+                  <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                    <span className="text-[10px]" style={{ color: 'var(--muted)' }}>S/</span>
+                    <input type="number" step="0.01" min="0"
+                      value={baseEditada}
+                      onChange={e => setBaseEditada(Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="w-20 h-6 px-1 rounded text-xs border font-mono text-right dev-nospin"
+                      style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
+                    />
+                  </div>
                 </div>
-                {montoAtraso > 0 && (
-                  <div className="flex justify-between">
+                {(contrato.total_atraso || 0) > 0 && (
+                  <div className="flex justify-between items-center">
                     <span style={{ color: 'var(--danger)' }}>Recargo por atraso</span>
-                    <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {montoAtraso.toFixed(2)}</span>
+                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                      <span className="text-[10px]" style={{ color: 'var(--muted)' }}>+ S/</span>
+                      <input type="number" step="0.01" min="0"
+                        value={atrasoEditado}
+                        onChange={e => setAtrasoEditado(Math.max(0, parseFloat(e.target.value) || 0))}
+                        className="w-20 h-6 px-1 rounded text-xs border font-mono text-right dev-nospin"
+                        style={{ backgroundColor: 'var(--bg)', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                      />
+                    </div>
                   </div>
                 )}
                 {(contrato.deposito_monto || 0) > 0 && (
