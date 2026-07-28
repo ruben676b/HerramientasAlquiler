@@ -2,20 +2,20 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useToast } from './Toast';
 
-export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendiente, onClose, onConfirm }) {
+export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendiente, itemBase, itemMora, onClose, onConfirm }) {
   const toast = useToast();
   const isItem = tipo === 'item';
   const garantia = contrato.garantia_retenida || 0;
   const pendiente = isItem ? (itemPendiente || 0) : Math.max(0, (contrato.total_pagado ? 0 : 0));
 
   // Recalcular pendiente para modo total
-  let total, pagado, saldoPendiente;
+  let total, pagado, saldoPendiente, montoBase, montoAtraso;
   if (!isItem) {
     const dias = Math.max(1, Math.ceil(
       (new Date(contrato.fecha_devolucion_pactada + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
     ) + 1);
-    const montoBase = contrato.total_contrato ? contrato.total_contrato : ((contrato.subtotal_diario || 0) * dias);
-    const montoAtraso = contrato.total_atraso || 0;
+    montoBase = contrato.total_contrato ? contrato.total_contrato : ((contrato.subtotal_diario || 0) * dias);
+    montoAtraso = contrato.total_atraso || 0;
     total = montoBase + montoAtraso + (contrato.deposito_monto || 0);
     pagado = contrato.total_pagado || 0;
     saldoPendiente = Math.max(0, total - pagado);
@@ -92,13 +92,13 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
                 <div className="flex justify-between">
                   <span style={{ color: 'var(--muted)' }}>Base ({item?.dias_item || 0} d&iacute;a{(item?.dias_item || 0) !== 1 ? 's' : ''})</span>
                   <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>
-                    S/ {((item?.precio_dia_aplicado || 0) * (item?.dias_item || 1) * (item?.cantidad || 1)).toFixed(2)}
+                    S/ {(itemBase || 0).toFixed(2)}
                   </span>
                 </div>
-                {(item?.dias_atraso_item || 0) > 0 && (
+                {(itemMora || 0) > 0 && (
                   <div className="flex justify-between">
-                    <span style={{ color: 'var(--danger)' }}>Mora ({item.dias_atraso_item} d&iacute;a{item.dias_atraso_item !== 1 ? 's' : ''})</span>
-                    <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {(item?.monto_atraso_item || 0).toFixed(2)}</span>
+                    <span style={{ color: 'var(--danger)' }}>Mora ({item?.dias_atraso_item || 0} d&iacute;a{(item?.dias_atraso_item || 0) !== 1 ? 's' : ''})</span>
+                    <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {(itemMora || 0).toFixed(2)}</span>
                   </div>
                 )}
                 <hr style={{ borderColor: 'var(--border)', marginTop: 4, marginBottom: 2 }} />
@@ -112,6 +112,23 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
                 <p className="font-medium" style={{ color: 'var(--ink)' }}>{contrato.cliente_nombre}</p>
                 <p style={{ color: 'var(--muted)' }}>Contrato #{contrato.id}</p>
                 <hr style={{ borderColor: 'var(--border)', marginTop: 6, marginBottom: 4 }} />
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--muted)' }}>Alquiler base ({Math.max(1, Math.ceil((new Date(contrato.fecha_devolucion_pactada + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000) + 1)} d&iacute;a{Math.max(1, Math.ceil((new Date(contrato.fecha_devolucion_pactada + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000) + 1) !== 1 ? 's' : ''})</span>
+                  <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {montoBase.toFixed(2)}</span>
+                </div>
+                {montoAtraso > 0 && (
+                  <div className="flex justify-between">
+                    <span style={{ color: 'var(--danger)' }}>Recargo por atraso</span>
+                    <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {montoAtraso.toFixed(2)}</span>
+                  </div>
+                )}
+                {(contrato.deposito_monto || 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span style={{ color: 'var(--muted)' }}>Dep&oacute;sito</span>
+                    <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {(contrato.deposito_monto || 0).toFixed(2)}</span>
+                  </div>
+                )}
+                <hr style={{ borderColor: 'var(--border)', marginTop: 4, marginBottom: 2 }} />
                 <div className="flex justify-between">
                   <span style={{ color: 'var(--muted)' }}>Total a pagar</span>
                   <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {total.toFixed(2)}</span>

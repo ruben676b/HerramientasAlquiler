@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('api', {
   crearContrato: (data) => ipcRenderer.invoke('crear-contrato', data),
   registrarDevolucion: (data) =>
     ipcRenderer.invoke('registrar-devolucion', data),
+  revertirDevolucion: (data) =>
+    ipcRenderer.invoke('revertir-devolucion', data),
   getContratos: (filtros) => ipcRenderer.invoke('get-contratos', filtros),
   registrarPago: (data) => ipcRenderer.invoke('registrar-pago', data),
 

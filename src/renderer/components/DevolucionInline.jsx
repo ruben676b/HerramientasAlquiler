@@ -84,6 +84,19 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
     finally { setCobrando(false); }
   };
 
+  const handleDeshacer = async (idx) => {
+    if (!window.api) return;
+    try {
+      await window.api.revertirDevolucion({ idDetalle: items[idx].id });
+      setGuardados(p => { const n = { ...p }; delete n[idx]; return n; });
+      setEstados(p => { const n = { ...p }; delete n[idx]; return n; });
+      toast('Devolución revertida');
+      onRecargar();
+    } catch (e) {
+      toast('Error al revertir: ' + (e.message || e), 'error');
+    }
+  };
+
   const setEstado = async (idx, e) => {
     if (!window.api || guardados[idx]) return;
     setEstados(p => ({ ...p, [idx]: e }));
@@ -257,7 +270,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                           <span style={{ color: 'var(--danger)' }}>Mora </span>
                           {editandoMora[idx] ? (
                             <input type="number" step="0.01" min="0"
-                              defaultValue={moraCalc}
+                              defaultValue={moraActual}
                               onBlur={e => { setMora(idx, parseFloat(e.target.value) || 0); setEditandoMora(p => ({ ...p, [idx]: false })); }}
                               onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
                               className="w-20 h-6 px-1 rounded text-xs border font-mono text-right dev-nospin"
@@ -282,8 +295,15 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                   </div>
                   {/* Fila 5: Botones de estado */}
                   {yaGuardado ? (
-                    <div className="flex items-center gap-1 mt-2 pt-1.5 text-[10px] font-medium" style={{ borderTop: '0.5px solid var(--border)', color: 'var(--success)' }}>
-                      <CheckCircle size={12} /> Devuelto correctamente
+                    <div className="flex items-center justify-between mt-2 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
+                      <div className="flex items-center gap-1 text-[10px] font-medium" style={{ color: 'var(--success)' }}>
+                        <CheckCircle size={12} /> Devuelto correctamente
+                      </div>
+                      <button onClick={() => handleDeshacer(idx)}
+                        className="text-[10px] px-2 h-5 rounded font-medium transition-all duration-150 hover:opacity-80"
+                        style={{ backgroundColor: 'oklch(0.92 0.03 25)', color: 'var(--danger)' }}>
+                        Deshacer
+                      </button>
                     </div>
                   ) : (
                     <div className="flex gap-1 mt-2 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
@@ -319,8 +339,8 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                   )}
                   {/* Pagar por ítem (solo si está marcado como devuelto y tiene pendiente > 0) */}
                   {est && (baseItem + moraActual) > 0 && (
-                    <button onClick={() => setPagoItemState({ item, pendiente: baseItem + moraActual })}
-                      className="w-full mt-1.5 h-6 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-1"
+                      <button onClick={() => setPagoItemState({ item, pendiente: baseItem + moraActual, baseItem, moraItem: moraActual })}
+                        className="w-full mt-1.5 h-6 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-1"
                       style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}>
@@ -439,6 +459,8 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
         contrato={c}
         item={pagoItemState.item}
         itemPendiente={pagoItemState.pendiente}
+        itemBase={pagoItemState.baseItem}
+        itemMora={pagoItemState.moraItem}
         onClose={() => setPagoItemState(null)}
         onConfirm={() => { setPagoItemState(null); onRecargar(); }}
       />

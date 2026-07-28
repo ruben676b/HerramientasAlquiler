@@ -6,6 +6,7 @@ const {
   registrarDevolucion,
   getContratos,
   registrarPagoAdicional,
+  revertirDevolucionItem,
 } = require('./services/contratoService');
 const {
   getHerramientas,
@@ -147,6 +148,11 @@ function registerIpcHandlers() {
   ipcMain.handle('registrar-pago', (_e, data) => {
     const { idContrato, monto, metodo, tipo } = data;
     return registrarPagoAdicional(idContrato, monto, metodo, tipo);
+  });
+
+  ipcMain.handle('revertir-devolucion', (_e, data) => {
+    const { idDetalle } = data;
+    return revertirDevolucionItem(idDetalle);
   });
 
   // --- Sistema ---

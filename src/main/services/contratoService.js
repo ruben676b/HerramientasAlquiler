@@ -411,4 +411,82 @@ function registrarPagoAdicional(idContrato, monto, metodo, tipo) {
   return { id: result.lastInsertRowid, monto, metodo };
 }
 
-module.exports = { crearContrato, registrarDevolucion, getContratos, registrarPagoAdicional };
+/**
+ * Revierte la devolución de un ítem individual.
+ * Restaura el detalle a 'pendiente', la herramienta a 'alquilado',
+ * y elimina el registro de mantenimiento si estaba dañado.
+ * Para granel, maneja tanto devolución completa como split parcial.
+ */
+function revertirDevolucionItem(idDetalle) {
+  const detalle = db.prepare('SELECT * FROM DETALLE_CONTRATO WHERE id = ?').get(idDetalle);
+  if (!detalle) throw new Error('Detalle no encontrado');
+
+  const ejecutar = db.transaction(() => {
+    if (detalle.tipo_item === 'individual') {
+      if (detalle.estado_devolucion !== 'bien' && detalle.estado_devolucion !== 'dañado')
+        throw new Error('El ítem no está en estado devuelto');
+
+      db.prepare("UPDATE DETALLE_CONTRATO SET estado_devolucion = 'pendiente', fecha_devolucion_real = NULL WHERE id = ?")
+        .run(idDetalle);
+
+      db.prepare("UPDATE HERRAMIENTA SET estado = 'alquilado' WHERE id = ?")
+        .run(detalle.id_herramienta);
+
+      if (detalle.estado_devolucion === 'dañado') {
+        db.prepare("DELETE FROM MANTENIMIENTO WHERE id_herramienta = ? AND fecha_inicio = ? AND tipo = 'correctivo' AND descripcion LIKE 'Devolucion:%'")
+          .run(detalle.id_herramienta, detalle.fecha_devolucion_real);
+      }
+    } else if (detalle.tipo_item === 'granel') {
+      const rowsDevueltas = db.prepare(`
+        SELECT * FROM DETALLE_CONTRATO
+        WHERE id_contrato = ? AND id_item_granel = ?
+        AND estado_devolucion IN ('bien', 'dañado')
+      `).all(detalle.id_contrato, detalle.id_item_granel);
+
+      let cantidadARestaurar = 0;
+
+      if (detalle.estado_devolucion === 'pendiente') {
+        // CASO SPLIT: fila original reducida + fila(s) nueva(s) devuelta(s)
+        for (const row of rowsDevueltas) {
+          cantidadARestaurar += row.cantidad;
+          db.prepare('DELETE FROM DETALLE_CONTRATO WHERE id = ?').run(row.id);
+        }
+        db.prepare('UPDATE DETALLE_CONTRATO SET cantidad = cantidad + ? WHERE id = ?')
+          .run(cantidadARestaurar, idDetalle);
+      } else {
+        // CASO DEVOLUCIÓN COMPLETA: la fila original misma fue devuelta
+        cantidadARestaurar = detalle.cantidad;
+        db.prepare("UPDATE DETALLE_CONTRATO SET estado_devolucion = 'pendiente', fecha_devolucion_real = NULL WHERE id = ?")
+          .run(idDetalle);
+      }
+
+      db.prepare('UPDATE ITEM_GRANEL SET cantidad_disponible = cantidad_disponible - ? WHERE id = ?')
+        .run(cantidadARestaurar, detalle.id_item_granel);
+    }
+
+    // Recalcular estado del contrato (CHECK: 'reservado','alquilado','devuelto','devolución incompleta')
+    const totalItems = db.prepare(
+      "SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO WHERE id_contrato = ?"
+    ).get(detalle.id_contrato);
+
+    const pendientes = db.prepare(
+      "SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO WHERE id_contrato = ? AND estado_devolucion = 'pendiente'"
+    ).get(detalle.id_contrato);
+
+    const hayDevueltos = (totalItems.cnt - pendientes.cnt) > 0;
+
+    if (hayDevueltos) {
+      db.prepare("UPDATE CONTRATO SET estado = 'devolución incompleta', fecha_modificacion = datetime('now') WHERE id = ?")
+        .run(detalle.id_contrato);
+    } else {
+      db.prepare("UPDATE CONTRATO SET estado = 'alquilado', fecha_devolucion_real = NULL, fecha_modificacion = datetime('now') WHERE id = ?")
+        .run(detalle.id_contrato);
+    }
+
+    return { ok: true };
+  });
+
+  return ejecutar();
+}
+
+module.exports = { crearContrato, registrarDevolucion, getContratos, registrarPagoAdicional, revertirDevolucionItem };
