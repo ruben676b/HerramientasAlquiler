@@ -306,8 +306,8 @@ function getContratos(filtros = {}) {
            cl.telefono AS cliente_telefono,
       (SELECT COUNT(*) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS total_items,
       (SELECT SUM(precio_dia_aplicado * cantidad) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS subtotal_diario,
-      (SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = c.id AND tipo != 'deposito') AS total_pagado,
-      (SELECT COALESCE(SUM(CASE WHEN tipo = 'deposito' THEN monto WHEN tipo = 'devolucion_deposito' THEN -monto END), 0) FROM PAGO WHERE id_contrato = c.id AND tipo IN ('deposito', 'devolucion_deposito')) AS garantia_retenida
+      (SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = c.id AND tipo != 'deposito' AND (anulado IS NULL OR anulado = 0)) AS total_pagado,
+      (SELECT COALESCE(SUM(CASE WHEN tipo = 'deposito' THEN monto WHEN tipo = 'devolucion_deposito' THEN -monto END), 0) FROM PAGO WHERE id_contrato = c.id AND tipo IN ('deposito', 'devolucion_deposito') AND (anulado IS NULL OR anulado = 0)) AS garantia_retenida
     FROM CONTRATO c
     JOIN CLIENTE cl ON c.id_cliente = cl.id
     LEFT JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id
@@ -349,7 +349,7 @@ function getContratos(filtros = {}) {
     `).all(c.id);
 
     const pagos = db.prepare(`
-      SELECT id, monto, metodo, tipo, fecha_pago
+      SELECT id, monto, metodo, tipo, fecha_pago, anulado, fecha_anulacion, motivo_anulacion, id_detalle
       FROM PAGO WHERE id_contrato = ?
       ORDER BY fecha_pago ASC
     `).all(c.id);
@@ -375,9 +375,9 @@ function getContratos(filtros = {}) {
       if (diasAtrasoItem > max_dias_atraso) max_dias_atraso = diasAtrasoItem;
       total_atraso += montoAtrasoItem;
 
-      // Pagos aplicados a este ítem específico
+      // Pagos aplicados a este ítem específico (excluyendo anulados)
       const pagadoItem = db.prepare(
-        "SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = ? AND id_detalle = ?"
+        "SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = ? AND id_detalle = ? AND (anulado IS NULL OR anulado = 0)"
       ).get(c.id, item.id)['COALESCE(SUM(monto), 0)'];
       const saldoItem = Math.max(0, totalItem + montoAtrasoItem - pagadoItem);
 
@@ -495,4 +495,25 @@ function revertirDevolucionItem(idDetalle) {
   return ejecutar();
 }
 
-module.exports = { crearContrato, registrarDevolucion, getContratos, registrarPagoAdicional, revertirDevolucionItem };
+/**
+ * Anula un pago registrado, marcándolo como anulado.
+ * No elimina el registro, solo lo desactiva lógicamente.
+ * Al anular, los totales se recalculan automáticamente en getContratos.
+ *
+ * @param {number} idPago
+ * @param {string} [motivo]
+ */
+function anularPago(idPago, motivo) {
+  const pago = db.prepare('SELECT * FROM PAGO WHERE id = ?').get(idPago);
+  if (!pago) throw new Error('Pago no encontrado.');
+  if (pago.anulado) throw new Error('El pago ya está anulado.');
+
+  db.prepare(`
+    UPDATE PAGO SET anulado = 1, fecha_anulacion = datetime('now'), motivo_anulacion = ?
+    WHERE id = ?
+  `).run(motivo || null, idPago);
+
+  return { id: idPago, anulado: true };
+}
+
+module.exports = { crearContrato, registrarDevolucion, getContratos, registrarPagoAdicional, revertirDevolucionItem, anularPago };

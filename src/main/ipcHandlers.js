@@ -7,6 +7,7 @@ const {
   getContratos,
   registrarPagoAdicional,
   revertirDevolucionItem,
+  anularPago,
 } = require('./services/contratoService');
 const {
   getHerramientas,
@@ -153,6 +154,11 @@ function registerIpcHandlers() {
   ipcMain.handle('revertir-devolucion', (_e, data) => {
     const { idDetalle } = data;
     return revertirDevolucionItem(idDetalle);
+  });
+
+  ipcMain.handle('anular-pago', (_e, data) => {
+    const { idPago, motivo } = data;
+    return anularPago(idPago, motivo);
   });
 
   // --- Sistema ---

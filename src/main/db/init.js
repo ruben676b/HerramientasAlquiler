@@ -164,6 +164,11 @@ function initDatabase() {
   // Migración: agregar id_detalle a PAGO para pagos por ítem
   try { db.exec("ALTER TABLE PAGO ADD COLUMN id_detalle INTEGER REFERENCES DETALLE_CONTRATO(id)"); } catch {}
 
+  // Migración: agregar columnas de anulación a PAGO
+  try { db.exec("ALTER TABLE PAGO ADD COLUMN anulado INTEGER DEFAULT 0 CHECK (anulado IN (0, 1))"); } catch {}
+  try { db.exec("ALTER TABLE PAGO ADD COLUMN fecha_anulacion TEXT"); } catch {}
+  try { db.exec("ALTER TABLE PAGO ADD COLUMN motivo_anulacion TEXT"); } catch {}
+
   try {
     db.exec(`
       CREATE TRIGGER IF NOT EXISTS trg_update_contrato_mod

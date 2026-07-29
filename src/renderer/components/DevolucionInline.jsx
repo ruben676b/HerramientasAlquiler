@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
-import { X, CheckCircle, AlertTriangle, Minus, Plus } from 'lucide-react';
+import { X, CheckCircle, AlertTriangle, Minus, Plus, ChevronRight } from 'lucide-react';
 import { useToast } from './Toast';
 import UnifiedPaymentModal from './UnifiedPaymentModal';
+import AnularPagoModal from './AnularPagoModal';
 
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const fmtFecha = (iso) => {
@@ -32,6 +33,9 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [cobrando, setCobrando] = useState(false);
   const [guardados, setGuardados] = useState({});
   const [pagoItemState, setPagoItemState] = useState(null);
+  const [anulandoPago, setAnulandoPago] = useState(null);
+  const [historialItemAbierto, setHistorialItemAbierto] = useState({});
+  const [historialPagosAbierto, setHistorialPagosAbierto] = useState(false);
   const [devolviendoGarantia, setDevolviendoGarantia] = useState(false);
   const [devGarMonto, setDevGarMonto] = useState('');
   const [devGarMetodo, setDevGarMetodo] = useState('efectivo');
@@ -354,6 +358,45 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                       </button>
                     </div>
                   )}
+                  {/* Historial de pagos del item */}
+                  {(() => {
+                    const pagosItem = pagos.filter(p => p.id_detalle === item.id);
+                    if (pagosItem.length === 0) return null;
+                    const abierto = historialItemAbierto[idx];
+                    return (
+                      <div className="mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
+                        <button onClick={() => setHistorialItemAbierto(p => ({ ...p, [idx]: !p[idx] }))}
+                          className="flex items-center gap-1 text-[9px] uppercase tracking-wider font-semibold w-full text-left"
+                          style={{ color: 'var(--muted)' }}>
+                          <ChevronRight size={10}
+                            style={{ transform: abierto ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }} />
+                          Pagos de este item ({pagosItem.length})
+                        </button>
+                        {abierto && (
+                          <div className="space-y-1 pt-1">
+                            {pagosItem.map(p => {
+                              const anulado = p.anulado === 1;
+                              return (
+                                <div key={p.id} className="flex items-center gap-1.5 text-[10px]"
+                                  style={{ opacity: anulado ? 0.4 : 1, textDecoration: anulado ? 'line-through' : 'none' }}>
+<span className="shrink-0" style={{ color: 'var(--muted)' }}>{p.fecha_pago?.slice(5, 10)}</span>
+                              <span className="font-mono" style={{ color: anulado ? 'var(--muted)' : 'var(--success)' }}>S/ {p.monto.toFixed(2)}</span>
+                              <span className="text-[8px] capitalize" style={{ color: 'var(--muted)' }}>{p.metodo}</span>
+                              <span className="flex-1" />
+                              {anulado
+                                ? <span className="text-[8px]" style={{ color: 'var(--muted)' }}>Anulado</span>
+                                    : <button onClick={() => setAnulandoPago(p)}
+                                        className="text-[9px] underline hover:opacity-70 shrink-0"
+                                        style={{ color: 'var(--danger)' }}>Anular</button>
+                                  }
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })
@@ -445,8 +488,61 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
               </>
             )}
           </div>
-          
-          {/* Botones de acción */}
+
+          {/* Historial de pagos general */}
+          <div className="rounded-lg" style={{ border: '0.5px solid var(--border)', backgroundColor: 'var(--bg)' }}>
+            <button onClick={() => setHistorialPagosAbierto(!historialPagosAbierto)}
+              className="flex items-center gap-1.5 w-full px-2.5 py-1.5 text-[11px] font-medium transition-colors duration-150 hover:opacity-80 rounded-lg"
+              style={{ color: 'var(--muted)' }}>
+              <ChevronRight size={11}
+                style={{ transform: historialPagosAbierto ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }} />
+              Historial de pagos{pagos.length > 0 ? ` (${pagos.length})` : ''}
+            </button>
+            {historialPagosAbierto && (
+              <div className="px-2.5 pb-1.5 space-y-1" style={{ borderTop: '0.5px solid var(--border)' }}>
+                {pagos.length === 0 ? (
+                  <p className="pt-1.5 text-[11px]" style={{ color: 'var(--faint)' }}>Sin pagos registrados</p>
+                ) : (
+                  pagos.map((p, idx) => {
+                    const esDeposito = p.tipo === 'deposito';
+                    const esDevolucionDeposito = p.tipo === 'devolucion_deposito';
+                    const anulado = p.anulado === 1;
+                    const colorMetodo = esDeposito ? 'oklch(0.55 0.12 70)' :
+                      esDevolucionDeposito ? 'var(--danger)' :
+                      p.metodo === 'efectivo' ? 'oklch(0.55 0.13 155)' :
+                      p.metodo === 'yape' ? 'oklch(0.48 0.14 330)' : 'oklch(0.55 0.12 240)';
+                    const labelMetodo = esDeposito ? 'Garantia +' :
+                      esDevolucionDeposito ? 'Garantia -' :
+                      p.metodo;
+                    return (
+                      <div key={idx} className="flex items-center gap-2 pt-1.5 text-[11px]"
+                        style={{ opacity: anulado ? 0.35 : 1 }}>
+                        <span className="shrink-0" style={{ color: 'var(--muted)' }}>{p.fecha_pago?.slice(5, 10) || '-'}</span>
+                        <span className="font-mono font-medium flex-1" style={{
+                          color: 'var(--ink)',
+                          textDecoration: anulado ? 'line-through' : 'none',
+                        }}>
+                          S/ {p.monto.toFixed(2)}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded-[10px] text-[9px] font-medium capitalize"
+                          style={{ backgroundColor: colorMetodo + '20', color: colorMetodo }}>
+                          {labelMetodo}
+                        </span>
+                        {anulado
+                          ? <span className="text-[9px] shrink-0" style={{ color: 'var(--muted)' }}>Anulado</span>
+                          : <button onClick={() => setAnulandoPago(p)}
+                              className="text-[9px] underline hover:opacity-70 shrink-0"
+                              style={{ color: 'var(--danger)' }}>Anular</button>
+                        }
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Botones de accion */}
           <div className="space-y-2 pt-1">
             <button onClick={() => setPagoItemState({ item: null, pendiente: pendiente, esTotal: true })}
               disabled={pendiente <= 0}
@@ -471,6 +567,13 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
         idDetalle={pagoItemState.idDetalle}
         onClose={() => setPagoItemState(null)}
         onConfirm={() => { setPagoItemState(null); onRecargar(); }}
+      />
+    )}
+    {anulandoPago && (
+      <AnularPagoModal
+        pago={anulandoPago}
+        onClose={() => setAnulandoPago(null)}
+        onConfirm={() => { setAnulandoPago(null); onRecargar(); }}
       />
     )}
     </>

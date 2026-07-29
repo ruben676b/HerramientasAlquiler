@@ -8,6 +8,7 @@ import Button from '../components/ui/button';
 import { useSessions } from '../contexts/SessionsContext';
 import { useToast } from '../components/Toast';
 import UnifiedPaymentModal from '../components/UnifiedPaymentModal';
+import AnularPagoModal from '../components/AnularPagoModal';
 import DevolucionInline from '../components/DevolucionInline';
 
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -33,6 +34,7 @@ export default function Alquileres() {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
   const [pagoModalContrato, setPagoModalContrato] = useState(null);
   const [historialAbierto, setHistorialAbierto] = useState(null);
+  const [anulandoPago, setAnulandoPago] = useState(null);
   const [devolucionActiva, setDevolucionActiva] = useState(null);
   const [addGarantiaId, setAddGarantiaId] = useState(null);
   const [garantiaMonto, setGarantiaMonto] = useState('');
@@ -510,15 +512,25 @@ export default function Alquileres() {
                                       esDevolucionDeposito ? 'Garantía −' :
                                       p.metodo;
                                     return (
-                                      <div key={idx} className="flex items-center gap-2 pt-1.5 text-[11px]">
-                                        <span className="shrink-0" style={{ color: 'var(--faint)' }}>{p.fecha_pago?.slice(5, 10) || '—'}</span>
-                                        <span className="font-mono font-medium flex-1" style={{ color: 'var(--ink)' }}>
+                                      <div key={idx} className="flex items-center gap-2 pt-1.5 text-[11px]"
+                                        style={{ opacity: p.anulado === 1 ? 0.35 : 1 }}>
+                                        <span className="shrink-0" style={{ color: 'var(--muted)' }}>{p.fecha_pago?.slice(5, 10) || '—'}</span>
+                                        <span className="font-mono font-medium flex-1" style={{
+                                          color: 'var(--ink)',
+                                          textDecoration: p.anulado === 1 ? 'line-through' : 'none',
+                                        }}>
                                           S/ {p.monto.toFixed(2)}
                                         </span>
                                         <span className="px-1.5 py-0.5 rounded-[10px] text-[9px] font-medium capitalize"
                                           style={{ backgroundColor: colorMetodo + '20', color: colorMetodo }}>
                                           {labelMetodo}
                                         </span>
+                                        {p.anulado === 1
+                                          ? <span className="text-[9px] shrink-0" style={{ color: 'var(--muted)' }}>Anulado</span>
+                                          : <button onClick={() => setAnulandoPago(p)}
+                                              className="text-[9px] underline hover:opacity-70 shrink-0"
+                                              style={{ color: 'var(--danger)' }}>Anular</button>
+                                        }
                                       </div>
                                     );
                                   })
@@ -577,6 +589,14 @@ export default function Alquileres() {
           contrato={pagoModalContrato}
           onClose={() => setPagoModalContrato(null)}
           onConfirm={() => { setPagoModalContrato(null); recargar(); }}
+        />
+      )}
+
+      {anulandoPago && (
+        <AnularPagoModal
+          pago={anulandoPago}
+          onClose={() => setAnulandoPago(null)}
+          onConfirm={() => { setAnulandoPago(null); recargar(); }}
         />
       )}
 
