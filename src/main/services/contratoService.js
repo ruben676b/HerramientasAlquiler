@@ -349,7 +349,7 @@ function getContratos(filtros = {}) {
     `).all(c.id);
 
     const pagos = db.prepare(`
-      SELECT id, monto, metodo, tipo, fecha_pago, anulado, fecha_anulacion, motivo_anulacion, id_detalle
+      SELECT id, monto, metodo, tipo, fecha_pago, anulado, fecha_anulacion, motivo_anulacion, id_detalle, grupo_pago
       FROM PAGO WHERE id_contrato = ?
       ORDER BY fecha_pago ASC
     `).all(c.id);
@@ -391,12 +391,73 @@ function getContratos(filtros = {}) {
 }
 
 /**
+ * Distribuye un pago general en cascada a los ítems del contrato.
+ * Cada ítem recibe una porción del pago hasta cubrir su saldo,
+ * y se crea un PAGO por ítem con el mismo grupo_pago (UUID).
+ */
+function distribuirPagoItems(idContrato, monto, metodo, tipo) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const c = db.prepare('SELECT * FROM CONTRATO WHERE id = ?').get(idContrato);
+  if (!c) throw new Error('Contrato no encontrado.');
+
+  const items = db.prepare(`
+    SELECT d.*,
+      (SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = ? AND id_detalle = d.id AND (anulado IS NULL OR anulado = 0)) AS pagado_item
+    FROM DETALLE_CONTRATO d WHERE d.id_contrato = ?
+    ORDER BY d.id ASC
+  `).all(idContrato, idContrato);
+
+  // Calcular saldo por ítem (misma lógica que getContratos)
+  const itemsConSaldo = items.map(item => {
+    const fechaDevItem = item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada;
+    const diasItem = Math.max(1, Math.ceil(
+      (new Date(fechaDevItem + 'T00:00:00') - new Date(c.fecha_salida + 'T00:00:00')) / 86400000
+    ) + 1);
+    const totalItem = diasItem * item.precio_dia_aplicado * item.cantidad;
+    const fechaPactadaItem = new Date(fechaDevItem + 'T00:00:00');
+    const refDate = item.fecha_devolucion_real
+      ? new Date(item.fecha_devolucion_real + 'T00:00:00')
+      : new Date(hoy + 'T00:00:00');
+    const diasAtrasoItem = Math.max(0, Math.ceil((refDate - fechaPactadaItem) / 86400000));
+    const montoAtrasoItem = diasAtrasoItem * item.precio_dia_aplicado * item.cantidad;
+    const saldo = Math.max(0, totalItem + montoAtrasoItem - (item.pagado_item || 0));
+    return { ...item, saldo };
+  }).filter(i => i.saldo > 0);
+
+  if (itemsConSaldo.length === 0) {
+    throw new Error('No hay items con saldo pendiente.');
+  }
+
+  const totalPendiente = itemsConSaldo.reduce((a, i) => a + i.saldo, 0);
+  if (monto > totalPendiente) {
+    throw new Error('El monto excede el saldo total pendiente (S/ ' + totalPendiente.toFixed(2) + ').');
+  }
+
+  const grupoPago = require('crypto').randomUUID();
+  let restante = monto;
+  const ids = [];
+
+  const ejecutar = db.transaction(() => {
+    for (const item of itemsConSaldo) {
+      if (restante <= 0) break;
+      const take = Math.min(restante, item.saldo);
+      const r = db.prepare(`
+        INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle, grupo_pago)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(idContrato, take, metodo, tipo || 'saldo', item.id, grupoPago);
+      ids.push(r.lastInsertRowid);
+      restante -= take;
+    }
+  });
+
+  ejecutar();
+  return { ids, grupo: grupoPago, monto: monto - restante };
+}
+
+/**
  * Registra un pago adicional para un contrato existente.
- *
- * @param {number} idContrato
- * @param {number} monto
- * @param {string} metodo - efectivo | yape | plin
- * @returns {{ id: number, monto: number, metodo: string }}
+ * Si se proporciona idDetalle, el pago se aplica directamente a ese ítem.
+ * Si no, se distribuye en cascada a todos los items con saldo pendiente.
  */
 function registrarPagoAdicional(idContrato, monto, metodo, tipo, idDetalle) {
   if (!idContrato || !monto || monto <= 0) {
@@ -409,12 +470,17 @@ function registrarPagoAdicional(idContrato, monto, metodo, tipo, idDetalle) {
     throw new Error('El contrato ya está cerrado. No se pueden registrar pagos adicionales.');
   }
 
-  const result = db.prepare(`
-    INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(idContrato, monto, metodo, tipo || 'saldo', idDetalle || null);
+  if (idDetalle) {
+    // Pago directo a un ítem específico
+    const result = db.prepare(`
+      INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(idContrato, monto, metodo, tipo || 'saldo', idDetalle);
+    return { id: result.lastInsertRowid, monto, metodo };
+  }
 
-  return { id: result.lastInsertRowid, monto, metodo };
+  // Pago general: distribuir en cascada a los ítems
+  return distribuirPagoItems(idContrato, monto, metodo, tipo);
 }
 
 /**
@@ -508,6 +574,27 @@ function anularPago(idPago, motivo) {
   if (!pago) throw new Error('Pago no encontrado.');
   if (pago.anulado) throw new Error('El pago ya está anulado.');
 
+  if (pago.grupo_pago) {
+    // Anular todo el grupo de pagos distribuidos
+    const ids = db.prepare(
+      "SELECT id FROM PAGO WHERE grupo_pago = ? AND (anulado IS NULL OR anulado = 0)"
+    ).all(pago.grupo_pago).map(r => r.id);
+
+    if (ids.length === 0) throw new Error('No se encontraron pagos activos en el grupo.');
+
+    const ejecutar = db.transaction(() => {
+      for (const id of ids) {
+        db.prepare(`
+          UPDATE PAGO SET anulado = 1, fecha_anulacion = datetime('now'), motivo_anulacion = ?
+          WHERE id = ?
+        `).run(motivo || null, id);
+      }
+    });
+    ejecutar();
+    return { ids, anulado: true };
+  }
+
+  // Pago individual (per-item o depósito directo)
   db.prepare(`
     UPDATE PAGO SET anulado = 1, fecha_anulacion = datetime('now'), motivo_anulacion = ?
     WHERE id = ?

@@ -3,6 +3,7 @@ import { X, CheckCircle, AlertTriangle, Minus, Plus, ChevronRight } from 'lucide
 import { useToast } from './Toast';
 import UnifiedPaymentModal from './UnifiedPaymentModal';
 import AnularPagoModal from './AnularPagoModal';
+import { gruparPagos } from '../lib/gruparPagos';
 
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const fmtFecha = (iso) => {
@@ -51,10 +52,9 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   ) + 1);
   const montoBase = c.total_contrato ? c.total_contrato : ((c.subtotal_diario || 0) * dias);
   
-  // Sumar mora sugerida de todos los ítems (usando mora editada si existe)
+  // Sumar mora sugerida de todos los ítems (usando cantidad original, no la devolución)
   const montoAtraso = items.reduce((sum, item, idx) => {
-    const cantidad = parseInt(cantidades[idx]) || item.cantidad || 1;
-    const sugerida = (item.dias_atraso_item || 0) * (item.precio_dia_aplicado || 0) * cantidad;
+    const sugerida = (item.dias_atraso_item || 0) * (item.precio_dia_aplicado || 0) * item.cantidad;
     return sum + (morasEditadas[idx] != null ? morasEditadas[idx] : sugerida);
   }, 0);
 
@@ -118,6 +118,15 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
     }
     // Guardar automáticamente marca Bien o Dañado
     const item = items[idx];
+    // Si es granel y cantidad a devolver es 0, prevenir y avisar
+    if (item.id_item_granel) {
+      const cantDevolver = parseInt(cantidades[idx]) || 0;
+      if (cantDevolver <= 0) {
+        toast('Indica cuántos devuelves primero.', 'warn');
+        setEstados(p => { const n = { ...p }; delete n[idx]; return n; });
+        return;
+      }
+    }
     try {
       const hoy = new Date().toISOString().slice(0, 10);
       await window.api.registrarDevolucion({
@@ -127,7 +136,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
           id_detalle: item.id,
           estado_devolucion: e,
           cantidad_devuelta: item.id_item_granel
-            ? (parseInt(cantidades[idx]) || item.cantidad)
+            ? (parseInt(cantidades[idx]) || 0)
             : undefined,
           costo_reparacion: e === 'dañado' ? (parseFloat(costosRep[idx]) || 0) : undefined,
         }],
@@ -233,19 +242,19 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                     Salida: {fmtFecha(c.fecha_salida)} &middot; Pactada: {fmtFecha(fechaPactadaItem)}
                     <span style={{ color: 'var(--muted)' }}> &middot; Base: {diasItem} día{diasItem !== 1 ? 's' : ''}</span>
                   </div>
-                  {/* Fila 3: Cantidad para granel */}
+                  {/* Fila 3: Cantidad para granel — empieza en 0, se sube al devolver */}
                   {esGranel && (
                     <div className="flex items-center gap-1.5 mb-1.5">
-                      <span className="text-[10px]" style={{ color: 'var(--muted)' }}>Devolver:</span>
-                      <button onClick={() => setCantidad(idx, Math.max(0, (parseInt(cantidades[idx]) || item.cantidad) - 1))}
+                      <span className="text-[10px]" style={{ color: 'var(--muted)' }}>Devolviendo:</span>
+                      <button onClick={() => setCantidad(idx, Math.max(0, (parseInt(cantidades[idx]) || 0) - 1))}
                         className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Minus size={10} /></button>
                       {editandoCant[idx] ? (
                         <input
                           ref={el => inputCantRefs.current[idx] = el}
                           type="number" min="0" max={item.cantidad}
-                          defaultValue={cantidades[idx] ?? item.cantidad}
+                          defaultValue={cantidades[idx] ?? 0}
                           onBlur={e => {
-                            const v = Math.max(0, Math.min(item.cantidad, parseInt(e.target.value) || item.cantidad));
+                            const v = Math.max(0, Math.min(item.cantidad, parseInt(e.target.value) || 0));
                             setCantidad(idx, v);
                             setEditandoCant(p => ({ ...p, [idx]: false }));
                           }}
@@ -257,9 +266,9 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                       ) : (
                         <span onClick={() => { setEditandoCant(p => ({ ...p, [idx]: true })); setTimeout(() => inputCantRefs.current[idx]?.select(), 60); }}
                           className="w-8 text-center font-mono text-xs font-semibold cursor-pointer px-0.5 rounded hover:bg-black/5"
-                          style={{ color: 'var(--ink)' }}>{cantidades[idx] ?? item.cantidad}</span>
+                          style={{ color: 'var(--ink)' }}>{cantidades[idx] ?? 0}</span>
                       )}
-                      <button onClick={() => setCantidad(idx, Math.min(item.cantidad, (parseInt(cantidades[idx]) || item.cantidad) + 1))}
+                      <button onClick={() => setCantidad(idx, Math.min(item.cantidad, (parseInt(cantidades[idx]) || 0) + 1))}
                         className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Plus size={10} /></button>
                       <span className="text-[9px]" style={{ color: 'var(--faint)' }}>de {item.cantidad}</span>
                     </div>
@@ -503,40 +512,45 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                 {pagos.length === 0 ? (
                   <p className="pt-1.5 text-[11px]" style={{ color: 'var(--faint)' }}>Sin pagos registrados</p>
                 ) : (
-                  pagos.map((p, idx) => {
-                    const esDeposito = p.tipo === 'deposito';
-                    const esDevolucionDeposito = p.tipo === 'devolucion_deposito';
-                    const anulado = p.anulado === 1;
-                    const colorMetodo = esDeposito ? 'oklch(0.55 0.12 70)' :
-                      esDevolucionDeposito ? 'var(--danger)' :
-                      p.metodo === 'efectivo' ? 'oklch(0.55 0.13 155)' :
-                      p.metodo === 'yape' ? 'oklch(0.48 0.14 330)' : 'oklch(0.55 0.12 240)';
-                    const labelMetodo = esDeposito ? 'Garantia +' :
-                      esDevolucionDeposito ? 'Garantia -' :
-                      p.metodo;
-                    return (
-                      <div key={idx} className="flex items-center gap-2 pt-1.5 text-[11px]"
-                        style={{ opacity: anulado ? 0.35 : 1 }}>
-                        <span className="shrink-0" style={{ color: 'var(--muted)' }}>{p.fecha_pago?.slice(5, 10) || '-'}</span>
-                        <span className="font-mono font-medium flex-1" style={{
-                          color: 'var(--ink)',
-                          textDecoration: anulado ? 'line-through' : 'none',
-                        }}>
-                          S/ {p.monto.toFixed(2)}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded-[10px] text-[9px] font-medium capitalize"
-                          style={{ backgroundColor: colorMetodo + '20', color: colorMetodo }}>
-                          {labelMetodo}
-                        </span>
-                        {anulado
-                          ? <span className="text-[9px] shrink-0" style={{ color: 'var(--muted)' }}>Anulado</span>
-                          : <button onClick={() => setAnulandoPago(p)}
-                              className="text-[9px] underline hover:opacity-70 shrink-0"
-                              style={{ color: 'var(--danger)' }}>Anular</button>
-                        }
-                      </div>
-                    );
-                  })
+                  (() => {
+                    const pagosAgrupados = gruparPagos(pagos);
+                    return pagosAgrupados.map((p, idx) => {
+                      const esDeposito = p.tipo === 'deposito';
+                      const esDevolucionDeposito = p.tipo === 'devolucion_deposito';
+                      const anulado = p.anulado === 1;
+                      const esGrupo = p.esGrupo;
+                      const colorMetodo = esDeposito ? 'oklch(0.55 0.12 70)' :
+                        esDevolucionDeposito ? 'var(--danger)' :
+                        p.metodo === 'efectivo' ? 'oklch(0.55 0.13 155)' :
+                        p.metodo === 'yape' ? 'oklch(0.48 0.14 330)' : 'oklch(0.55 0.12 240)';
+                      const labelMetodo = esDeposito ? 'Garantia +' :
+                        esDevolucionDeposito ? 'Garantia -' :
+                        esGrupo ? p.metodo + ' (distribuido)' :
+                        p.metodo;
+                      return (
+                        <div key={idx} className="flex items-center gap-2 pt-1.5 text-[11px]"
+                          style={{ opacity: anulado ? 0.35 : 1 }}>
+                          <span className="shrink-0" style={{ color: 'var(--muted)' }}>{p.fecha_pago?.slice(5, 10) || '-'}</span>
+                          <span className="font-mono font-medium flex-1" style={{
+                            color: 'var(--ink)',
+                            textDecoration: anulado ? 'line-through' : 'none',
+                          }}>
+                            S/ {p.monto.toFixed(2)}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded-[10px] text-[9px] font-medium capitalize"
+                            style={{ backgroundColor: colorMetodo + '20', color: colorMetodo }}>
+                            {labelMetodo}
+                          </span>
+                          {anulado
+                            ? <span className="text-[9px] shrink-0" style={{ color: 'var(--muted)' }}>Anulado</span>
+                            : <button onClick={() => setAnulandoPago(p)}
+                                className="text-[9px] underline hover:opacity-70 shrink-0"
+                                style={{ color: 'var(--danger)' }}>Anular</button>
+                          }
+                        </div>
+                      );
+                    });
+                  })()
                 )}
               </div>
             )}

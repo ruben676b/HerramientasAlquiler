@@ -9,6 +9,7 @@ import { useSessions } from '../contexts/SessionsContext';
 import { useToast } from '../components/Toast';
 import UnifiedPaymentModal from '../components/UnifiedPaymentModal';
 import AnularPagoModal from '../components/AnularPagoModal';
+import { gruparPagos } from '../lib/gruparPagos';
 import DevolucionInline from '../components/DevolucionInline';
 
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -501,17 +502,21 @@ export default function Alquileres() {
                                 {pagos.length === 0 ? (
                                   <p className="pt-1.5 text-[11px]" style={{ color: 'var(--faint)' }}>Sin pagos registrados</p>
                                 ) : (
-                                  pagos.map((p, idx) => {
-                                    const esDeposito = p.tipo === 'deposito';
-                                    const esDevolucionDeposito = p.tipo === 'devolucion_deposito';
-                                    const colorMetodo = esDeposito ? 'oklch(0.55 0.12 70)' :
-                                      esDevolucionDeposito ? 'var(--danger)' :
-                                      p.metodo === 'efectivo' ? 'oklch(0.55 0.13 155)' :
-                                      p.metodo === 'yape' ? 'oklch(0.48 0.14 330)' : 'oklch(0.55 0.12 240)';
-                                    const labelMetodo = esDeposito ? 'Garantía +' :
-                                      esDevolucionDeposito ? 'Garantía −' :
-                                      p.metodo;
-                                    return (
+                                  (() => {
+                                    const pagosAgrupados = gruparPagos(pagos);
+                                    return pagosAgrupados.map((p, idx) => {
+                                      const esDeposito = p.tipo === 'deposito';
+                                      const esDevolucionDeposito = p.tipo === 'devolucion_deposito';
+                                      const esGrupo = p.esGrupo;
+                                      const colorMetodo = esDeposito ? 'oklch(0.55 0.12 70)' :
+                                        esDevolucionDeposito ? 'var(--danger)' :
+                                        p.metodo === 'efectivo' ? 'oklch(0.55 0.13 155)' :
+                                        p.metodo === 'yape' ? 'oklch(0.48 0.14 330)' : 'oklch(0.55 0.12 240)';
+                                      const labelMetodo = esDeposito ? 'Garantia +' :
+                                        esDevolucionDeposito ? 'Garantia -' :
+                                        esGrupo ? p.metodo + ' (distribuido)' :
+                                        p.metodo;
+                                      return (
                                       <div key={idx} className="flex items-center gap-2 pt-1.5 text-[11px]"
                                         style={{ opacity: p.anulado === 1 ? 0.35 : 1 }}>
                                         <span className="shrink-0" style={{ color: 'var(--muted)' }}>{p.fecha_pago?.slice(5, 10) || '—'}</span>
@@ -533,8 +538,9 @@ export default function Alquileres() {
                                         }
                                       </div>
                                     );
-                                  })
-                                )}
+                                  });
+                                })()
+                              )}
                               </div>
                             )}
                           </div>

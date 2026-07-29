@@ -169,6 +169,9 @@ function initDatabase() {
   try { db.exec("ALTER TABLE PAGO ADD COLUMN fecha_anulacion TEXT"); } catch {}
   try { db.exec("ALTER TABLE PAGO ADD COLUMN motivo_anulacion TEXT"); } catch {}
 
+  // Migración: agregar grupo_pago a PAGO para pagos distribuidos
+  try { db.exec("ALTER TABLE PAGO ADD COLUMN grupo_pago TEXT"); } catch {}
+
   try {
     db.exec(`
       CREATE TRIGGER IF NOT EXISTS trg_update_contrato_mod
