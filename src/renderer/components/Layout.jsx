@@ -6,6 +6,7 @@ const Mostrador = lazy(() => import('../views/Mostrador'));
 const Inventario = lazy(() => import('../views/Inventario'));
 const Configuracion = lazy(() => import('../views/Configuracion'));
 const Clientes = lazy(() => import('../views/Clientes'));
+const Caja = lazy(() => import('../views/Caja'));
 
 const VIEWS = {
   alquileres: Alquileres,
@@ -13,7 +14,7 @@ const VIEWS = {
   inventario: Inventario,
   configuracion: Configuracion,
   clientes: Clientes,
-  caja: () => <Placeholder titulo="Caja" />,
+  caja: Caja,
   reportes: () => <Placeholder titulo="Reportes" />,
 };
 

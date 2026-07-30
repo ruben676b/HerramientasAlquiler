@@ -36,13 +36,16 @@ export default function MultiSessionModal() {
       onClick={closeDialog}
     >
       <div
-        className="m-auto w-[98vw] max-w-[1400px] h-[92vh] rounded-2xl flex overflow-hidden shadow-2xl"
+        className="m-auto w-[98vw] max-w-[1400px] h-[92vh] rounded-2xl flex overflow-hidden shadow-2xl relative"
         style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border)' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Botón cerrar global */}
-        <button onClick={closeDialog} className="absolute top-3 right-3 z-50 p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5"
-          style={{ color: 'var(--muted)' }}><X size={18} /></button>
+        <button onClick={closeDialog} 
+          className="absolute top-4 right-4 z-50 flex items-center justify-center w-8 h-8 rounded-full shadow-sm transition-all hover:scale-105"
+          style={{ backgroundColor: 'oklch(0.95 0.02 25)', color: 'var(--danger)', border: '1px solid oklch(0.90 0.03 25)' }}>
+          <X size={18} strokeWidth={2.5} />
+        </button>
 
         {/* ===== SIDEBAR DE SESIONES ===== */}
         <div
@@ -171,7 +174,7 @@ const PASOS = [
 ];
 
 function SessionForm({ session }) {
-  const { updateSession, closeDialog, markSaved, loadFormData, saveFormData, sessions } = useSessions();
+  const { updateSession, closeDialog, markSaved, loadFormData, saveFormData, sessions, removeSession, setActiveId } = useSessions();
   const toast = useToast();
   const saved = loadFormData(session.id) || {};
 
@@ -320,7 +323,7 @@ function SessionForm({ session }) {
     if (!busquedaEquipo) return [];
     const q = busquedaEquipo.toLowerCase();
     const herr = todasHerramientas
-      .filter(h => h.id.toLowerCase().includes(q) || h.nombre.toLowerCase().includes(q) || h.id.replace('-', '').toLowerCase().includes(q))
+      .filter(h => (h.id || '').toLowerCase().includes(q) || (h.nombre || '').toLowerCase().includes(q) || (h.id || '').replace('-', '').toLowerCase().includes(q))
       .sort((a, b) => {
         if (a.estado === 'disponible' && b.estado !== 'disponible') return -1;
         if (b.estado === 'disponible' && a.estado !== 'disponible') return 1;
@@ -329,7 +332,7 @@ function SessionForm({ session }) {
       .slice(0, 8)
       .map(h => ({ ...h, _tipo: 'herramienta', _enLista: items.some(i => i.id_herramienta === h.id) }));
     const gran = granelCat
-      .filter(g => g.nombre.toLowerCase().includes(q))
+      .filter(g => (g.nombre || '').toLowerCase().includes(q))
       .slice(0, 8)
       .map(g => {
         const enLista = items.find(i => i.id_item_granel === g.id);
@@ -563,8 +566,16 @@ function SessionForm({ session }) {
         toast('Contrato #' + idContrato + ' creado (sin PDF).', 'warning');
       }
 
-      markSaved(session.id);
+      removeSession(session.id);
       toast('Alquiler #' + idContrato + ' guardado correctamente');
+      window.dispatchEvent(new CustomEvent('contrato-creado'));
+      
+      const remainingSessions = sessions.filter(s => !s.saved && s.id !== session.id);
+      if (remainingSessions.length === 0) {
+        closeDialog();
+      } else {
+        setActiveId(remainingSessions[0].id);
+      }
     } catch (e) {
       setError(e.message || 'Error al guardar contrato.');
     }

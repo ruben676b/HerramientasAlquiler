@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, User, FileText, PenTool, Save, Key } from 'lucide-react';
+import { Settings, User, FileText, PenTool, Save, Key, Database, Download, RefreshCcw } from 'lucide-react';
 import Button from '../components/ui/button';
 import SignaturePad from '../components/SignaturePad';
 import { useToast } from '../components/Toast';
@@ -9,6 +9,7 @@ const TABS = [
   { id: 'clausulas', label: 'Cláusulas', icon: FileText },
   { id: 'firma', label: 'Firma', icon: PenTool },
   { id: 'api', label: 'API', icon: Key },
+  { id: 'backup', label: 'Backup', icon: Database },
 ];
 
 export default function Configuracion() {
@@ -30,6 +31,35 @@ export default function Configuracion() {
       toast('Configuración guardada');
     } catch (e) {
       toast('Error: ' + e.message, 'error');
+    }
+  };
+
+  const crearBackup = async () => {
+    if (!window.api) return;
+    try {
+      const res = await window.api.crearBackup();
+      if (res.success) {
+        toast('Backup guardado correctamente');
+      } else if (!res.cancelado) {
+        toast('Error al crear backup: ' + res.error, 'error');
+      }
+    } catch (e) {
+      toast('Error de sistema: ' + e.message, 'error');
+    }
+  };
+
+  const restaurarBackup = async () => {
+    if (!window.api) return;
+    if (!window.confirm('¿Está seguro de restaurar una copia de seguridad? Se sobrescribirán todos los datos actuales y la aplicación se reiniciará.')) return;
+    try {
+      const res = await window.api.restaurarBackup();
+      if (res.success) {
+        // App restarts
+      } else if (!res.cancelado) {
+        toast('Error al restaurar: ' + res.error, 'error');
+      }
+    } catch (e) {
+      toast('Error de sistema: ' + e.message, 'error');
     }
   };
 
@@ -144,6 +174,26 @@ export default function Configuracion() {
               </Button>
             </div>
           </>
+        )}
+
+        {tab === 'backup' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-sm font-medium mb-2" style={{ color: 'var(--ink)' }}>Respaldo de Base de Datos</h3>
+              <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>Crea una copia de seguridad de toda la información del sistema (herramientas, contratos, clientes, etc). Es muy recomendable hacerlo periódicamente.</p>
+              <Button variant="primary" onClick={crearBackup}>
+                <Download size={16} style={{ marginRight: '6px' }} /> Crear Backup
+              </Button>
+            </div>
+            
+            <div className="pt-5 border-t" style={{ borderColor: 'var(--border)' }}>
+              <h3 className="text-sm font-medium mb-2 text-red-600">Restaurar Sistema</h3>
+              <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>Restaura el sistema desde una copia de seguridad local. <br /><strong>Advertencia:</strong> Esta acción sobrescribirá todos los datos actuales y reiniciará la aplicación.</p>
+              <Button onClick={restaurarBackup} style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+                <RefreshCcw size={16} style={{ marginRight: '6px' }} /> Restaurar Backup
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>

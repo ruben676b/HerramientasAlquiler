@@ -93,6 +93,37 @@ export function SessionsProvider({ children }) {
   const closeDialog = useCallback(() => {
     setIsOpen(false);
     setActiveId(null);
+    
+    // Limpiar sesiones vacías para no acumular basura
+    setSessions(prev => {
+      const toKeep = [];
+      let changed = false;
+      for (const s of prev) {
+        if (s.saved) {
+          toKeep.push(s);
+          continue;
+        }
+        
+        let isModified = false;
+        try {
+          const data = JSON.parse(localStorage.getItem(DATA_PREFIX + s.id)) || {};
+          const hasDni = data.dni && data.dni.trim() !== '';
+          const hasNombre = data.nombre && data.nombre.trim() !== '';
+          const hasItems = data.items && data.items.length > 0;
+          isModified = hasDni || hasNombre || hasItems;
+        } catch {
+          isModified = false;
+        }
+        
+        if (!isModified) {
+          localStorage.removeItem(DATA_PREFIX + s.id);
+          changed = true;
+        } else {
+          toKeep.push(s);
+        }
+      }
+      return changed ? toKeep : prev;
+    });
   }, []);
 
   const value = {

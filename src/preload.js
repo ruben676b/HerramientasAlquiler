@@ -75,6 +75,13 @@ contextBridge.exposeInMainWorld('api', {
   getContratosCliente: (id) => ipcRenderer.invoke('get-contratos-cliente', id),
   getDetalleContrato: (id) => ipcRenderer.invoke('get-detalle-contrato', id),
 
-  // Debug
+// Debug
   log: (msg) => ipcRenderer.invoke('log', msg),
+
+  // Caja
+  getResumenCaja: (fecha) => ipcRenderer.invoke('get-resumen-caja', fecha),
+
+  // Backup
+  crearBackup: () => ipcRenderer.invoke('crear-backup'),
+  restaurarBackup: () => ipcRenderer.invoke('restaurar-backup'),
 });
