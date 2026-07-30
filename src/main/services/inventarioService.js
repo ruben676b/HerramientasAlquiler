@@ -117,10 +117,7 @@ function actualizarGranel(id, datos) {
   params.push(id);
   db.prepare('UPDATE ITEM_GRANEL SET ' + fields.join(', ') + ' WHERE id = ?').run(...params);
 
-  // Sincronizar cantidad_disponible con cantidad_total si corresponde
-  if (datos.cantidad_total !== undefined) {
-    db.prepare('UPDATE ITEM_GRANEL SET cantidad_disponible = cantidad_total WHERE id = ?').run(id);
-  }
+  // NOTE: no es necesario sincronizar cantidad_disponible — el trigger trg_granel_disponible lo recalcula
 
   return { id };
 }
@@ -145,12 +142,22 @@ function getGranelAgrupado() {
         nombre: item.nombre,
         total: 0,
         disponibles: 0,
+        alquiladas: 0,
+        danadas: 0,
+        perdidas: 0,
+        vendidas: 0,
+        bajas: 0,
         variantes: [],
       };
     }
     const g = mapa[item.nombre];
     g.total += item.cantidad_total;
     g.disponibles += item.cantidad_disponible;
+    g.alquiladas += item.cantidad_alquilada || 0;
+    g.danadas += item.cantidad_danada || 0;
+    g.perdidas += item.cantidad_perdida || 0;
+    g.vendidas += item.cantidad_vendida || 0;
+    g.bajas += item.cantidad_baja || 0;
     g.variantes.push(item);
   }
 
@@ -189,9 +196,9 @@ function agregarStockGranel(id, cantidad) {
   if (!item) throw new Error('Material no encontrado.');
 
   db.prepare(`
-    UPDATE ITEM_GRANEL SET cantidad_total = cantidad_total + ?, cantidad_disponible = cantidad_disponible + ?
+    UPDATE ITEM_GRANEL SET cantidad_total = cantidad_total + ?
     WHERE id = ?
-  `).run(cantidad, cantidad, id);
+  `).run(cantidad, id);
 
   return { id, agregado: cantidad };
 }
@@ -254,18 +261,67 @@ function ajustarStock(id, delta) {
   const item = db.prepare('SELECT * FROM ITEM_GRANEL WHERE id = ? AND activo = 1').get(id);
   if (!item) throw new Error('Material no encontrado.');
 
-  const nuevoDisponible = item.cantidad_disponible + delta;
-  if (nuevoDisponible < 0) throw new Error('No se puede dejar stock negativo. Disponible: ' + item.cantidad_disponible);
-
-  const nuevoTotal = item.cantidad_total + delta;
-  if (nuevoTotal < 0) throw new Error('No se puede dejar stock total negativo.');
+  if (delta <= 0) {
+    throw new Error('Para restar stock use darBajaGranel con un motivo específico.');
+  }
 
   db.prepare(`
-    UPDATE ITEM_GRANEL SET cantidad_total = ?, cantidad_disponible = ?
+    UPDATE ITEM_GRANEL SET cantidad_total = cantidad_total + ?
     WHERE id = ?
-  `).run(nuevoTotal, nuevoDisponible, id);
+  `).run(delta, id);
 
-  return { id, disponible: nuevoDisponible, total: nuevoTotal };
+  return { id, total: item.cantidad_total + delta };
+}
+
+/**
+ * Da de baja unidades de un material con un motivo específico.
+ * @param {number} id - ID del ITEM_GRANEL
+ * @param {number} cantidad - Unidades a dar de baja
+ * @param {'baja'|'perdido'|'dañado'|'vendido'} motivo - Motivo de la baja
+ */
+function darBajaGranel(id, cantidad, motivo) {
+  if (!cantidad || cantidad < 1) throw new Error('Cantidad debe ser al menos 1.');
+  if (!['baja', 'perdido', 'dañado', 'vendido'].includes(motivo)) {
+    throw new Error('Motivo inválido. Use: baja, perdido, dañado o vendido.');
+  }
+
+  const item = db.prepare('SELECT * FROM ITEM_GRANEL WHERE id = ? AND activo = 1').get(id);
+  if (!item) throw new Error('Material no encontrado.');
+
+  if (item.cantidad_disponible < cantidad) {
+    throw new Error(
+      'Solo hay ' + item.cantidad_disponible + ' unidades disponibles, no suficientes para dar de baja ' + cantidad + '.'
+    );
+  }
+
+  const colMap = { baja: 'cantidad_baja', perdido: 'cantidad_perdida', dañado: 'cantidad_danada', vendido: 'cantidad_vendida' };
+  const col = colMap[motivo];
+
+  db.prepare('UPDATE ITEM_GRANEL SET ' + col + ' = ' + col + ' + ? WHERE id = ?')
+    .run(cantidad, id);
+
+  return { id, motivo, cantidad };
+}
+
+/**
+ * Repara una cantidad de unidades dañadas, moviéndolas de cantidad_danada a cantidad_disponible.
+ */
+function repararGranel(id, cantidad) {
+  if (!cantidad || cantidad < 1) throw new Error('Cantidad debe ser al menos 1.');
+
+  const item = db.prepare('SELECT * FROM ITEM_GRANEL WHERE id = ? AND activo = 1').get(id);
+  if (!item) throw new Error('Material no encontrado.');
+
+  if ((item.cantidad_danada || 0) < cantidad) {
+    throw new Error('Solo hay ' + (item.cantidad_danada || 0) + ' unidades dañadas, no suficientes para reparar ' + cantidad + '.');
+  }
+
+  db.prepare(`
+    UPDATE ITEM_GRANEL SET cantidad_danada = cantidad_danada - ?
+    WHERE id = ?
+  `).run(cantidad, id);
+
+  return { id, reparadas: cantidad, danadaRestante: (item.cantidad_danada || 0) - cantidad };
 }
 
 /* ================================================================
@@ -608,6 +664,8 @@ module.exports = {
   editarGranelFull,
   eliminarVariante,
   ajustarStock,
+  darBajaGranel,
+  repararGranel,
   generarPrefijo,
   crearCategoria,
   crearLote,

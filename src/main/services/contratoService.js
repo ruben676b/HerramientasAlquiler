@@ -158,7 +158,7 @@ function crearContrato(
         );
 
         db.prepare(
-          'UPDATE ITEM_GRANEL SET cantidad_disponible = cantidad_disponible - ? WHERE id = ?'
+          'UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?'
         ).run(item.cantidad, item.id_item_granel);
       }
     }
@@ -215,7 +215,7 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
       // Saltar ítems ya procesados en devoluciones parciales previas
       if (detalle.estado_devolucion !== 'pendiente') continue;
 
-      const esDevuelto = item.estado_devolucion === 'bien' || item.estado_devolucion === 'dañado';
+      const esDevuelto = item.estado_devolucion === 'bien' || item.estado_devolucion === 'dañado' || item.estado_devolucion === 'perdido';
 
       // Actualizar estado del ítem y registrar fecha si fue devuelto
       if (esDevuelto) {
@@ -249,19 +249,42 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
 
             db.prepare(`
               INSERT INTO DETALLE_CONTRATO
-                (id_contrato, tipo_item, id_item_granel, cantidad, precio_dia_aplicado, mora_dia_aplicada, estado_devolucion, fecha_devolucion_real)
-              VALUES (?, 'granel', ?, ?, ?, ?, ?, ?)
+                (id_contrato, tipo_item, id_item_granel, cantidad, precio_dia_aplicado, mora_dia_aplicada, estado_devolucion, fecha_devolucion_real, costo_perdida)
+              VALUES (?, 'granel', ?, ?, ?, ?, ?, ?, ?)
             `).run(idContrato, detalle.id_item_granel, cantDevuelta,
               detalle.precio_dia_aplicado, detalle.mora_dia_aplicada,
-              item.estado_devolucion, fechaDevolucionReal);
+              item.estado_devolucion, fechaDevolucionReal,
+              item.estado_devolucion === 'perdido' ? (item.costo_perdida || null) : null);
           } else {
             // Devolución completa
-            db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ? WHERE id = ?')
-              .run(item.estado_devolucion, fechaDevolucionReal, detalle.id_detalle);
+            const updateSql = item.estado_devolucion === 'perdido' && item.costo_perdida != null
+              ? 'UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ?, costo_perdida = ? WHERE id = ?'
+              : 'UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ? WHERE id = ?';
+            const updateParams = item.estado_devolucion === 'perdido' && item.costo_perdida != null
+              ? [item.estado_devolucion, fechaDevolucionReal, item.costo_perdida, item.id_detalle]
+              : [item.estado_devolucion, fechaDevolucionReal, item.id_detalle];
+            db.prepare(updateSql).run(...updateParams);
           }
 
-          db.prepare('UPDATE ITEM_GRANEL SET cantidad_disponible = cantidad_disponible + ? WHERE id = ?')
-            .run(cantDevuelta, detalle.id_item_granel);
+          // Stock según el estado de devolución
+          if (item.estado_devolucion === 'bien') {
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada - ? WHERE id = ?')
+              .run(cantDevuelta, detalle.id_item_granel);
+          } else if (item.estado_devolucion === 'dañado') {
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_danada = cantidad_danada + ?, cantidad_alquilada = cantidad_alquilada - ? WHERE id = ?')
+              .run(cantDevuelta, cantDevuelta, detalle.id_item_granel);
+            // Registrar costo de reparación si aplica
+            if (item.costo_reparacion) {
+              totalDanos += item.costo_reparacion;
+              const hoy = new Date().toISOString().slice(0, 10);
+              const desc = observaciones?.[item.id_detalle] || 'Dañado en devolución';
+              db.prepare('INSERT INTO MANTENIMIENTO (id_herramienta, fecha_inicio, descripcion, tipo, costo) VALUES (?, ?, ?, ?, ?)')
+                .run('GRANEL-' + detalle.id_item_granel, hoy, 'Devolucion granel: ' + desc, 'correctivo', item.costo_reparacion || 0);
+            }
+          } else if (item.estado_devolucion === 'perdido') {
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_perdida = cantidad_perdida + ?, cantidad_alquilada = cantidad_alquilada - ? WHERE id = ?')
+              .run(cantDevuelta, cantDevuelta, detalle.id_item_granel);
+          }
 
           // Mora para la porción devuelta (usando cantDevuelta, no detalle.cantidad)
           const diasAtrasoItem = Math.max(0, Math.ceil((fechaReal - fechaPactada) / (1000 * 60 * 60 * 24)));
@@ -341,7 +364,8 @@ function getContratos(filtros = {}) {
     const items = db.prepare(`
       SELECT d.*, COALESCE(h.nombre, i.nombre) AS item_nombre,
              COALESCE(h.id, 'MAT') AS item_codigo,
-             i.condicion AS item_condicion
+             i.condicion AS item_condicion,
+             i.precio_venta AS item_precio_venta
       FROM DETALLE_CONTRATO d
       LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id
       LEFT JOIN ITEM_GRANEL i ON d.id_item_granel = i.id
@@ -512,28 +536,79 @@ function revertirDevolucionItem(idDetalle) {
       const rowsDevueltas = db.prepare(`
         SELECT * FROM DETALLE_CONTRATO
         WHERE id_contrato = ? AND id_item_granel = ?
-        AND estado_devolucion IN ('bien', 'dañado')
+        AND estado_devolucion IN ('bien', 'dañado', 'perdido')
       `).all(detalle.id_contrato, detalle.id_item_granel);
 
       let cantidadARestaurar = 0;
+      let tieneDanadosOPerdidos = false;
 
       if (detalle.estado_devolucion === 'pendiente') {
         // CASO SPLIT: fila original reducida + fila(s) nueva(s) devuelta(s)
         for (const row of rowsDevueltas) {
           cantidadARestaurar += row.cantidad;
+          // Revertir stock según estado
+          if (row.estado_devolucion === 'bien') {
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+              .run(row.cantidad, detalle.id_item_granel);
+          } else if (row.estado_devolucion === 'dañado') {
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_danada = cantidad_danada - ?, cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+              .run(row.cantidad, row.cantidad, detalle.id_item_granel);
+            tieneDanadosOPerdidos = true;
+          } else if (row.estado_devolucion === 'perdido') {
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_perdida = cantidad_perdida - ?, cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+              .run(row.cantidad, row.cantidad, detalle.id_item_granel);
+            tieneDanadosOPerdidos = true;
+          }
           db.prepare('DELETE FROM DETALLE_CONTRATO WHERE id = ?').run(row.id);
         }
         db.prepare('UPDATE DETALLE_CONTRATO SET cantidad = cantidad + ? WHERE id = ?')
           .run(cantidadARestaurar, idDetalle);
       } else {
         // CASO DEVOLUCIÓN COMPLETA: la fila original misma fue devuelta
-        cantidadARestaurar = detalle.cantidad;
-        db.prepare("UPDATE DETALLE_CONTRATO SET estado_devolucion = 'pendiente', fecha_devolucion_real = NULL WHERE id = ?")
+        // También limpiar posibles split rows creados en la misma devolución multi-outcome
+        const splitRows = db.prepare(`
+          SELECT * FROM DETALLE_CONTRATO
+          WHERE id_contrato = ? AND id_item_granel = ?
+          AND estado_devolucion IN ('bien', 'dañado', 'perdido')
+          AND id != ?
+        `).all(detalle.id_contrato, detalle.id_item_granel, idDetalle);
+
+        let totalSplit = 0;
+        for (const row of splitRows) {
+          totalSplit += row.cantidad;
+          if (row.estado_devolucion === 'bien') {
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+              .run(row.cantidad, detalle.id_item_granel);
+          } else if (row.estado_devolucion === 'dañado') {
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_danada = cantidad_danada - ?, cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+              .run(row.cantidad, row.cantidad, detalle.id_item_granel);
+          } else if (row.estado_devolucion === 'perdido') {
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_perdida = cantidad_perdida - ?, cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+              .run(row.cantidad, row.cantidad, detalle.id_item_granel);
+          }
+          db.prepare('DELETE FROM DETALLE_CONTRATO WHERE id = ?').run(row.id);
+        }
+
+        cantidadARestaurar = detalle.cantidad + totalSplit;
+        if (detalle.estado_devolucion === 'bien') {
+          db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+            .run(cantidadARestaurar, detalle.id_item_granel);
+        } else if (detalle.estado_devolucion === 'dañado') {
+          db.prepare('UPDATE ITEM_GRANEL SET cantidad_danada = cantidad_danada - ?, cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+            .run(cantidadARestaurar, cantidadARestaurar, detalle.id_item_granel);
+        } else if (detalle.estado_devolucion === 'perdido') {
+          db.prepare('UPDATE ITEM_GRANEL SET cantidad_perdida = cantidad_perdida - ?, cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+            .run(cantidadARestaurar, cantidadARestaurar, detalle.id_item_granel);
+        }
+        db.prepare("UPDATE DETALLE_CONTRATO SET estado_devolucion = 'pendiente', fecha_devolucion_real = NULL, costo_perdida = NULL WHERE id = ?")
           .run(idDetalle);
       }
 
-      db.prepare('UPDATE ITEM_GRANEL SET cantidad_disponible = cantidad_disponible - ? WHERE id = ?')
-        .run(cantidadARestaurar, detalle.id_item_granel);
+      // Eliminar registros de mantenimiento asociados
+      if (detalle.estado_devolucion === 'dañado' || tieneDanadosOPerdidos) {
+        db.prepare("DELETE FROM MANTENIMIENTO WHERE id_herramienta = ? AND descripcion LIKE 'Devolucion granel:%' AND fecha_inicio = ?")
+          .run('GRANEL-' + detalle.id_item_granel, detalle.fecha_devolucion_real);
+      }
     }
 
     // Recalcular estado del contrato (CHECK: 'reservado','alquilado','devuelto','devolución incompleta')

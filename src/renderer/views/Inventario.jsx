@@ -194,6 +194,10 @@ export default function Inventario() {
     try { await window.api.ajustarStock(id, delta); toast('Stock actualizado'); await cargar(); }
     catch (e) { setError(e.message); }
   };
+  const handleDarBaja = async (id, cantidad, motivo) => {
+    try { await window.api.darBajaGranel(id, cantidad, motivo); toast(cantidad + ' unidad(es) marcada(s) como ' + motivo); await cargar(); }
+    catch (e) { setError(e.message); }
+  };
   const handleBajaVariante = async (id) => {
     try { await window.api.eliminarVariante(id); toast('Variante eliminada'); await cargar(); }
     catch (e) { setError(e.message); }
@@ -391,8 +395,8 @@ export default function Inventario() {
                         S/ {g.variantes.find(v=>v.condicion==='nuevo')?.precio_dia?.toFixed(2) || '—'} nuevo · S/ {g.variantes.find(v=>v.condicion==='usado')?.precio_dia?.toFixed(2) || '—'} usado
                       </span>
                     </div>
-                    <span className="text-xs font-mono shrink-0" style={{ color: 'var(--muted)' }}>
-                      {g.disponibles}/{g.total} disponibles
+                    <span className="text-[10px] font-mono shrink-0" style={{ color: 'var(--muted)' }}>
+                      Disp {g.disponibles} / Total {g.total}
                     </span>
                     <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => setModal({ tipo: 'editar-granel', data: g })}
@@ -402,37 +406,56 @@ export default function Inventario() {
                     </div>
                   </button>
 
-                  {isOpen && g.variantes.map((v) => {
-                    const cb = SEMANTIC[v.condicion];
-                    const bajo = v.cantidad_total > 0 && v.cantidad_disponible / v.cantidad_total < 0.2;
-                    return (
-                      <div key={v.id} className="group flex items-center gap-3 px-4 py-2 text-sm transition-colors duration-150 hover:bg-[var(--surface)]" style={{ borderTop: '1px solid var(--border)' }}>
-                        <span className="w-5" />
-                        <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0"
-                          style={{ backgroundColor: cb?.soft, color: cb?.variable }}>{v.condicion}</span>
-                        <span className="flex-1 text-xs" style={{ color: 'var(--muted)' }}>S/ {v.precio_dia.toFixed(2)}/día</span>
-                        <span className="text-xs font-mono w-20 text-right" style={{ color: bajo ? 'var(--danger)' : 'var(--ink)' }}>
-                          {v.cantidad_disponible}/{v.cantidad_total}
-                          {bajo && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full align-middle" style={{ backgroundColor: 'var(--danger)' }} />}
-                        </span>
-                        <div className="flex items-center gap-0.5 shrink-0">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setModal({ tipo: 'restar-stock', data: v }); }}
-                            className="w-5 h-5 rounded flex items-center justify-center text-[13px] font-bold transition-colors duration-150 hover:bg-red-50 dark:hover:bg-red-950 active:scale-90"
-                            style={{ color: 'var(--danger)' }}
-                            title="Restar stock"
-                          >−</button>
-                          <span className="text-xs font-mono w-8 text-center" style={{ color: v.cantidad_disponible > 0 ? 'var(--ink)' : 'var(--faint)' }}>{v.cantidad_disponible}</span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setModal({ tipo: 'sumar-stock', data: v }); }}
-                            className="w-5 h-5 rounded flex items-center justify-center text-[13px] font-bold transition-colors duration-150 hover:bg-green-50 dark:hover:bg-green-950 active:scale-90"
-                            style={{ color: 'var(--success)' }}
-                            title="Sumar stock"
-                          >+</button>
-                        </div>
+                  {isOpen && (
+                    <>
+                      {/* Column headers */}
+                      <div className="flex items-center px-4 py-1 text-[9px] uppercase tracking-wider font-semibold" style={{ color: 'var(--faint)', borderTop: '1px solid var(--border)' }}>
+                        <span className="w-5 shrink-0" />
+                        <span className="w-14 shrink-0" />
+                        <span className="text-right w-10 shrink-0">Disp</span>
+                        <span className="text-right w-9 shrink-0">Alq</span>
+                        <span className="text-right w-9 shrink-0">Dañ</span>
+                        <span className="text-right w-9 shrink-0">Perd</span>
+                        <span className="text-right w-9 shrink-0">Vend</span>
+                        <span className="text-right w-9 shrink-0">Baja</span>
+                        <span className="text-right w-10 shrink-0">Total</span>
+                        <span className="flex-1" />
+                        <span className="w-[52px] shrink-0" />
                       </div>
-                    );
-                  })}
+                      {g.variantes.map((v) => {
+                        const cb = SEMANTIC[v.condicion];
+                        return (
+                          <div key={v.id} className="group flex items-center px-4 py-1.5 text-xs transition-colors duration-150 hover:bg-[var(--surface)]" style={{ borderTop: '1px solid var(--border)' }}>
+                            <span className="w-5 shrink-0" />
+                            <span className="inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium shrink-0 w-14 justify-center"
+                              style={{ backgroundColor: cb?.soft, color: cb?.variable }}>{v.condicion}</span>
+                            <span className="w-10 text-right font-mono" style={{ color: v.cantidad_disponible > 0 ? 'var(--ink)' : 'var(--faint)' }}>{v.cantidad_disponible}</span>
+                            <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_alquilada || 0) > 0 ? 'oklch(0.45 0.12 240)' : 'var(--faint)' }}>{v.cantidad_alquilada || 0}</span>
+                            <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_danada || 0) > 0 ? 'oklch(0.55 0.13 70)' : 'var(--faint)' }}>{v.cantidad_danada || 0}</span>
+                            <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_perdida || 0) > 0 ? 'var(--danger)' : 'var(--faint)' }}>{v.cantidad_perdida || 0}</span>
+                            <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_vendida || 0) > 0 ? 'var(--info)' : 'var(--faint)' }}>{v.cantidad_vendida || 0}</span>
+                            <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_baja || 0) > 0 ? 'var(--muted)' : 'var(--faint)' }}>{v.cantidad_baja || 0}</span>
+                            <span className="w-10 text-right font-mono font-semibold" style={{ color: 'var(--ink)' }}>{v.cantidad_total}</span>
+                            <span className="flex-1 text-[10px] text-right" style={{ color: 'var(--muted)' }}>S/ {v.precio_dia.toFixed(2)}/día</span>
+                            <div className="flex items-center gap-0.5 shrink-0 w-[52px] justify-end">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setModal({ tipo: 'baja-granel', data: v }); }}
+                                className="w-5 h-5 rounded flex items-center justify-center text-[13px] font-bold transition-colors duration-150 hover:bg-red-50 dark:hover:bg-red-950 active:scale-90"
+                                style={{ color: 'var(--danger)' }}
+                                title="Dar de baja / Perder / Dañar / Vender"
+                              >−</button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setModal({ tipo: 'sumar-stock', data: v }); }}
+                                className="w-5 h-5 rounded flex items-center justify-center text-[13px] font-bold transition-colors duration-150 hover:bg-green-50 dark:hover:bg-green-950 active:scale-90"
+                                style={{ color: 'var(--success)' }}
+                                title="Comprar stock"
+                              >+</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -446,8 +469,8 @@ export default function Inventario() {
       {modal?.tipo === 'editar-familia' && <ModalEditarFamilia familia={modal.familia} onSave={handleEditarFamilia} onClose={() => setModal(null)} />}
       {modal?.tipo === 'crear-granel' && <ModalCrearGranel onSave={handleCrearGranel} onClose={() => setModal(null)} />}
       {modal?.tipo === 'editar-granel' && <ModalEditarGranel data={modal.data} onSave={handleEditarGranel} onClose={() => setModal(null)} />}
-      {modal?.tipo === 'sumar-stock' && <StockModal tipo="sumar" data={modal.data} onApply={(d) => handleAjustarStock(modal.data.id, d)} onClose={() => setModal(null)} />}
-      {modal?.tipo === 'restar-stock' && <StockModal tipo="restar" data={modal.data} onApply={(d) => handleAjustarStock(modal.data.id, d)} onClose={() => setModal(null)} />}
+      {modal?.tipo === 'sumar-stock' && <StockModal data={modal.data} onApply={(d) => handleAjustarStock(modal.data.id, d)} onClose={() => setModal(null)} />}
+      {modal?.tipo === 'baja-granel' && <BajaGranelModal data={modal.data} onSave={handleDarBaja} onClose={() => setModal(null)} />}
 
       <ConfirmModal
         open={!!confirm}
@@ -646,21 +669,63 @@ function InlineStockInput({ value, onApply }) {
   );
 }
 
-function StockModal({ tipo, data, onApply, onClose }) {
+function StockModal({ data, onApply, onClose }) {
   const [cant, setCant] = useState('');
-  const sumar = tipo === 'sumar';
 
   const aplicar = () => {
     const c = parseInt(cant, 10);
-    if (c > 0) onApply(sumar ? c : -c);
+    if (c > 0) onApply(c);
     onClose();
   };
 
   return (
-    <ModalShell title={(sumar ? 'Sumar stock: ' : 'Restar stock: ') + data.nombre + ' (' + data.condicion + ')'} onClose={onClose} onSubmit={aplicar}>
+    <ModalShell title={'Comprar stock: ' + data.nombre + ' (' + data.condicion + ')'} onClose={onClose} onSubmit={aplicar}>
       <p className="text-xs" style={{ color: 'var(--muted)' }}>Stock actual: {data.cantidad_disponible} de {data.cantidad_total}</p>
-      <Field label={sumar ? 'Cantidad a agregar' : 'Cantidad a restar'} req>
-        <input type="number" min="1" max={sumar ? undefined : data.cantidad_disponible} value={cant} onChange={(e) => setCant(e.target.value)} className={inputCls}
+      <Field label="Cantidad a agregar" req>
+        <input type="number" min="1" value={cant} onChange={(e) => setCant(e.target.value)} className={inputCls}
+          style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} autoFocus
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicar(); } }} />
+      </Field>
+    </ModalShell>
+  );
+}
+
+function BajaGranelModal({ data, onSave, onClose }) {
+  const [cant, setCant] = useState('');
+  const [motivo, setMotivo] = useState('baja');
+
+  const aplicar = () => {
+    const c = parseInt(cant, 10);
+    if (c > 0) onSave(data.id, c, motivo);
+    onClose();
+  };
+
+  const MOTIVOS = [
+    { id: 'baja', label: 'Dar de baja (sin motivo específico)', color: 'var(--muted)' },
+    { id: 'perdido', label: 'Perdido', color: 'var(--danger)' },
+    { id: 'dañado', label: 'Dañado', color: 'oklch(0.55 0.13 70)' },
+    { id: 'vendido', label: 'Vendido', color: 'var(--info)' },
+  ];
+
+  return (
+    <ModalShell title={'Dar de baja: ' + data.nombre + ' (' + data.condicion + ')'} onClose={onClose} onSubmit={aplicar}>
+      <p className="text-xs" style={{ color: 'var(--muted)' }}>
+        Disponible: {data.cantidad_disponible} | Total: {data.cantidad_total}
+      </p>
+      <Field label="Motivo" req>
+        <div className="space-y-1">
+          {MOTIVOS.map(m => (
+            <label key={m.id} className="flex items-center gap-2 py-1 px-2 rounded-lg text-xs cursor-pointer transition-colors duration-150 hover:bg-black/5"
+              style={{ backgroundColor: motivo === m.id ? m.color + '15' : 'transparent', color: motivo === m.id ? m.color : 'var(--ink)' }}>
+              <input type="radio" name="motivo" value={m.id} checked={motivo === m.id}
+                onChange={() => setMotivo(m.id)} className="accent-current" />
+              {m.label}
+            </label>
+          ))}
+        </div>
+      </Field>
+      <Field label="Cantidad" req>
+        <input type="number" min="1" max={data.cantidad_disponible} value={cant} onChange={(e) => setCant(e.target.value)} className={inputCls}
           style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} autoFocus
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicar(); } }} />
       </Field>

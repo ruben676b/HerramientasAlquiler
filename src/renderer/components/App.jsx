@@ -5,6 +5,7 @@ export default function App() {
   const [granel, setGranel] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [reparando, setReparando] = useState(null); // { id, cantidad } | null
 
   useEffect(() => {
     if (!window.api) {
@@ -30,6 +31,19 @@ export default function App() {
 
     cargarDatos();
   }, []);
+
+  const handleReparar = async (id, cantidad) => {
+    if (!cantidad || cantidad < 1) return;
+    try {
+      await window.api.repararGranel(id, cantidad);
+      // Recargar datos
+      const items = await window.api.getGranel();
+      setGranel(items);
+      setReparando(null);
+    } catch (err) {
+      alert('Error al reparar: ' + (err.message || err));
+    }
+  };
 
   if (loading) {
     return (
@@ -96,7 +110,13 @@ export default function App() {
                   <th className="text-left px-4 py-2 font-medium text-gray-600">Nombre</th>
                   <th className="text-left px-4 py-2 font-medium text-gray-600">Condición</th>
                   <th className="text-right px-4 py-2 font-medium text-gray-600">Precio/día</th>
-                  <th className="text-right px-4 py-2 font-medium text-gray-600">Stock</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">Disp</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">Alq</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">Dañ</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">Perd</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">Vend</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">Baja</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -117,9 +137,45 @@ export default function App() {
                     <td className="px-4 py-2 text-right text-gray-700 font-mono">
                       S/ {item.precio_dia.toFixed(2)}
                     </td>
-                    <td className="px-4 py-2 text-right text-gray-700">
-                      {item.cantidad_disponible}/{item.cantidad_total}
+                    <td className="px-4 py-2 text-right text-gray-700">{item.cantidad_disponible}</td>
+                    <td className="px-4 py-2 text-right font-mono" style={{ color: (item.cantidad_alquilada || 0) > 0 ? '#2563eb' : '#9ca3af' }}>{item.cantidad_alquilada || 0}</td>
+                    <td className="px-4 py-2 text-right">
+                      {(item.cantidad_danada || 0) > 0 ? (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="text-red-600 font-mono">{item.cantidad_danada}</span>
+                          {reparando === item.id ? (
+                            <span className="inline-flex items-center gap-0.5">
+                              <input type="number" min="1" max={item.cantidad_danada}
+                                defaultValue={item.cantidad_danada}
+                                className="w-12 h-5 px-0.5 rounded text-[10px] border text-center font-mono"
+                                style={{ borderColor: '#d1d5db' }}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    const v = parseInt(e.target.value) || 0;
+                                    handleReparar(item.id, v);
+                                  }
+                                  if (e.key === 'Escape') setReparando(null);
+                                }} />
+                              <button onClick={() => handleReparar(item.id, item.cantidad_danada)}
+                                className="text-[10px] px-1.5 h-5 rounded font-medium"
+                                style={{ backgroundColor: '#059669', color: '#fff' }}>Rep</button>
+                            </span>
+                          ) : (
+                            <button onClick={() => setReparando(item.id)}
+                              className="text-[10px] px-1.5 h-5 rounded font-medium"
+                              style={{ backgroundColor: '#fef3c7', color: '#92400e' }}>
+                              Reparar
+                            </button>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">0</span>
+                      )}
                     </td>
+                    <td className="px-4 py-2 text-right font-mono" style={{ color: (item.cantidad_perdida || 0) > 0 ? '#dc2626' : '#9ca3af' }}>{item.cantidad_perdida || 0}</td>
+                    <td className="px-4 py-2 text-right font-mono" style={{ color: (item.cantidad_vendida || 0) > 0 ? '#0891b2' : '#9ca3af' }}>{item.cantidad_vendida || 0}</td>
+                    <td className="px-4 py-2 text-right font-mono" style={{ color: (item.cantidad_baja || 0) > 0 ? '#6b7280' : '#9ca3af' }}>{item.cantidad_baja || 0}</td>
+                    <td className="px-4 py-2 text-right text-gray-700 font-mono">{item.cantidad_total}</td>
                   </tr>
                 ))}
               </tbody>

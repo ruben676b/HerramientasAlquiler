@@ -40,6 +40,11 @@ function initDatabase() {
       mora_dia REAL NOT NULL CHECK (mora_dia >= 0),
       cantidad_total INTEGER NOT NULL CHECK (cantidad_total >= 0),
       cantidad_disponible INTEGER NOT NULL CHECK (cantidad_disponible >= 0 AND cantidad_disponible <= cantidad_total),
+      cantidad_danada INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_danada >= 0),
+      cantidad_alquilada INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_alquilada >= 0),
+      cantidad_perdida INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_perdida >= 0),
+      cantidad_vendida INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_vendida >= 0),
+      cantidad_baja INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_baja >= 0),
       activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1))
     );
 
@@ -97,10 +102,11 @@ function initDatabase() {
       cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
       precio_dia_aplicado REAL NOT NULL CHECK (precio_dia_aplicado >= 0),
       mora_dia_aplicada REAL NOT NULL CHECK (mora_dia_aplicada >= 0),
-      estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto')),
+      estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto', 'perdido')),
       fecha_devolucion_real TEXT,
       fecha_devolucion_pactada_item TEXT,
       total_item_snapshot REAL,
+      costo_perdida REAL CHECK (costo_perdida >= 0),
       FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
       FOREIGN KEY (id_herramienta) REFERENCES HERRAMIENTA(id),
       FOREIGN KEY (id_item_granel) REFERENCES ITEM_GRANEL(id),
@@ -172,6 +178,74 @@ function initDatabase() {
   // Migración: agregar grupo_pago a PAGO para pagos distribuidos
   try { db.exec("ALTER TABLE PAGO ADD COLUMN grupo_pago TEXT"); } catch {}
 
+  // Migración: agregar cantidad_danada a ITEM_GRANEL para control de dañados
+  try { db.exec("ALTER TABLE ITEM_GRANEL ADD COLUMN cantidad_danada INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_danada >= 0)"); } catch {}
+
+  // Migración: agregar cantidad_alquilada, cantidad_perdida, cantidad_vendida, cantidad_baja
+  try { db.exec("ALTER TABLE ITEM_GRANEL ADD COLUMN cantidad_alquilada INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_alquilada >= 0)"); } catch {}
+  try { db.exec("ALTER TABLE ITEM_GRANEL ADD COLUMN cantidad_perdida INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_perdida >= 0)"); } catch {}
+  try { db.exec("ALTER TABLE ITEM_GRANEL ADD COLUMN cantidad_vendida INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_vendida >= 0)"); } catch {}
+  try { db.exec("ALTER TABLE ITEM_GRANEL ADD COLUMN cantidad_baja INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_baja >= 0)"); } catch {}
+
+  // Inicializar cantidad_alquilada desde contratos activos (migración única)
+  try {
+    db.exec(`
+      UPDATE ITEM_GRANEL
+      SET cantidad_alquilada = COALESCE((
+        SELECT SUM(dc.cantidad)
+        FROM DETALLE_CONTRATO dc
+        JOIN CONTRATO c ON dc.id_contrato = c.id
+        WHERE dc.id_item_granel = ITEM_GRANEL.id
+          AND dc.estado_devolucion = 'pendiente'
+          AND c.estado IN ('alquilado', 'atrasado', 'reservado')
+      ), 0)
+      WHERE activo = 1
+    `);
+  } catch (err) {
+    console.error('[DB] Error inicializando cantidad_alquilada:', err);
+  }
+
+  // Migración: agregar costo_perdida a DETALLE_CONTRATO
+  try { db.exec("ALTER TABLE DETALLE_CONTRATO ADD COLUMN costo_perdida REAL CHECK (costo_perdida >= 0)"); } catch {}
+
+  // Migración: agregar estado 'perdido' a DETALLE_CONTRATO (recrear tabla si el CHECK no lo incluye)
+  try {
+    const ddl = db.prepare("SELECT sql FROM sqlite_master WHERE name='DETALLE_CONTRATO' AND type='table'").get();
+    if (ddl && !ddl.sql.includes("'perdido'")) {
+      db.exec("PRAGMA foreign_keys = OFF");
+      db.exec(`
+        CREATE TABLE DETALLE_CONTRATO_NEW (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          id_contrato INTEGER NOT NULL,
+          tipo_item TEXT NOT NULL CHECK (tipo_item IN ('individual', 'granel')),
+          id_herramienta TEXT,
+          id_item_granel INTEGER,
+          cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+          precio_dia_aplicado REAL NOT NULL CHECK (precio_dia_aplicado >= 0),
+          mora_dia_aplicada REAL NOT NULL CHECK (mora_dia_aplicada >= 0),
+          estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto', 'perdido')),
+          fecha_devolucion_real TEXT,
+          fecha_devolucion_pactada_item TEXT,
+          total_item_snapshot REAL,
+          costo_perdida REAL CHECK (costo_perdida >= 0),
+          FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
+          FOREIGN KEY (id_herramienta) REFERENCES HERRAMIENTA(id),
+          FOREIGN KEY (id_item_granel) REFERENCES ITEM_GRANEL(id),
+          CHECK (
+            (tipo_item = 'individual' AND id_herramienta NOT NULL AND id_item_granel IS NULL AND cantidad = 1) OR
+            (tipo_item = 'granel' AND id_item_granel NOT NULL AND id_herramienta IS NULL)
+          )
+        )
+      `);
+      db.exec("INSERT INTO DETALLE_CONTRATO_NEW SELECT * FROM DETALLE_CONTRATO");
+      db.exec("DROP TABLE DETALLE_CONTRATO");
+      db.exec("ALTER TABLE DETALLE_CONTRATO_NEW RENAME TO DETALLE_CONTRATO");
+      db.exec("PRAGMA foreign_keys = ON");
+    }
+  } catch (err) {
+    console.error('[DB] Error migrando DETALLE_CONTRATO (perdido):', err);
+  }
+
   try {
     db.exec(`
       CREATE TRIGGER IF NOT EXISTS trg_update_contrato_mod
@@ -182,6 +256,36 @@ function initDatabase() {
     `);
   } catch (err) {
     console.error('[DB] Error creando trigger trg_update_contrato_mod:', err);
+  }
+
+  // Trigger: recalcular cantidad_disponible automáticamente en ITEM_GRANEL
+  try {
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS trg_granel_disponible
+      AFTER UPDATE OF cantidad_alquilada, cantidad_danada, cantidad_perdida, cantidad_vendida, cantidad_baja, cantidad_total ON ITEM_GRANEL
+      BEGIN
+        UPDATE ITEM_GRANEL
+        SET cantidad_disponible = NEW.cantidad_total - NEW.cantidad_alquilada - NEW.cantidad_danada - NEW.cantidad_perdida - NEW.cantidad_vendida - NEW.cantidad_baja
+        WHERE id = NEW.id;
+      END;
+    `);
+  } catch (err) {
+    console.error('[DB] Error creando trigger trg_granel_disponible:', err);
+  }
+
+  // Trigger: verificar que disponible no sea negativa en INSERT
+  try {
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS trg_granel_disponible_insert
+      AFTER INSERT ON ITEM_GRANEL
+      BEGIN
+        UPDATE ITEM_GRANEL
+        SET cantidad_disponible = NEW.cantidad_total - NEW.cantidad_alquilada - NEW.cantidad_danada - NEW.cantidad_perdida - NEW.cantidad_vendida - NEW.cantidad_baja
+        WHERE id = NEW.id;
+      END;
+    `);
+  } catch (err) {
+    console.error('[DB] Error creando trigger trg_granel_disponible_insert:', err);
   }
 
   // Siempre actualizar cláusulas (pueden cambiar entre versiones)

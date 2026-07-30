@@ -40,6 +40,12 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [devolviendoGarantia, setDevolviendoGarantia] = useState(false);
   const [devGarMonto, setDevGarMonto] = useState('');
   const [devGarMetodo, setDevGarMetodo] = useState('efectivo');
+  // Estado para multi-outcome en materiales (granel)
+  const [buenas, setBuenas] = useState({});
+  const [danadas, setDanadas] = useState({});
+  const [perdidas, setPerdidas] = useState({});
+  const [costosPerdida, setCostosPerdida] = useState({});
+  const [editandoCostoPerd, setEditandoCostoPerd] = useState({});
 
   const c = contrato;
   const items = c.items || [];
@@ -94,6 +100,12 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
       await window.api.revertirDevolucion({ idDetalle: items[idx].id });
       setGuardados(p => { const n = { ...p }; delete n[idx]; return n; });
       setEstados(p => { const n = { ...p }; delete n[idx]; return n; });
+      // Limpiar estado granel asociado
+      setBuenas(p => { const n = { ...p }; delete n[idx]; return n; });
+      setDanadas(p => { const n = { ...p }; delete n[idx]; return n; });
+      setPerdidas(p => { const n = { ...p }; delete n[idx]; return n; });
+      setCostosPerdida(p => { const n = { ...p }; delete n[idx]; return n; });
+      setCostosRep(p => { const n = { ...p }; delete n[idx]; return n; });
       toast('Devolución revertida');
       onRecargar();
     } catch (e) {
@@ -155,6 +167,46 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const setCosto = (idx, v) => setCostosRep(p => ({ ...p, [idx]: v }));
   const setCantidad = (idx, v) => setCantidades(p => ({ ...p, [idx]: v }));
   const setMora = (idx, v) => setMoraEditadas(p => ({ ...p, [idx]: v }));
+  const setBuen = (idx, v) => setBuenas(p => ({ ...p, [idx]: Math.max(0, v) }));
+  const setDan = (idx, v) => setDanadas(p => ({ ...p, [idx]: Math.max(0, v) }));
+  const setPerd = (idx, v) => setPerdidas(p => ({ ...p, [idx]: Math.max(0, v) }));
+  const setCostoPerd = (idx, v) => setCostosPerdida(p => ({ ...p, [idx]: v }));
+
+  /** Registra devolución parcial con múltiples outcomes para materiales */
+  const registrarDevParcialGranel = async (idx) => {
+    if (!window.api || guardados[idx]) return;
+    const item = items[idx];
+    const b = buenas[idx] || 0;
+    const d = danadas[idx] || 0;
+    const p_ = perdidas[idx] || 0;
+    const total = b + d + p_;
+    if (total <= 0) {
+      toast('Indica cuántos devuelves primero.', 'warn');
+      return;
+    }
+    if (total > item.cantidad) {
+      toast('El total devuelto (' + total + ') supera la cantidad alquilada (' + item.cantidad + ').', 'error');
+      return;
+    }
+    try {
+      const hoy = new Date().toISOString().slice(0, 10);
+      const outcomes = [];
+      if (b > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'bien', cantidad_devuelta: b });
+      if (d > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'dañado', cantidad_devuelta: d, costo_reparacion: parseFloat(costosRep[idx]) || 0 });
+      if (p_ > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'perdido', cantidad_devuelta: p_, costo_perdida: parseFloat(costosPerdida[idx]) || null });
+      await window.api.registrarDevolucion({
+        idContrato: c.id,
+        fechaDevolucionReal: hoy,
+        itemsDevueltos: outcomes,
+        observaciones: notas[idx] ? { [item.id]: notas[idx] } : {},
+      });
+      setGuardados(p => ({ ...p, [idx]: true }));
+      toast((item.item_nombre || item.nombre) + ' — devuelto parcialmente');
+      onRecargar();
+    } catch (err) {
+      toast('Error al guardar: ' + (err.message || err), 'error');
+    }
+  };
 
   const closeDevMode = () => {
     setError('');
@@ -242,35 +294,93 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                     Salida: {fmtFecha(c.fecha_salida)} &middot; Pactada: {fmtFecha(fechaPactadaItem)}
                     <span style={{ color: 'var(--muted)' }}> &middot; Base: {diasItem} día{diasItem !== 1 ? 's' : ''}</span>
                   </div>
-                  {/* Fila 3: Cantidad para granel — empieza en 0, se sube al devolver */}
+                  {/* Fila 3: Cantidad para granel — multi-outcome */}
                   {esGranel && (
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <span className="text-[10px]" style={{ color: 'var(--muted)' }}>Devolviendo:</span>
-                      <button onClick={() => setCantidad(idx, Math.max(0, (parseInt(cantidades[idx]) || 0) - 1))}
-                        className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Minus size={10} /></button>
-                      {editandoCant[idx] ? (
-                        <input
-                          ref={el => inputCantRefs.current[idx] = el}
-                          type="number" min="0" max={item.cantidad}
-                          defaultValue={cantidades[idx] ?? 0}
-                          onBlur={e => {
-                            const v = Math.max(0, Math.min(item.cantidad, parseInt(e.target.value) || 0));
-                            setCantidad(idx, v);
-                            setEditandoCant(p => ({ ...p, [idx]: false }));
-                          }}
-                          onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-                          className="w-10 h-5 px-0.5 rounded text-xs text-center font-mono border dev-nospin"
-                          style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
-                          autoFocus
-                        />
-                      ) : (
-                        <span onClick={() => { setEditandoCant(p => ({ ...p, [idx]: true })); setTimeout(() => inputCantRefs.current[idx]?.select(), 60); }}
-                          className="w-8 text-center font-mono text-xs font-semibold cursor-pointer px-0.5 rounded hover:bg-black/5"
-                          style={{ color: 'var(--ink)' }}>{cantidades[idx] ?? 0}</span>
-                      )}
-                      <button onClick={() => setCantidad(idx, Math.min(item.cantidad, (parseInt(cantidades[idx]) || 0) + 1))}
-                        className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Plus size={10} /></button>
-                      <span className="text-[9px]" style={{ color: 'var(--faint)' }}>de {item.cantidad}</span>
+                    <div className="rounded-md p-2 mt-1 mb-1.5 space-y-1.5"
+                      style={{ backgroundColor: 'oklch(0.98 0.005 240)', border: '0.5px solid var(--border)' }}>
+                      {/* Buen estado */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-medium" style={{ color: 'var(--success)' }}>Buen estado:</span>
+                        <button onClick={() => setBuen(idx, Math.max(0, (buenas[idx] || 0) - 1))}
+                          className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Minus size={10} /></button>
+                        <span className="w-7 text-center font-mono text-xs font-semibold cursor-pointer"
+                          style={{ color: 'var(--ink)' }}
+                          onClick={() => { const v = prompt('Cantidad en buen estado:', buenas[idx] || 0); if (v !== null) setBuen(idx, parseInt(v) || 0); }}>
+                          {buenas[idx] || 0}
+                        </span>
+                        <button onClick={() => setBuen(idx, (buenas[idx] || 0) + 1)}
+                          className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Plus size={10} /></button>
+                      </div>
+                      {/* Dañadas */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-medium" style={{ color: 'oklch(0.55 0.13 70)' }}>Dañadas:</span>
+                        <button onClick={() => setDan(idx, Math.max(0, (danadas[idx] || 0) - 1))}
+                          className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Minus size={10} /></button>
+                        <span className="w-7 text-center font-mono text-xs font-semibold cursor-pointer"
+                          style={{ color: 'var(--ink)' }}
+                          onClick={() => { const v = prompt('Cantidad dañada:', danadas[idx] || 0); if (v !== null) setDan(idx, parseInt(v) || 0); }}>
+                          {danadas[idx] || 0}
+                        </span>
+                        <button onClick={() => setDan(idx, (danadas[idx] || 0) + 1)}
+                          className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Plus size={10} /></button>
+                        {(danadas[idx] || 0) > 0 && (
+                          <span className="flex items-center gap-0.5 ml-1">
+                            <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Costo S/</span>
+                            <input type="number" step="0.01" min="0" value={costosRep[idx] ?? ''}
+                              placeholder="0" onChange={e => setCosto(idx, e.target.value)}
+                              className="w-14 h-5 px-0.5 rounded text-[9px] border text-center font-mono dev-nospin"
+                              style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                          </span>
+                        )}
+                      </div>
+                      {/* Perdidas */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-medium" style={{ color: 'var(--danger)' }}>Perdidas:</span>
+                        <button onClick={() => setPerd(idx, Math.max(0, (perdidas[idx] || 0) - 1))}
+                          className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Minus size={10} /></button>
+                        <span className="w-7 text-center font-mono text-xs font-semibold cursor-pointer"
+                          style={{ color: 'var(--ink)' }}
+                          onClick={() => { const v = prompt('Cantidad perdida:', perdidas[idx] || 0); if (v !== null) setPerd(idx, parseInt(v) || 0); }}>
+                          {perdidas[idx] || 0}
+                        </span>
+                        <button onClick={() => setPerd(idx, (perdidas[idx] || 0) + 1)}
+                          className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Plus size={10} /></button>
+                        {(perdidas[idx] || 0) > 0 && (
+                          <span className="flex items-center gap-0.5 ml-1">
+                            <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Reponer S/</span>
+                            <input type="number" step="0.01" min="0"
+                              defaultValue={costosPerdida[idx] ?? (item.item_precio_venta || 0)}
+                              onBlur={e => setCostoPerd(idx, parseFloat(e.target.value) || 0)}
+                              onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                              className="w-14 h-5 px-0.5 rounded text-[9px] border text-center font-mono dev-nospin"
+                              style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                          </span>
+                        )}
+                      </div>
+                      {/* Total devuelto hoy + botón registrar */}
+                      <div className="flex items-center justify-between pt-1" style={{ borderTop: '0.5px solid var(--border)' }}>
+                        <span className="text-[9px]" style={{ color: 'var(--muted)' }}>
+                          Total: {(buenas[idx] || 0) + (danadas[idx] || 0) + (perdidas[idx] || 0)} de {item.cantidad}
+                        </span>
+                        <button onClick={() => registrarDevParcialGranel(idx)}
+                          className="px-2.5 h-6 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97]"
+                          style={{ backgroundColor: 'oklch(0.50 0.13 155)', color: '#fff', border: 'none' }}>
+                          Registrar devolución
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {/* Granel: estado devuelto + deshacer */}
+                  {esGranel && yaGuardado && (
+                    <div className="flex items-center justify-between mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
+                      <div className="flex items-center gap-1 text-[10px] font-medium" style={{ color: 'var(--success)' }}>
+                        <CheckCircle size={12} /> Devuelto parcialmente
+                      </div>
+                      <button onClick={() => handleDeshacer(idx)}
+                        className="text-[10px] px-2 h-5 rounded font-medium transition-all duration-150 hover:opacity-80"
+                        style={{ backgroundColor: 'oklch(0.92 0.03 25)', color: 'var(--danger)' }}>
+                        Deshacer
+                      </button>
                     </div>
                   )}
                   {/* Fila 4: Base + Mora + Pagado + Total */}
@@ -311,8 +421,8 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                       </div>
                     </div>
                   </div>
-                  {/* Fila 5: Botones de estado */}
-                  {yaGuardado ? (
+                  {/* Fila 5: Botones de estado — solo para items individuales */}
+                  {!esGranel && (yaGuardado ? (
                     <div className="flex items-center justify-between mt-2 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
                       <div className="flex items-center gap-1 text-[10px] font-medium" style={{ color: 'var(--success)' }}>
                         <CheckCircle size={12} /> Devuelto correctamente
@@ -340,9 +450,9 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                         );
                       })}
                     </div>
-                  )}
-                  {/* Dañado: costo + nota */}
-                  {est === 'dañado' && (
+                  ))}
+                  {/* Dañado: costo + nota — solo individual */}
+                  {!esGranel && est === 'dañado' && (
                     <div className="flex items-center gap-2 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
                       <span className="text-[10px] shrink-0" style={{ color: 'var(--muted)' }}>Costo reparación: S/</span>
                       <input type="number" step="0.01" min="0" value={costosRep[idx] ?? ''}

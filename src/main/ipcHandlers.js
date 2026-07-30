@@ -24,6 +24,8 @@ const {
   editarGranelFull,
   eliminarVariante,
   ajustarStock,
+  darBajaGranel,
+  repararGranel,
   generarPrefijo,
   crearCategoria,
   crearLote,
@@ -60,7 +62,8 @@ function registerIpcHandlers() {
     return db
       .prepare(
         `SELECT id, nombre, condicion, precio_dia, mora_dia, precio_minimo, precio_mes,
-                 cantidad_total, cantidad_disponible
+                cantidad_total, cantidad_disponible, cantidad_danada,
+                cantidad_alquilada, cantidad_perdida, cantidad_vendida, cantidad_baja
          FROM ITEM_GRANEL WHERE activo = 1 ORDER BY nombre, condicion`
       )
       .all();
@@ -216,6 +219,14 @@ function registerIpcHandlers() {
 
   ipcMain.handle('ajustar-stock', (_e, id, delta) => {
     return ajustarStock(id, delta);
+  });
+
+  ipcMain.handle('reparar-granel', (_e, id, cantidad) => {
+    return repararGranel(id, cantidad);
+  });
+
+  ipcMain.handle('dar-baja-granel', (_e, id, cantidad, motivo) => {
+    return darBajaGranel(id, cantidad, motivo);
   });
 
   // --- RENIEC ---

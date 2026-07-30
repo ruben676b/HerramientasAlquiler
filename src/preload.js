@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld('api', {
   editarGranelFull: (nombreOrig, data) => ipcRenderer.invoke('editar-granel-full', nombreOrig, data),
   eliminarVariante: (id) => ipcRenderer.invoke('eliminar-variante', id),
   ajustarStock: (id, delta) => ipcRenderer.invoke('ajustar-stock', id, delta),
+  repararGranel: (id, cantidad) => ipcRenderer.invoke('reparar-granel', id, cantidad),
+  darBajaGranel: (id, cantidad, motivo) => ipcRenderer.invoke('dar-baja-granel', id, cantidad, motivo),
   crearGranel: (data) => ipcRenderer.invoke('crear-granel', data),
   actualizarGranel: (id, data) => ipcRenderer.invoke('actualizar-granel', id, data),
   bajaGranel: (id) => ipcRenderer.invoke('baja-granel', id),
