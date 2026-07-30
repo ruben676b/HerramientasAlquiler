@@ -708,30 +708,29 @@ function SessionForm({ session }) {
                 className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }}
                 placeholder="9 dígitos" maxLength={9} />
             </div>
+          </div>
+        )}
 
-            {/* Fechas */}
-            <div>
-              <label className="text-[13px] font-medium mb-1.5 block" style={{ color: 'var(--ink)' }}>Fechas</label>
-              <div className="flex items-center gap-3">
-                <div className="flex-1">
-                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--muted)' }}>Salida</span>
-                  <input type="date" value={fechaSalida} onChange={(e) => setFechaSalida(e.target.value)}
-                    className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
-                </div>
-                <div className="flex-1">
-                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--muted)' }}>Devoluci&oacute;n sugerida</span>
-                  <input type="date" value={fechaDevolucion} onChange={(e) => setFechaDevolucion(e.target.value)}
-                    className={inputCls} style={{ backgroundColor: 'var(--surface)', color: fechaDevolucion < fechaSalida ? 'var(--danger)' : 'var(--ink)', borderColor: fechaDevolucion < fechaSalida ? 'var(--danger)' : 'var(--border)' }} />
-                </div>
-                <div className="shrink-0 pt-5">
-                  <span className="inline-flex px-2 py-1 rounded-lg text-xs font-bold"
-                    style={{ backgroundColor: 'var(--info)', color: '#fff' }}>
-                    {dias} d&iacute;a{dias !== 1 ? 's' : ''}
-                  </span>
-                </div>
-              </div>
-              {/* Botones rápidos de duración */}
-              <div className="flex gap-1 mt-2">
+        {/* ===== PASO 2: EQUIPOS ===== */}
+        {step === 1 && (
+          <div className="flex-1 overflow-y-auto p-5 flex flex-col space-y-3">
+            {/* Barra de fechas globales */}
+            <div className="flex items-center gap-2 shrink-0 px-3 py-2 rounded-lg"
+              style={{ backgroundColor: 'var(--surface)', border: '0.5px solid var(--border)' }}>
+              <span className="text-[11px] shrink-0" style={{ color: 'var(--muted)' }}>Salida</span>
+              <input type="date" value={fechaSalida} onChange={(e) => setFechaSalida(e.target.value)}
+                className="h-7 px-1.5 rounded text-[10px] border font-mono"
+                style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+              <span className="text-[11px]" style={{ color: 'var(--faint)' }}>→</span>
+              <span className="text-[11px] shrink-0" style={{ color: 'var(--muted)' }}>Devolución</span>
+              <input type="date" value={fechaDevolucion} onChange={(e) => setFechaDevolucion(e.target.value)}
+                className="h-7 px-1.5 rounded text-[10px] border font-mono"
+                style={{ backgroundColor: 'var(--bg)', color: fechaDevolucion < fechaSalida ? 'var(--danger)' : 'var(--ink)', borderColor: fechaDevolucion < fechaSalida ? 'var(--danger)' : 'var(--border)' }} />
+              <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0"
+                style={{ backgroundColor: 'var(--info)', color: '#fff' }}>
+                {dias} d
+              </span>
+              <div className="flex gap-0.5 shrink-0">
                 {[
                   { label: '1d', dias: 0 },
                   { label: '3d', dias: 2 },
@@ -742,24 +741,25 @@ function SessionForm({ session }) {
                   const activo = fechaDevolucion === sumarDias(fechaSalida, b.dias);
                   return (
                     <button key={b.label} onClick={() => setFechaDevolucion(sumarDias(fechaSalida, b.dias))}
-                      className="flex-1 h-8 rounded-lg text-xs font-medium transition-all duration-150"
+                      className="px-1.5 h-6 rounded text-[10px] font-medium transition-all duration-150"
                       style={{
-                        backgroundColor: activo ? 'var(--primary)' : 'var(--surface)',
+                        backgroundColor: activo ? 'var(--primary)' : 'transparent',
                         color: activo ? 'var(--primary-text)' : 'var(--muted)',
-                        border: !activo ? '0.5px solid var(--border)' : 'none',
+                        border: activo ? 'none' : '0.5px solid var(--border)',
                       }}>
                       {b.label}
                     </button>
                   );
                 })}
               </div>
+              {items.length > 0 && (
+                <button onClick={() => setItems(items.map(i => ({ ...i, fecha_devolucion_item: fechaDevolucion, total_editado: undefined })))}
+                  className="px-2 h-6 rounded text-[10px] font-medium transition-all duration-150 shrink-0"
+                  style={{ backgroundColor: 'oklch(0.55 0.13 240)', color: '#fff', border: 'none' }}>
+                  Aplicar a todo
+                </button>
+              )}
             </div>
-          </div>
-        )}
-
-        {/* ===== PASO 2: EQUIPOS ===== */}
-        {step === 1 && (
-          <div className="flex-1 overflow-y-auto p-5 flex flex-col space-y-3">
             {/* Buscador unificado */}
             <div className="relative shrink-0">
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--faint)' }} />
