@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, X, Plus, Package, Wrench } from 'lucide-react';
+import { Search, X, Plus, Package, Wrench, Star, Info } from 'lucide-react';
 import { cn } from '../lib/utils';
 import Button from '../components/ui/button';
+import StarRating, { CalificacionBadge } from '../components/StarRating';
+import DetalleClienteModal from '../components/DetalleClienteModal';
 
 /* ================================================================
    MOSTRADOR — Emitir Contrato
@@ -13,6 +15,7 @@ export default function Mostrador() {
   const [resultados, setResultados] = useState([]);
   const [cliente, setCliente] = useState(null);
   const [buscando, setBuscando] = useState(false);
+  const [detalleCliente, setDetalleCliente] = useState(null);
 
   // --- Fechas ---
   const hoy = new Date().toISOString().slice(0, 10);
@@ -350,6 +353,26 @@ export default function Mostrador() {
                       ⚠ LISTA NEGRA
                     </span>
                   ) : null}
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <CalificacionBadge
+                      promedio={cliente.promedio_estrellas}
+                      total={cliente.total_calificaciones}
+                    />
+                    {cliente.promedio_estrellas && (
+                      <StarRating value={cliente.promedio_estrellas} readonly size={11} />
+                    )}
+                    <span className="text-[10px]" style={{ color: 'var(--faint)' }}>
+                      {cliente.total_alquileres || 0} alquiler{cliente.total_alquileres !== 1 ? 'es' : ''}
+                    </span>
+                    <button
+                      onClick={() => setDetalleCliente(cliente)}
+                      className="p-1 rounded-md hover:bg-[var(--surface)] transition-colors ml-0.5"
+                      style={{ color: 'var(--faint)' }}
+                      title="Ver detalle del cliente"
+                    >
+                      <Info size={13} />
+                    </button>
+                  </div>
                 </div>
                 <button
                   onClick={() => { setCliente(null); setTermino(''); }}
@@ -688,6 +711,13 @@ export default function Mostrador() {
           </div>
         </div>
       </div>
+
+      {detalleCliente && (
+        <DetalleClienteModal
+          cliente={detalleCliente}
+          onClose={() => setDetalleCliente(null)}
+        />
+      )}
     </div>
   );
 }

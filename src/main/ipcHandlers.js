@@ -100,16 +100,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('buscar-clientes', (_event, termino) => {
-    const patron = '%' + termino + '%';
-    return db
-      .prepare(
-        `SELECT id, tipo, nombre, dni, telefono, en_lista_negra
-         FROM CLIENTE
-         WHERE activo = 1 AND (nombre LIKE ? OR dni LIKE ?)
-         ORDER BY nombre
-         LIMIT 10`
-      )
-      .all(patron, patron);
+    return buscarClientesConCalificacion(termino);
   });
 
   // --- Contratos ---

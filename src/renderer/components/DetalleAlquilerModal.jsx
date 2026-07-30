@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { X, Calendar, Package, CreditCard, Star, CheckCircle, AlertTriangle, XCircle, Clock } from 'lucide-react';
 import StarRating from './StarRating';
 
@@ -25,6 +26,34 @@ export default function DetalleAlquilerModal({ contrato, onClose }) {
   const diasAlquiler = Math.max(1, Math.ceil(
     (new Date(c.fecha_devolucion_pactada + 'T00:00:00') - new Date(c.fecha_salida + 'T00:00:00')) / 86400000
   ) + 1);
+
+  const [editandoCalif, setEditandoCalif] = useState(false);
+  const [editEstrellas, setEditEstrellas] = useState(calificacion?.estrellas || 0);
+  const [editComentario, setEditComentario] = useState(calificacion?.comentario || '');
+  const [guardandoCalif, setGuardandoCalif] = useState(false);
+  const [califError, setCalifError] = useState('');
+
+  const guardarCalificacion = async () => {
+    if (editEstrellas === 0) { setCalifError('Seleccione al menos 1 estrella'); return; }
+    if (!window.api) return;
+    setGuardandoCalif(true);
+    setCalifError('');
+    try {
+      await window.api.guardarCalificacion(c.id, editEstrellas, editComentario.trim());
+      setEditandoCalif(false);
+    } catch (e) {
+      setCalifError(e.message || 'Error al guardar');
+    } finally {
+      setGuardandoCalif(false);
+    }
+  };
+
+  const iniciarEdicion = () => {
+    setEditEstrellas(calificacion?.estrellas || 0);
+    setEditComentario(calificacion?.comentario || '');
+    setEditandoCalif(true);
+    setCalifError('');
+  };
 
   return (
     <div className="fixed inset-0 z-[60] flex" style={{ backgroundColor: 'oklch(0 0 0 / 0.5)' }} onClick={onClose}>
@@ -200,25 +229,79 @@ export default function DetalleAlquilerModal({ contrato, onClose }) {
           </div>
 
           {/* Calificación */}
-          {calificacion && (
-            <div className="rounded-lg p-3" style={{ backgroundColor: 'oklch(0.97 0.02 80)', border: '1px solid oklch(0.90 0.04 80)' }}>
-              <p className="text-[10px] uppercase tracking-wider font-semibold mb-1.5" style={{ color: 'oklch(0.50 0.13 80)' }}>
-                <Star size={11} className="inline mr-1" style={{ verticalAlign: '-1px' }} />
-                Calificación del cliente
-              </p>
-              <div className="flex items-center gap-2">
-                <StarRating value={calificacion.estrellas} readonly size={16} />
-                <span className="text-xs font-semibold" style={{ color: 'oklch(0.50 0.13 80)' }}>
-                  {calificacion.estrellas}/5
-                </span>
+          <div className="rounded-lg p-3" style={{ backgroundColor: 'oklch(0.97 0.02 80)', border: '1px solid oklch(0.90 0.04 80)' }}>
+            <p className="text-[10px] uppercase tracking-wider font-semibold mb-1.5" style={{ color: 'oklch(0.50 0.13 80)' }}>
+              <Star size={11} className="inline mr-1" style={{ verticalAlign: '-1px' }} />
+              Calificación del cliente
+            </p>
+
+            {editandoCalif ? (
+              <div className="space-y-2">
+                <div className="flex justify-center">
+                  <StarRating value={editEstrellas} onChange={setEditEstrellas} size={22} />
+                </div>
+                {editEstrellas > 0 && (
+                  <p className="text-[11px] text-center font-medium" style={{ color: 'oklch(0.50 0.13 80)' }}>
+                    {['', 'Malo', 'Regular', 'Bueno', 'Muy bueno', 'Excelente'][editEstrellas]}
+                  </p>
+                )}
+                <textarea
+                  value={editComentario}
+                  onChange={e => setEditComentario(e.target.value)}
+                  placeholder="Comentario opcional..."
+                  rows={2}
+                  className="w-full px-2.5 py-1.5 rounded-lg text-xs resize-none outline-none focus:ring-2"
+                  style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', border: '1px solid var(--border)' }}
+                />
+                {califError && (
+                  <p className="text-xs" style={{ color: 'var(--danger)' }}>{califError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button onClick={() => setEditandoCalif(false)}
+                    className="flex-1 h-7 rounded text-[10px] font-medium transition-all"
+                    style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)', border: '0.5px solid var(--border)' }}>
+                    Cancelar
+                  </button>
+                  <button onClick={guardarCalificacion} disabled={guardandoCalif}
+                    className="flex-1 h-7 rounded text-[10px] font-semibold transition-all active:scale-[0.97] disabled:opacity-50"
+                    style={{ backgroundColor: 'oklch(0.55 0.13 240)', color: '#fff', border: 'none' }}>
+                    {guardandoCalif ? 'Guardando...' : 'Guardar'}
+                  </button>
+                </div>
               </div>
-              {calificacion.comentario && (
-                <p className="text-xs mt-1.5 italic" style={{ color: 'oklch(0.40 0.08 80)' }}>
-                  "{calificacion.comentario}"
-                </p>
-              )}
-            </div>
-          )}
+            ) : calificacion ? (
+              <div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <StarRating value={calificacion.estrellas} readonly size={16} />
+                    <span className="text-xs font-semibold" style={{ color: 'oklch(0.50 0.13 80)' }}>
+                      {calificacion.estrellas}/5
+                    </span>
+                  </div>
+                  <button onClick={iniciarEdicion}
+                    className="px-2 h-6 rounded text-[10px] font-medium transition-all"
+                    style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)', border: '0.5px solid var(--border)' }}>
+                    Editar
+                  </button>
+                </div>
+                {calificacion.comentario && (
+                  <p className="text-xs mt-1.5 italic" style={{ color: 'oklch(0.40 0.08 80)' }}>
+                    "{calificacion.comentario}"
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-2">
+                <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>Aún no se ha calificado a este cliente</p>
+                <button onClick={iniciarEdicion}
+                  className="px-3 h-7 rounded-lg text-xs font-semibold transition-all active:scale-[0.97]"
+                  style={{ backgroundColor: 'oklch(0.62 0.17 80 / 0.12)', color: 'oklch(0.52 0.17 80)', border: '0.5px solid oklch(0.62 0.17 80 / 0.3)' }}>
+                  <Star size={11} className="inline mr-1" style={{ verticalAlign: '-1px' }} />
+                  Calificar
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Notas */}
           {c.notas && (

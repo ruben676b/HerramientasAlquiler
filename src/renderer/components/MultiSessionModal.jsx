@@ -1,10 +1,12 @@
-import { X, Plus, Circle, CheckCircle2, Clock, ChevronLeft, ChevronRight, User, Wrench, DollarSign, Search, AlertTriangle, Package, FileText } from 'lucide-react';
+import { X, Plus, Circle, CheckCircle2, Clock, ChevronLeft, ChevronRight, User, Wrench, DollarSign, Search, AlertTriangle, Package, FileText, Star, Info } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import ConfirmModal from './ConfirmModal';
 import { useSessions } from '../contexts/SessionsContext';
 import { useToast } from './Toast';
 import { cn } from '../lib/utils';
 import SignaturePad from './SignaturePad';
+import StarRating, { CalificacionBadge } from './StarRating';
+import DetalleClienteModal from './DetalleClienteModal';
 import Button from './ui/button';
 
 const fmtLocalDate = (d) => {
@@ -215,6 +217,7 @@ function SessionForm({ session }) {
   const [sugerenciasDni, setSugerenciasDni] = useState([]);
   const [sugerenciasNombre, setSugerenciasNombre] = useState([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState(saved.clienteSeleccionado || null);
+  const [detalleCliente, setDetalleCliente] = useState(null);
   const [buscando, setBuscando] = useState(false);
   const [dniFocus, setDniFocus] = useState(false);
   const [nombreFocus, setNombreFocus] = useState(false);
@@ -700,6 +703,29 @@ function SessionForm({ session }) {
                 <span>Este cliente está en lista negra. Verifique antes de continuar.</span>
               </div>
             ) : null}
+
+            {clienteSeleccionado && (
+              <div className="flex items-center gap-2 px-1">
+                <CalificacionBadge
+                  promedio={clienteSeleccionado.promedio_estrellas}
+                  total={clienteSeleccionado.total_calificaciones}
+                />
+                {clienteSeleccionado.promedio_estrellas && (
+                  <StarRating value={clienteSeleccionado.promedio_estrellas} readonly size={12} />
+                )}
+                <span className="text-[10px]" style={{ color: 'var(--faint)' }}>
+                  {clienteSeleccionado.total_alquileres || 0} alquiler{clienteSeleccionado.total_alquileres !== 1 ? 'es' : ''}
+                </span>
+                <button
+                  onClick={() => setDetalleCliente(clienteSeleccionado)}
+                  className="p-1 rounded-md hover:bg-[var(--surface)] transition-colors"
+                  style={{ color: 'var(--faint)' }}
+                  title="Ver detalle del cliente"
+                >
+                  <Info size={12} />
+                </button>
+              </div>
+            )}
 
             {/* Teléfono */}
             <div>
@@ -1357,6 +1383,13 @@ function SessionForm({ session }) {
           </button>
         )}
       </div>
+
+      {detalleCliente && (
+        <DetalleClienteModal
+          cliente={detalleCliente}
+          onClose={() => setDetalleCliente(null)}
+        />
+      )}
     </div>
   );
 }

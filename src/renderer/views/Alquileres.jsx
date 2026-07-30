@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Search, Plus, ChevronDown, ChevronRight, Calendar, Clock,
-  XCircle, X, CheckCircle, AlertTriangle, FileText, ArrowRight,
+  XCircle, X, CheckCircle, AlertTriangle, FileText, ArrowRight, Star,
 } from 'lucide-react';
 import { SEMANTIC } from '../lib/constants';
 import Button from '../components/ui/button';
@@ -11,6 +11,7 @@ import UnifiedPaymentModal from '../components/UnifiedPaymentModal';
 import AnularPagoModal from '../components/AnularPagoModal';
 import { gruparPagos } from '../lib/gruparPagos';
 import DevolucionInline from '../components/DevolucionInline';
+import CalificarContratoModal from '../components/CalificarContratoModal';
 
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 
@@ -41,6 +42,7 @@ export default function Alquileres() {
   const [garantiaMonto, setGarantiaMonto] = useState('');
   const [garantiaMetodo, setGarantiaMetodo] = useState('efectivo');
   const [devolverGarantiaId, setDevolverGarantiaId] = useState(null);
+  const [calificarContrato, setCalificarContrato] = useState(null);
   const [devGarantiaMonto, setDevGarantiaMonto] = useState('');
   const [devGarantiaMetodo, setDevGarantiaMetodo] = useState('efectivo');
   const searchRef = useRef(null);
@@ -604,6 +606,15 @@ export default function Alquileres() {
                           <FileText size={12} /> Ver contrato
                         </button>
                         <button
+                          onClick={() => setCalificarContrato(c)}
+                          className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
+                          style={{ backgroundColor: 'oklch(0.62 0.17 80 / 0.12)', color: 'oklch(0.52 0.17 80)', border: '0.5px solid oklch(0.62 0.17 80 / 0.3)' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.2)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.12)'; }}
+                        >
+                          <Star size={12} /> Calificar
+                        </button>
+                        <button
                           onClick={() => setDevolucionActiva(devolucionActiva === c.id ? null : c.id)}
                           className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
                           style={{ backgroundColor: devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)', color: '#fff', border: 'none' }}
@@ -656,6 +667,15 @@ export default function Alquileres() {
             <embed src={pdfPreviewUrl} type="application/pdf" className="flex-1 w-full border-0" />
           </div>
         </div>
+      )}
+
+      {calificarContrato && (
+        <CalificarContratoModal
+          idContrato={calificarContrato.id}
+          idCliente={calificarContrato.id_cliente}
+          onClose={() => setCalificarContrato(null)}
+          onGuardado={() => { recargar(); toast('Calificación guardada'); }}
+        />
       )}
     </div>
     </>

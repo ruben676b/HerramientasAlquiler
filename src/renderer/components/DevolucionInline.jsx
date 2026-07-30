@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, CheckCircle, AlertTriangle, Minus, Plus, ChevronRight, Clock } from 'lucide-react';
+import { X, CheckCircle, AlertTriangle, Minus, Plus, ChevronRight, Clock, Star } from 'lucide-react';
 import { useToast } from './Toast';
 import UnifiedPaymentModal from './UnifiedPaymentModal';
 import AnularPagoModal from './AnularPagoModal';
+import CalificarContratoModal from './CalificarContratoModal';
 import { gruparPagos } from '../lib/gruparPagos';
 
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -57,6 +58,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [historialGranelAbierto, setHistorialGranelAbierto] = useState({});
   const [devolucionesGranel, setDevolucionesGranel] = useState({});
   const [cargandoHistorial, setCargandoHistorial] = useState({});
+  const [calificarModal, setCalificarModal] = useState(false);
 
   const cargarHistorialGranel = async (idx, item) => {
     if (!window.api || !item.id_item_granel) return;
@@ -400,13 +402,22 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
       {/* Encabezado con botón cancelar */}
       <div className="flex items-center justify-between px-1">
         <p className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: 'var(--danger)' }}>Modo devolución</p>
-        <button onClick={closeDevMode}
-          className="flex items-center gap-1 px-2 h-6 rounded text-[10px] font-medium transition-all duration-150"
-          style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)', border: '0.5px solid var(--border)' }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}>
-          <X size={12} /> Salir
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setCalificarModal(true)}
+            className="flex items-center gap-1 px-2 h-6 rounded text-[10px] font-semibold transition-all duration-150"
+            style={{ backgroundColor: 'oklch(0.62 0.17 80 / 0.12)', color: 'oklch(0.52 0.17 80)', border: '0.5px solid oklch(0.62 0.17 80 / 0.3)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.2)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.12)'; }}>
+            <Star size={11} /> Calificar
+          </button>
+          <button onClick={closeDevMode}
+            className="flex items-center gap-1 px-2 h-6 rounded text-[10px] font-medium transition-all duration-150"
+            style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)', border: '0.5px solid var(--border)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}>
+            <X size={12} /> Salir
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -995,6 +1006,14 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
         pago={anulandoPago}
         onClose={() => setAnulandoPago(null)}
         onConfirm={() => { setAnulandoPago(null); onRecargar(); }}
+      />
+    )}
+    {calificarModal && (
+      <CalificarContratoModal
+        idContrato={c.id}
+        idCliente={c.id_cliente}
+        onClose={() => setCalificarModal(false)}
+        onGuardado={() => { toast('Calificación guardada'); }}
       />
     )}
     </>
