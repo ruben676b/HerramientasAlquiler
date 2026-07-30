@@ -348,6 +348,7 @@ function SessionForm({ session }) {
       return;
     }
     setItems([...items, { tipo: 'individual', id_herramienta: h.id, nombre: h.nombre, precio_dia: h.precio_dia, precio_minimo: h.precio_minimo, precio_mes: h.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion }]);
+    setBusquedaEquipo('');
   };
 
   const agregarGranel = (g) => {
@@ -358,6 +359,7 @@ function SessionForm({ session }) {
     } else {
       setItems([...items, { tipo: 'granel', id_item_granel: g.id, nombre: g.nombre, condicion: g.condicion, precio_dia: g.precio_dia, precio_minimo: g.precio_minimo, precio_mes: g.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion }]);
     }
+    setBusquedaEquipo('');
   };
 
   const cambiarFechaItem = (idx, fecha) => {
@@ -450,7 +452,19 @@ function SessionForm({ session }) {
       if (dni && dni.length !== 8) return setError('El DNI debe tener 8 dígitos.');
       if (fechaDevolucion < fechaSalida) return setError('La devolución debe ser posterior a la salida.');
     }
-    if (step === 1 && items.length === 0) return setError('Agregue al menos un ítem al alquiler.');
+    if (step === 1) {
+      if (items.length === 0) return setError('Agregue al menos un ítem al alquiler.');
+      for (const item of items) {
+        if (!item.id_item_granel) continue;
+        const original = granelCat.find(g => g.id === item.id_item_granel);
+        if (!original) continue;
+        const enOtras = granelEnOtrasSesiones[item.id_item_granel] || 0;
+        const disponible = original.cantidad_disponible - enOtras;
+        if (item.cantidad > disponible) {
+          return setError('Stock insuficiente para "' + item.nombre + '". Pedido: ' + item.cantidad + ', disponible: ' + disponible + '.');
+        }
+      }
+    }
     setStep(step + 1);
   };
 
@@ -904,7 +918,7 @@ function SessionForm({ session }) {
                                 ref={el => inputCantRefs.current[idx] = el}
                                 type="number" min="1"
                                 defaultValue={item.cantidad}
-                                onBlur={e => { const v = parseInt(e.target.value) || 1; setItems(items.map((it, i) => i === idx ? { ...it, cantidad: Math.max(1, v), total_editado: undefined } : it)); setCantEditando(p => ({ ...p, [idx]: false })); }}
+                                onBlur={e => { const max = item._maxDisponible || 999; const v = Math.max(1, Math.min(parseInt(e.target.value) || 1, max)); setItems(items.map((it, i) => i === idx ? { ...it, cantidad: v, total_editado: undefined } : it)); setCantEditando(p => ({ ...p, [idx]: false })); }}
                                 onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
                                 className="w-10 h-5 px-0.5 rounded text-xs text-center font-mono border"
                                 style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }}
@@ -919,6 +933,11 @@ function SessionForm({ session }) {
                               className="w-5 h-5 rounded flex items-center justify-center text-sm font-bold hover:bg-black/5"
                               style={{ color: 'var(--muted)' }}>+</button>
                             <span className="text-[10px]" style={{ color: 'var(--faint)' }}>unid.</span>
+                            <span className="text-[10px] ml-auto shrink-0" style={{
+                              color: item.cantidad >= item._maxDisponible ? 'var(--danger)' : 'var(--muted)'
+                            }}>
+                              Stock: {item._stockOriginal} disp.
+                            </span>
                           </div>
                         )}
 

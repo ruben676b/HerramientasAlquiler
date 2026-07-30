@@ -41,6 +41,6 @@ export function gruparPagos(pagos) {
   return [...sueltos, ...agrupados].sort((a, b) => {
     const fa = a.fecha_pago || '';
     const fb = b.fecha_pago || '';
-    return fa.localeCompare(fb);
+    return fb.localeCompare(fa);
   });
 }

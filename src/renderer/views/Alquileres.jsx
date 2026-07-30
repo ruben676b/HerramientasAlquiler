@@ -61,6 +61,10 @@ export default function Alquileres() {
     if (!window.api) return;
     try {
       const c = await window.api.getContratos({ busqueda });
+      if (window.api.log) {
+        const granelItems = c[0]?.items?.filter(i => i.id_item_granel).map(i => ({ id: i.id, id_item_granel: i.id_item_granel, cantidad: i.cantidad, granel_pendiente: i.granel_pendiente, granel_dev_bien: i.granel_dev_bien, granel_dev_danada: i.granel_dev_danada, granel_dev_perdida: i.granel_dev_perdida }));
+        window.api.log('[DEBUG recargar] contratos: ' + c.length + ' granelItems: ' + JSON.stringify(granelItems));
+      }
       setTodosContratos(c);
     } catch (e) { setError(e.message); }
   };
@@ -216,7 +220,9 @@ export default function Alquileres() {
             ) + 1);
             const montoBase = c.total_contrato ? c.total_contrato : (c.subtotal_diario || 0) * dias; // fallback para contratos viejos
             const montoAtraso = c.total_atraso || 0;
-            const total = montoBase + montoAtraso;
+            const totalDanos = c.total_danos || 0;
+            const totalPerdidas = c.total_perdidas || 0;
+            const total = montoBase + montoAtraso + totalDanos + totalPerdidas;
             const pagado = c.total_pagado || 0;
             const garantia = c.garantia_retenida || 0;
             const pendiente = Math.max(0, total - pagado);
@@ -334,6 +340,21 @@ export default function Alquileres() {
                                         &middot; Base: {item.dias_item || 0} d&iacute;a{(item.dias_item || 0) !== 1 ? 's' : ''}
                                       </span>
                                     </div>
+                                    {/* Granel: resumen devolución */}
+                                    {esGranel && (item.granel_dev_bien || item.granel_dev_danada || item.granel_dev_perdida || 0) > 0 && (
+                                      <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
+                                        <span />
+                                        <span className="text-[11px] flex items-center gap-2">
+                                          <span style={{ color: 'var(--muted)' }}>Dev:</span>
+                                          {(item.granel_dev_bien || 0) > 0 && <span style={{ color: 'var(--success)' }}>{item.granel_dev_bien} bien</span>}
+                                          {(item.granel_dev_danada || 0) > 0 && <span style={{ color: 'oklch(0.55 0.13 70)' }}>{item.granel_dev_danada} dañ</span>}
+                                          {(item.granel_dev_perdida || 0) > 0 && <span style={{ color: 'var(--danger)' }}>{item.granel_dev_perdida} perd</span>}
+                                          {(item.granel_pendiente || 0) > 0 && <span style={{ color: 'var(--faint)' }}>pend: {item.granel_pendiente}</span>}
+                                          {(item.granel_pendiente === 0) && <span className="font-medium" style={{ color: 'var(--success)' }}>Completo</span>}
+                                        </span>
+                                        <span />
+                                      </div>
+                                    )}
                                     {/* Fila 3: Base S/ + Mora + Total */}
                                     <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
                                       <span />
@@ -371,6 +392,20 @@ export default function Alquileres() {
                               <div className="flex justify-between items-baseline text-xs">
                                 <span style={{ color: 'var(--danger)' }}>Recargos por atraso</span>
                                 <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {montoAtraso.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {/* Daños */}
+                            {totalDanos > 0 && (
+                              <div className="flex justify-between items-baseline text-xs">
+                                <span style={{ color: 'var(--warning)' }}>Cobro por daños</span>
+                                <span className="font-mono tabular-nums" style={{ color: 'var(--warning)' }}>+ S/ {totalDanos.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {/* Pérdidas */}
+                            {totalPerdidas > 0 && (
+                              <div className="flex justify-between items-baseline text-xs">
+                                <span style={{ color: 'var(--danger)' }}>Cobro por pérdidas</span>
+                                <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {totalPerdidas.toFixed(2)}</span>
                               </div>
                             )}
                             {/* Deposito */}

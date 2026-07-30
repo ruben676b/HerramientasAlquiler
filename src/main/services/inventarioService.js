@@ -189,16 +189,45 @@ function crearMaterial({ nombre, precio_nuevo, precio_minimo_nuevo, precio_mes_n
   return { nombre };
 }
 
+// Helper: leer estado actual de columnas auditables
+function readGranelState(id) {
+  return db.prepare(`
+    SELECT cantidad_total, cantidad_alquilada, cantidad_danada, cantidad_perdida, cantidad_vendida, cantidad_baja
+    FROM ITEM_GRANEL WHERE id = ? AND activo = 1
+  `).get(id);
+}
+
+// Helper: insertar entrada en AUDIT_GRANEL
+function insertAudit(itemId, accion, cantidad, prev, next) {
+  db.prepare(`
+    INSERT INTO AUDIT_GRANEL
+      (item_id, accion, cantidad, prev_total, prev_alquilada, prev_danada, prev_perdida, prev_vendida, prev_baja,
+       new_total, new_alquilada, new_danada, new_perdida, new_vendida, new_baja)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    itemId, accion, cantidad,
+    prev.cantidad_total, prev.cantidad_alquilada || 0, prev.cantidad_danada || 0,
+    prev.cantidad_perdida || 0, prev.cantidad_vendida || 0, prev.cantidad_baja || 0,
+    next.cantidad_total, next.cantidad_alquilada || 0, next.cantidad_danada || 0,
+    next.cantidad_perdida || 0, next.cantidad_vendida || 0, next.cantidad_baja || 0
+  );
+}
+
 function agregarStockGranel(id, cantidad) {
   if (!cantidad || cantidad < 1) throw new Error('Cantidad debe ser al menos 1.');
 
   const item = db.prepare('SELECT * FROM ITEM_GRANEL WHERE id = ? AND activo = 1').get(id);
   if (!item) throw new Error('Material no encontrado.');
 
+  const prev = readGranelState(id);
+
   db.prepare(`
     UPDATE ITEM_GRANEL SET cantidad_total = cantidad_total + ?
     WHERE id = ?
   `).run(cantidad, id);
+
+  const next = readGranelState(id);
+  insertAudit(id, 'compra', cantidad, prev, next);
 
   return { id, agregado: cantidad };
 }
@@ -265,10 +294,15 @@ function ajustarStock(id, delta) {
     throw new Error('Para restar stock use darBajaGranel con un motivo específico.');
   }
 
+  const prev = readGranelState(id);
+
   db.prepare(`
     UPDATE ITEM_GRANEL SET cantidad_total = cantidad_total + ?
     WHERE id = ?
   `).run(delta, id);
+
+  const next = readGranelState(id);
+  insertAudit(id, 'ajuste', delta, prev, next);
 
   return { id, total: item.cantidad_total + delta };
 }
@@ -294,11 +328,16 @@ function darBajaGranel(id, cantidad, motivo) {
     );
   }
 
+  const prev = readGranelState(id);
+
   const colMap = { baja: 'cantidad_baja', perdido: 'cantidad_perdida', dañado: 'cantidad_danada', vendido: 'cantidad_vendida' };
   const col = colMap[motivo];
 
   db.prepare('UPDATE ITEM_GRANEL SET ' + col + ' = ' + col + ' + ? WHERE id = ?')
     .run(cantidad, id);
+
+  const next = readGranelState(id);
+  insertAudit(id, motivo, cantidad, prev, next);
 
   return { id, motivo, cantidad };
 }
@@ -316,12 +355,85 @@ function repararGranel(id, cantidad) {
     throw new Error('Solo hay ' + (item.cantidad_danada || 0) + ' unidades dañadas, no suficientes para reparar ' + cantidad + '.');
   }
 
+  const prev = readGranelState(id);
+
   db.prepare(`
     UPDATE ITEM_GRANEL SET cantidad_danada = cantidad_danada - ?
     WHERE id = ?
   `).run(cantidad, id);
 
+  const next = readGranelState(id);
+  insertAudit(id, 'reparacion', cantidad, prev, next);
+
   return { id, reparadas: cantidad, danadaRestante: (item.cantidad_danada || 0) - cantidad };
+}
+
+/* ================================================================
+   AUDITORÍA — historial de modificaciones de stock granel
+   ================================================================ */
+
+function getAuditGranel(itemId) {
+  return db.prepare(`
+    SELECT * FROM AUDIT_GRANEL
+    WHERE item_id = ?
+    ORDER BY id DESC
+    LIMIT 50
+  `).all(itemId);
+}
+
+function revertirAuditGranel(auditId) {
+  const entry = db.prepare('SELECT * FROM AUDIT_GRANEL WHERE id = ?').get(auditId);
+  if (!entry) throw new Error('Entrada de auditoría no encontrada.');
+  if (entry.revertido) throw new Error('Esta entrada ya fue revertida.');
+  if (entry.accion === 'undo') throw new Error('No se puede deshacer una operación de deshacer.');
+
+  // Verificar que sea la última entrada no revertida para este ítem
+  const ultima = db.prepare(`
+    SELECT id FROM AUDIT_GRANEL
+    WHERE item_id = ? AND revertido = 0
+    ORDER BY id DESC LIMIT 1
+  `).get(entry.item_id);
+
+  if (!ultima || ultima.id !== entry.id) {
+    throw new Error('Solo se puede deshacer la última modificación no revertida.');
+  }
+
+  const ejecutar = db.transaction(() => {
+    const actual = db.prepare('SELECT * FROM ITEM_GRANEL WHERE id = ?').get(entry.item_id);
+    if (!actual) throw new Error('Ítem no encontrado.');
+
+    // Restaurar valores previos
+    db.prepare(`
+      UPDATE ITEM_GRANEL SET
+        cantidad_total = ?, cantidad_alquilada = ?, cantidad_danada = ?,
+        cantidad_perdida = ?, cantidad_vendida = ?, cantidad_baja = ?
+      WHERE id = ?
+    `).run(
+      entry.prev_total, entry.prev_alquilada, entry.prev_danada,
+      entry.prev_perdida, entry.prev_vendida, entry.prev_baja,
+      entry.item_id
+    );
+
+    // Marcar entrada original como revertida
+    db.prepare('UPDATE AUDIT_GRANEL SET revertido = 1 WHERE id = ?').run(auditId);
+
+    // Insertar entrada de undo
+    db.prepare(`
+      INSERT INTO AUDIT_GRANEL
+        (item_id, accion, cantidad, prev_total, prev_alquilada, prev_danada, prev_perdida, prev_vendida, prev_baja,
+         new_total, new_alquilada, new_danada, new_perdida, new_vendida, new_baja)
+      VALUES (?, 'undo', 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      entry.item_id,
+      actual.cantidad_total, actual.cantidad_alquilada || 0, actual.cantidad_danada || 0,
+      actual.cantidad_perdida || 0, actual.cantidad_vendida || 0, actual.cantidad_baja || 0,
+      entry.prev_total, entry.prev_alquilada, entry.prev_danada,
+      entry.prev_perdida, entry.prev_vendida, entry.prev_baja
+    );
+  });
+
+  ejecutar();
+  return { revertido: auditId };
 }
 
 /* ================================================================
@@ -676,4 +788,6 @@ module.exports = {
   cambiarEstado,
   getHistorialUnidad,
   getHerramientasPorCategoria,
+  getAuditGranel,
+  revertirAuditGranel,
 };

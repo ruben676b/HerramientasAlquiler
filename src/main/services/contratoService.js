@@ -1,4 +1,12 @@
+const fs = require('fs');
 const db = require('../db/database');
+
+const LOG_FILE = '/tmp/sistema-alquiler-debug.log';
+function log(msg) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try { fs.appendFileSync(LOG_FILE, line); } catch(e) {}
+  console.log(msg);
+}
 
 /**
  * Crea un contrato de alquiler con sus ítems dentro de una transacción atómica.
@@ -207,27 +215,46 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
     const fechaReal = new Date(fechaDevolucionReal + 'T00:00:00');
     let totalMora = 0;
     let totalDanos = 0;
+    const granelAccum = {};
 
     for (const item of itemsDevueltos) {
       const detalle = db.prepare('SELECT * FROM DETALLE_CONTRATO WHERE id = ? AND id_contrato = ?').get(item.id_detalle, idContrato);
       if (!detalle) throw new Error('Detalle de contrato no encontrado: ' + item.id_detalle);
+      log('[DEBUG registrarDevolucion] item.id_detalle=' + item.id_detalle + ' detalle.id=' + detalle.id + ' tipo_item=' + detalle.tipo_item + ' estado=' + detalle.estado_devolucion + ' id_item_granel=' + detalle.id_item_granel + ' cantidad=' + detalle.cantidad);
+
+      // Si el item individual ya está en 'dañado' y se envía nuevo costo, actualizar MANTENIMIENTO
+      if (detalle.tipo_item === 'individual' && detalle.estado_devolucion === 'dañado' && item.estado_devolucion === 'dañado') {
+        log('[DIAG registrarDevolucion] RE-SAVE dañado id_detalle=' + item.id_detalle + ' costo=' + item.costo_reparacion);
+        if (item.costo_reparacion) {
+          const desc = observaciones?.[item.id_detalle] || '';
+          db.prepare(`
+            UPDATE MANTENIMIENTO SET costo = ?, descripcion = ?
+            WHERE id_herramienta = ? AND fecha_fin IS NULL AND tipo = 'correctivo'
+            ORDER BY id DESC LIMIT 1
+          `).run(item.costo_reparacion, 'Devolucion: ' + desc, detalle.id_herramienta);
+          totalDanos = (totalDanos || 0) + item.costo_reparacion;
+        }
+        continue;
+      }
 
       // Saltar ítems ya procesados en devoluciones parciales previas
-      if (detalle.estado_devolucion !== 'pendiente') continue;
+      // Granel: permitir siempre aunque tenga estado histórico distinto de 'pendiente' (datos pre-migración)
+      if (detalle.tipo_item !== 'granel' && detalle.estado_devolucion !== 'pendiente') {
+        log('[DIAG registrarDevolucion] SKIP ya procesado id_detalle=' + item.id_detalle + ' estado=' + detalle.estado_devolucion);
+        continue;
+      }
 
       const esDevuelto = item.estado_devolucion === 'bien' || item.estado_devolucion === 'dañado' || item.estado_devolucion === 'perdido';
 
-      // Actualizar estado del ítem y registrar fecha si fue devuelto
-      if (esDevuelto) {
-        db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ? WHERE id = ?')
-          .run(item.estado_devolucion, fechaDevolucionReal, item.id_detalle);
-      } else {
-        db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ? WHERE id = ?')
-          .run(item.estado_devolucion, item.id_detalle);
-      }
-
       if (esDevuelto) {
         if (detalle.tipo_item === 'individual') {
+          // Actualizar estado y fecha del detalle solo para items individuales
+          log('[DIAG registrarDevolucion] ANTES UPDATE id_detalle=' + item.id_detalle + ' estado_devolucion=' + detalle.estado_devolucion);
+          db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ? WHERE id = ?')
+            .run(item.estado_devolucion, fechaDevolucionReal, item.id_detalle);
+          const despues = db.prepare('SELECT estado_devolucion, fecha_devolucion_real FROM DETALLE_CONTRATO WHERE id = ?').get(item.id_detalle);
+          log('[DIAG registrarDevolucion] DESPUES UPDATE id_detalle=' + item.id_detalle + ' estado_devolucion=' + (despues?.estado_devolucion) + ' fecha=' + (despues?.fecha_devolucion_real));
+
           const nuevoEstado = item.estado_devolucion === 'dañado' ? 'mantenimiento' : 'disponible';
           db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(nuevoEstado, detalle.id_herramienta);
 
@@ -238,75 +265,104 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
             db.prepare('INSERT INTO MANTENIMIENTO (id_herramienta, fecha_inicio, descripcion, tipo, costo) VALUES (?, ?, ?, ?, ?)')
               .run(detalle.id_herramienta, hoy, 'Devolucion: ' + desc, 'correctivo', item.costo_reparacion || 0);
           }
+
+          // Mora individual
+          const diasAtrasoInd = Math.max(0, Math.ceil((fechaReal - fechaPactada) / (1000 * 60 * 60 * 24)));
+          if (diasAtrasoInd > 0) {
+            totalMora += diasAtrasoInd * detalle.precio_dia_aplicado * detalle.cantidad;
+          }
         } else if (detalle.tipo_item === 'granel') {
-          const cantDevuelta = item.cantidad_devuelta || detalle.cantidad;
-
-          if (cantDevuelta < detalle.cantidad) {
-            // Split parcial: reducir la fila original y crear nueva fila para la porción devuelta
-            const restante = detalle.cantidad - cantDevuelta;
-            db.prepare('UPDATE DETALLE_CONTRATO SET cantidad = ? WHERE id = ?')
-              .run(restante, detalle.id_detalle);
-
-            db.prepare(`
-              INSERT INTO DETALLE_CONTRATO
-                (id_contrato, tipo_item, id_item_granel, cantidad, precio_dia_aplicado, mora_dia_aplicada, estado_devolucion, fecha_devolucion_real, costo_perdida)
-              VALUES (?, 'granel', ?, ?, ?, ?, ?, ?, ?)
-            `).run(idContrato, detalle.id_item_granel, cantDevuelta,
-              detalle.precio_dia_aplicado, detalle.mora_dia_aplicada,
-              item.estado_devolucion, fechaDevolucionReal,
-              item.estado_devolucion === 'perdido' ? (item.costo_perdida || null) : null);
-          } else {
-            // Devolución completa
-            const updateSql = item.estado_devolucion === 'perdido' && item.costo_perdida != null
-              ? 'UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ?, costo_perdida = ? WHERE id = ?'
-              : 'UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ? WHERE id = ?';
-            const updateParams = item.estado_devolucion === 'perdido' && item.costo_perdida != null
-              ? [item.estado_devolucion, fechaDevolucionReal, item.costo_perdida, item.id_detalle]
-              : [item.estado_devolucion, fechaDevolucionReal, item.id_detalle];
-            db.prepare(updateSql).run(...updateParams);
+          log('[DEBUG registrarDevolucion] ENTRANDO granel branch, id_detalle: ' + item.id_detalle + ' estado_devolucion: ' + item.estado_devolucion + ' cantidad_devuelta: ' + (item.cantidad_devuelta ?? 'N/A') + ' detalle.cantidad: ' + detalle.cantidad);
+          // Granel: NO se actualiza estado_devolucion del DETALLE_CONTRATO
+          // Se acumulan outcomes y se insertan en DEVOLUCION_GRANEL después del loop
+          // Acumular outcomes del mismo detalle para insertar en DEVOLUCION_GRANEL
+          if (!granelAccum[item.id_detalle]) {
+            granelAccum[item.id_detalle] = {
+              id_item_granel: detalle.id_item_granel,
+              precio: detalle.precio_dia_aplicado,
+              bien: 0,
+              danada: 0,
+              perdida: 0,
+              costo_reparacion: 0,
+              costo_perdida: null,
+            };
+            log('[DEBUG registrarDevolucion] CREADO nuevo granelAccum para id_detalle: ' + item.id_detalle);
           }
-
-          // Stock según el estado de devolución
+          const acc = granelAccum[item.id_detalle];
+          const cant = item.cantidad_devuelta || detalle.cantidad;
+          log('[DEBUG registrarDevolucion] ANTES de acumular granelAccum[' + item.id_detalle + ']: bien=' + acc.bien + ' danada=' + acc.danada + ' perdida=' + acc.perdida + ' cant=' + cant + ' estado=' + item.estado_devolucion);
           if (item.estado_devolucion === 'bien') {
-            db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada - ? WHERE id = ?')
-              .run(cantDevuelta, detalle.id_item_granel);
+            acc.bien += cant;
           } else if (item.estado_devolucion === 'dañado') {
-            db.prepare('UPDATE ITEM_GRANEL SET cantidad_danada = cantidad_danada + ?, cantidad_alquilada = cantidad_alquilada - ? WHERE id = ?')
-              .run(cantDevuelta, cantDevuelta, detalle.id_item_granel);
-            // Registrar costo de reparación si aplica
-            if (item.costo_reparacion) {
-              totalDanos += item.costo_reparacion;
-              const hoy = new Date().toISOString().slice(0, 10);
-              const desc = observaciones?.[item.id_detalle] || 'Dañado en devolución';
-              db.prepare('INSERT INTO MANTENIMIENTO (id_herramienta, fecha_inicio, descripcion, tipo, costo) VALUES (?, ?, ?, ?, ?)')
-                .run('GRANEL-' + detalle.id_item_granel, hoy, 'Devolucion granel: ' + desc, 'correctivo', item.costo_reparacion || 0);
-            }
+            acc.danada += cant;
+            acc.costo_reparacion += (item.costo_reparacion || 0);
           } else if (item.estado_devolucion === 'perdido') {
-            db.prepare('UPDATE ITEM_GRANEL SET cantidad_perdida = cantidad_perdida + ?, cantidad_alquilada = cantidad_alquilada - ? WHERE id = ?')
-              .run(cantDevuelta, cantDevuelta, detalle.id_item_granel);
+            acc.perdida += cant;
+            acc.costo_perdida = item.costo_perdida != null ? item.costo_perdida : null;
           }
-
-          // Mora para la porción devuelta (usando cantDevuelta, no detalle.cantidad)
-          const diasAtrasoItem = Math.max(0, Math.ceil((fechaReal - fechaPactada) / (1000 * 60 * 60 * 24)));
-          if (diasAtrasoItem > 0) {
-            totalMora += diasAtrasoItem * detalle.precio_dia_aplicado * cantDevuelta;
-          }
-        } else {
-          // Ítems individuales
-          const diasAtrasoItem = Math.max(0, Math.ceil((fechaReal - fechaPactada) / (1000 * 60 * 60 * 24)));
-          if (diasAtrasoItem > 0) {
-            totalMora += diasAtrasoItem * detalle.precio_dia_aplicado * detalle.cantidad;
-          }
+          log('[DEBUG registrarDevolucion] DESPUES de acumular granelAccum[' + item.id_detalle + ']: bien=' + acc.bien + ' danada=' + acc.danada + ' perdida=' + acc.perdida);
         }
       }
     }
 
-    // Determinar estado del contrato según ítems pendientes
-    const pendientes = db.prepare(
-      "SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO WHERE id_contrato = ? AND estado_devolucion = 'pendiente'"
+    log('[DEBUG registrarDevolucion] granelAccum DESPUES del for-loop: ' + JSON.stringify(granelAccum) + ' entries: ' + Object.keys(granelAccum).length);
+
+    // Procesar outcomes acumulados de granel en DEVOLUCION_GRANEL
+    for (const [idDetalle, acc] of Object.entries(granelAccum)) {
+      log('[DEBUG registrarDevolucion] ITERANDO granelAccum idDetalle=' + idDetalle + ' bien=' + acc.bien + ' danada=' + acc.danada + ' perdida=' + acc.perdida);
+      const totalDevuelto = acc.bien + acc.danada + acc.perdida;
+      if (totalDevuelto <= 0) continue;
+
+      const detalle = db.prepare('SELECT * FROM DETALLE_CONTRATO WHERE id = ?').get(Number(idDetalle));
+      if (!detalle) continue;
+
+      const insertResult = db.prepare(`
+        INSERT INTO DEVOLUCION_GRANEL (id_contrato, id_item_granel, id_detalle, fecha, cantidad_bien, cantidad_danada, cantidad_perdida, costo_reparacion, costo_perdida)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(idContrato, acc.id_item_granel, Number(idDetalle), fechaDevolucionReal, acc.bien, acc.danada, acc.perdida,
+        acc.costo_reparacion || null, acc.costo_perdida);
+      log('[DEBUG registrarDevolucion] INSERT DEVOLUCION_GRANEL: ' + JSON.stringify({ idContrato, idItemGranel: acc.id_item_granel, bien: acc.bien, danada: acc.danada, perdida: acc.perdida, lastInsertRowid: insertResult.lastInsertRowid }));
+
+      // Stock
+      if (acc.bien > 0) {
+        db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = MAX(0, cantidad_alquilada - ?) WHERE id = ?')
+          .run(acc.bien, acc.id_item_granel);
+      }
+      if (acc.danada > 0) {
+        db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = MAX(0, cantidad_alquilada - ?), cantidad_danada = cantidad_danada + ? WHERE id = ?')
+          .run(acc.danada, acc.danada, acc.id_item_granel);
+        totalDanos += acc.costo_reparacion;
+      }
+      if (acc.perdida > 0) {
+        db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = MAX(0, cantidad_alquilada - ?), cantidad_perdida = cantidad_perdida + ? WHERE id = ?')
+          .run(acc.perdida, acc.perdida, acc.id_item_granel);
+      }
+
+      // Mora sobre el total devuelto en este evento
+      const diasAtrasoItem = Math.max(0, Math.ceil((fechaReal - fechaPactada) / (1000 * 60 * 60 * 24)));
+      if (diasAtrasoItem > 0) {
+        totalMora += diasAtrasoItem * acc.precio * totalDevuelto;
+      }
+    }
+
+    // Determinar estado del contrato: individuales por estado_devolucion, granel por DEVOLUCION_GRANEL
+    const individualesPendientes = db.prepare(
+      "SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO WHERE id_contrato = ? AND tipo_item = 'individual' AND estado_devolucion = 'pendiente'"
     ).get(idContrato);
 
-    const completado = pendientes.cnt === 0;
+    const granelPendientes = db.prepare(`
+      SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO d
+      WHERE d.id_contrato = ? AND d.tipo_item = 'granel'
+      AND d.cantidad > (
+        SELECT COALESCE(SUM(dg.cantidad_bien + dg.cantidad_danada + dg.cantidad_perdida), 0)
+        FROM DEVOLUCION_GRANEL dg
+        WHERE dg.id_contrato = d.id_contrato
+        AND dg.id_item_granel = d.id_item_granel
+        AND dg.revertido = 0
+      )
+    `).get(idContrato);
+
+    const completado = (individualesPendientes.cnt + granelPendientes.cnt) === 0;
     if (completado) {
       db.prepare("UPDATE CONTRATO SET estado = ?, fecha_devolucion_real = ?, fecha_modificacion = datetime('now') WHERE id = ?")
         .run('devuelto', fechaDevolucionReal, idContrato);
@@ -315,7 +371,9 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
         .run('devolución incompleta', idContrato);
     }
 
-    return { totalMora, totalDanos, completado, pendientes: pendientes.cnt };
+    const resultado = { totalMora, totalDanos, completado, pendientes: individualesPendientes.cnt + granelPendientes.cnt };
+    log('[DIAG registrarDevolucion] TRANSACCION RESULTADO: ' + JSON.stringify(resultado));
+    return resultado;
   });
 
   return ejecutar();
@@ -372,16 +430,53 @@ function getContratos(filtros = {}) {
       WHERE d.id_contrato = ?
     `).all(c.id);
 
+    // Devolución granel: resumen por id_detalle (nuevos) y por id_item_granel (legacy sin id_detalle)
+    const devGranel = db.prepare(`
+      SELECT group_key, total_bien, total_danada, total_perdida, total_costo_reparacion, total_costo_perdida FROM (
+        SELECT 'detalle_' || id_detalle AS group_key,
+               COALESCE(SUM(cantidad_bien), 0) AS total_bien,
+               COALESCE(SUM(cantidad_danada), 0) AS total_danada,
+               COALESCE(SUM(cantidad_perdida), 0) AS total_perdida,
+               COALESCE(SUM(costo_reparacion), 0) AS total_costo_reparacion,
+               COALESCE(SUM(costo_perdida), 0) AS total_costo_perdida
+        FROM DEVOLUCION_GRANEL
+        WHERE id_contrato = ? AND revertido = 0 AND id_detalle IS NOT NULL
+        GROUP BY id_detalle
+        UNION ALL
+        SELECT 'granel_' || id_item_granel AS group_key,
+               COALESCE(SUM(cantidad_bien), 0) AS total_bien,
+               COALESCE(SUM(cantidad_danada), 0) AS total_danada,
+               COALESCE(SUM(cantidad_perdida), 0) AS total_perdida,
+               COALESCE(SUM(costo_reparacion), 0) AS total_costo_reparacion,
+               COALESCE(SUM(costo_perdida), 0) AS total_costo_perdida
+        FROM DEVOLUCION_GRANEL
+        WHERE id_contrato = ? AND revertido = 0 AND id_detalle IS NULL
+        GROUP BY id_item_granel
+      )
+    `).all(c.id, c.id);
+    log('[DEBUG getContratos] contratoId: ' + c.id + ' devGranel: ' + JSON.stringify(devGranel) + ' items: ' + JSON.stringify(items.map(i => ({ id: i.id, id_item_granel: i.id_item_granel, cantidad: i.cantidad }))));
+    const devGranelMap = Object.fromEntries(devGranel.map(d => [d.group_key, d]));
+
     const pagos = db.prepare(`
       SELECT id, monto, metodo, tipo, fecha_pago, anulado, fecha_anulacion, motivo_anulacion, id_detalle, grupo_pago
       FROM PAGO WHERE id_contrato = ?
-      ORDER BY fecha_pago ASC
+      ORDER BY fecha_pago DESC
     `).all(c.id);
 
     let total_atraso = 0;
     let max_dias_atraso = 0;
 
     const itemsConAtraso = items.map(item => {
+      // Enriquecer granel con resumen de DEVOLUCION_GRANEL
+      if (item.id_item_granel) {
+        const dev = devGranelMap['detalle_' + item.id] || devGranelMap['granel_' + item.id_item_granel] || { total_bien: 0, total_danada: 0, total_perdida: 0, total_costo_reparacion: 0, total_costo_perdida: 0 };
+        item.granel_dev_bien = dev.total_bien;
+        item.granel_dev_danada = dev.total_danada;
+        item.granel_dev_perdida = dev.total_perdida;
+        item.granel_pendiente = Math.max(0, item.cantidad - dev.total_bien - dev.total_danada - dev.total_perdida);
+        item.granel_dev_costo_reparacion = dev.total_costo_reparacion || 0;
+        item.granel_dev_costo_perdida = dev.total_costo_perdida || 0;
+      }
       // Fecha pactada por ítem: si tiene fecha propia, usar esa; si no, la del contrato
       const fechaDevItem = item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada;
       const diasItem = Math.max(1, Math.ceil(
@@ -410,7 +505,16 @@ function getContratos(filtros = {}) {
 
     const totalContrato = itemsConAtraso.reduce((a, i) => a + i.total_item, 0) + (c.deposito_monto || 0);
 
-    return { ...c, items: itemsConAtraso, pagos, dias_atraso: max_dias_atraso, total_atraso, total_contrato: totalContrato };
+    const total_danos = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_reparacion || 0), 0)
+      + (db.prepare(`
+        SELECT COALESCE(SUM(m.costo), 0) AS total
+        FROM MANTENIMIENTO m
+        JOIN DETALLE_CONTRATO d ON d.id_herramienta = m.id_herramienta
+        WHERE d.id_contrato = ? AND d.tipo_item = 'individual' AND d.estado_devolucion = 'dañado'
+      `).get(c.id)?.total || 0);
+    const total_perdidas = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_perdida || 0), 0);
+
+    return { ...c, items: itemsConAtraso, pagos, dias_atraso: max_dias_atraso, total_atraso, total_contrato: totalContrato, total_danos, total_perdidas };
   });
 }
 
@@ -551,11 +655,11 @@ function revertirDevolucionItem(idDetalle) {
             db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
               .run(row.cantidad, detalle.id_item_granel);
           } else if (row.estado_devolucion === 'dañado') {
-            db.prepare('UPDATE ITEM_GRANEL SET cantidad_danada = cantidad_danada - ?, cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_danada = MAX(0, cantidad_danada - ?), cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
               .run(row.cantidad, row.cantidad, detalle.id_item_granel);
             tieneDanadosOPerdidos = true;
           } else if (row.estado_devolucion === 'perdido') {
-            db.prepare('UPDATE ITEM_GRANEL SET cantidad_perdida = cantidad_perdida - ?, cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_perdida = MAX(0, cantidad_perdida - ?), cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
               .run(row.cantidad, row.cantidad, detalle.id_item_granel);
             tieneDanadosOPerdidos = true;
           }
@@ -580,10 +684,10 @@ function revertirDevolucionItem(idDetalle) {
             db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
               .run(row.cantidad, detalle.id_item_granel);
           } else if (row.estado_devolucion === 'dañado') {
-            db.prepare('UPDATE ITEM_GRANEL SET cantidad_danada = cantidad_danada - ?, cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_danada = MAX(0, cantidad_danada - ?), cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
               .run(row.cantidad, row.cantidad, detalle.id_item_granel);
           } else if (row.estado_devolucion === 'perdido') {
-            db.prepare('UPDATE ITEM_GRANEL SET cantidad_perdida = cantidad_perdida - ?, cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_perdida = MAX(0, cantidad_perdida - ?), cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
               .run(row.cantidad, row.cantidad, detalle.id_item_granel);
           }
           db.prepare('DELETE FROM DETALLE_CONTRATO WHERE id = ?').run(row.id);
@@ -594,35 +698,39 @@ function revertirDevolucionItem(idDetalle) {
           db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
             .run(cantidadARestaurar, detalle.id_item_granel);
         } else if (detalle.estado_devolucion === 'dañado') {
-          db.prepare('UPDATE ITEM_GRANEL SET cantidad_danada = cantidad_danada - ?, cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+          db.prepare('UPDATE ITEM_GRANEL SET cantidad_danada = MAX(0, cantidad_danada - ?), cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
             .run(cantidadARestaurar, cantidadARestaurar, detalle.id_item_granel);
         } else if (detalle.estado_devolucion === 'perdido') {
-          db.prepare('UPDATE ITEM_GRANEL SET cantidad_perdida = cantidad_perdida - ?, cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+          db.prepare('UPDATE ITEM_GRANEL SET cantidad_perdida = MAX(0, cantidad_perdida - ?), cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
             .run(cantidadARestaurar, cantidadARestaurar, detalle.id_item_granel);
         }
         db.prepare("UPDATE DETALLE_CONTRATO SET estado_devolucion = 'pendiente', fecha_devolucion_real = NULL, costo_perdida = NULL WHERE id = ?")
           .run(idDetalle);
       }
 
-      // Eliminar registros de mantenimiento asociados
-      if (detalle.estado_devolucion === 'dañado' || tieneDanadosOPerdidos) {
-        db.prepare("DELETE FROM MANTENIMIENTO WHERE id_herramienta = ? AND descripcion LIKE 'Devolucion granel:%' AND fecha_inicio = ?")
-          .run('GRANEL-' + detalle.id_item_granel, detalle.fecha_devolucion_real);
-      }
+      // Nota: granel no registra en MANTENIMIENTO, el daño se gestiona via cantidad_danada en ITEM_GRANEL
     }
 
-    // Recalcular estado del contrato (CHECK: 'reservado','alquilado','devuelto','devolución incompleta')
-    const totalItems = db.prepare(
-      "SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO WHERE id_contrato = ?"
+    // Recalcular estado del contrato (individual por estado_devolucion, granel por DEVOLUCION_GRANEL)
+    const individualesPendientes = db.prepare(
+      "SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO WHERE id_contrato = ? AND tipo_item = 'individual' AND estado_devolucion = 'pendiente'"
     ).get(detalle.id_contrato);
 
-    const pendientes = db.prepare(
-      "SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO WHERE id_contrato = ? AND estado_devolucion = 'pendiente'"
-    ).get(detalle.id_contrato);
+    const granelPendientes = db.prepare(`
+      SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO d
+      WHERE d.id_contrato = ? AND d.tipo_item = 'granel'
+      AND d.cantidad > (
+        SELECT COALESCE(SUM(dg.cantidad_bien + dg.cantidad_danada + dg.cantidad_perdida), 0)
+        FROM DEVOLUCION_GRANEL dg
+        WHERE dg.id_contrato = d.id_contrato
+        AND dg.id_item_granel = d.id_item_granel
+        AND dg.revertido = 0
+      )
+    `).get(detalle.id_contrato);
 
-    const hayDevueltos = (totalItems.cnt - pendientes.cnt) > 0;
+    const hayPendientes = (individualesPendientes.cnt + granelPendientes.cnt) > 0;
 
-    if (hayDevueltos) {
+    if (hayPendientes) {
       db.prepare("UPDATE CONTRATO SET estado = 'devolución incompleta', fecha_modificacion = datetime('now') WHERE id = ?")
         .run(detalle.id_contrato);
     } else {
@@ -631,6 +739,87 @@ function revertirDevolucionItem(idDetalle) {
     }
 
     return { ok: true };
+  });
+
+  return ejecutar();
+}
+
+/**
+ * Obtiene el historial de DEVOLUCION_GRANEL para un contrato y (opcional) ítem granel específico.
+ * Útil para mostrar el acordeón de historial por ítem en la UI.
+ */
+function getDevolucionesGranel(contratoId, itemGranelId) {
+  let sql = `
+    SELECT dg.*
+    FROM DEVOLUCION_GRANEL dg
+    WHERE dg.id_contrato = ? AND dg.revertido = 0
+  `;
+  const params = [contratoId];
+  if (itemGranelId) {
+    sql += ' AND dg.id_item_granel = ?';
+    params.push(itemGranelId);
+  }
+  sql += ' ORDER BY dg.fecha DESC, dg.id DESC';
+  const result = db.prepare(sql).all(...params);
+  log('[DEBUG getDevolucionesGranel] contratoId: ' + contratoId + ' itemGranelId: ' + itemGranelId + ' rows: ' + result.length + ' data: ' + JSON.stringify(result));
+  return result;
+}
+
+/**
+ * Revierte una entrada específica de DEVOLUCION_GRANEL.
+ * Restaura el stock y marca la entrada como revertida.
+ */
+function revertirDevolucionGranel(idDevolucionGranel) {
+  const entry = db.prepare('SELECT * FROM DEVOLUCION_GRANEL WHERE id = ?').get(idDevolucionGranel);
+  if (!entry) throw new Error('Entrada de devolución no encontrada.');
+  if (entry.revertido) throw new Error('La devolución ya fue revertida.');
+
+  const ejecutar = db.transaction(() => {
+    // Revertir stock
+    const total = entry.cantidad_bien + entry.cantidad_danada + entry.cantidad_perdida;
+    if (total > 0) {
+      db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?')
+        .run(total, entry.id_item_granel);
+    }
+    if (entry.cantidad_danada > 0) {
+      db.prepare('UPDATE ITEM_GRANEL SET cantidad_danada = MAX(0, cantidad_danada - ?) WHERE id = ?')
+        .run(entry.cantidad_danada, entry.id_item_granel);
+    }
+    if (entry.cantidad_perdida > 0) {
+      db.prepare('UPDATE ITEM_GRANEL SET cantidad_perdida = MAX(0, cantidad_perdida - ?) WHERE id = ?')
+        .run(entry.cantidad_perdida, entry.id_item_granel);
+    }
+
+    // Marcar como revertida
+    db.prepare('UPDATE DEVOLUCION_GRANEL SET revertido = 1 WHERE id = ?')
+      .run(idDevolucionGranel);
+
+    // Recalcular estado del contrato
+    const individualesPendientes = db.prepare(
+      "SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO WHERE id_contrato = ? AND tipo_item = 'individual' AND estado_devolucion = 'pendiente'"
+    ).get(entry.id_contrato);
+
+    const granelPendientes = db.prepare(`
+      SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO d
+      WHERE d.id_contrato = ? AND d.tipo_item = 'granel'
+      AND d.cantidad > (
+        SELECT COALESCE(SUM(dg.cantidad_bien + dg.cantidad_danada + dg.cantidad_perdida), 0)
+        FROM DEVOLUCION_GRANEL dg
+        WHERE dg.id_contrato = d.id_contrato
+        AND dg.id_item_granel = d.id_item_granel
+        AND dg.revertido = 0
+      )
+    `).get(entry.id_contrato);
+
+    const hayPendientes = (individualesPendientes.cnt + granelPendientes.cnt) > 0;
+
+    if (hayPendientes) {
+      db.prepare("UPDATE CONTRATO SET estado = 'devolución incompleta', fecha_modificacion = datetime('now') WHERE id = ?")
+        .run(entry.id_contrato);
+    } else {
+      db.prepare("UPDATE CONTRATO SET estado = 'devuelto', fecha_modificacion = datetime('now') WHERE id = ?")
+        .run(entry.id_contrato);
+    }
   });
 
   return ejecutar();
@@ -678,4 +867,4 @@ function anularPago(idPago, motivo) {
   return { id: idPago, anulado: true };
 }
 
-module.exports = { crearContrato, registrarDevolucion, getContratos, registrarPagoAdicional, revertirDevolucionItem, anularPago };
+module.exports = { crearContrato, registrarDevolucion, getContratos, registrarPagoAdicional, revertirDevolucionItem, revertirDevolucionGranel, getDevolucionesGranel, anularPago };

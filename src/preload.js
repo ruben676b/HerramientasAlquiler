@@ -17,6 +17,10 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('registrar-devolucion', data),
   revertirDevolucion: (data) =>
     ipcRenderer.invoke('revertir-devolucion', data),
+  getDevolucionesGranel: (contratoId, itemGranelId) =>
+    ipcRenderer.invoke('get-devoluciones-granel', contratoId, itemGranelId),
+  revertirDevolucionGranel: (idDevolucionGranel) =>
+    ipcRenderer.invoke('revertir-devolucion-granel', idDevolucionGranel),
   getContratos: (filtros) => ipcRenderer.invoke('get-contratos', filtros),
   registrarPago: (data) => ipcRenderer.invoke('registrar-pago', data),
   anularPago: (data) => ipcRenderer.invoke('anular-pago', data),
@@ -38,6 +42,8 @@ contextBridge.exposeInMainWorld('api', {
   ajustarStock: (id, delta) => ipcRenderer.invoke('ajustar-stock', id, delta),
   repararGranel: (id, cantidad) => ipcRenderer.invoke('reparar-granel', id, cantidad),
   darBajaGranel: (id, cantidad, motivo) => ipcRenderer.invoke('dar-baja-granel', id, cantidad, motivo),
+  getAuditGranel: (itemId) => ipcRenderer.invoke('get-audit-granel', itemId),
+  revertirAuditGranel: (auditId) => ipcRenderer.invoke('revertir-audit-granel', auditId),
   crearGranel: (data) => ipcRenderer.invoke('crear-granel', data),
   actualizarGranel: (id, data) => ipcRenderer.invoke('actualizar-granel', id, data),
   bajaGranel: (id) => ipcRenderer.invoke('baja-granel', id),
@@ -68,4 +74,7 @@ contextBridge.exposeInMainWorld('api', {
   buscarClientesPanel: (termino) => ipcRenderer.invoke('buscar-clientes-panel', termino),
   getContratosCliente: (id) => ipcRenderer.invoke('get-contratos-cliente', id),
   getDetalleContrato: (id) => ipcRenderer.invoke('get-detalle-contrato', id),
+
+  // Debug
+  log: (msg) => ipcRenderer.invoke('log', msg),
 });

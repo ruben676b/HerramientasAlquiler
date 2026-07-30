@@ -19,16 +19,12 @@ const DEVOLUCION_ICONS = {
 export default function DetalleAlquilerModal({ contrato, onClose }) {
   if (!contrato) return null;
 
-  const { contrato: c, items, pagos, calificacion } = contrato;
+  const { contrato: c, items, pagos, calificacion, total_atraso, total_danos, total_perdidas, total_base, total_pagado, total_general } = contrato;
   const estadoStyle = ESTADO_STYLES[c.estado] || ESTADO_STYLES['alquilado'];
 
   const diasAlquiler = Math.max(1, Math.ceil(
     (new Date(c.fecha_devolucion_pactada + 'T00:00:00') - new Date(c.fecha_salida + 'T00:00:00')) / 86400000
   ) + 1);
-
-  const subtotalDiario = items.reduce((a, i) => a + i.precio_dia_aplicado * i.cantidad, 0);
-  const totalBase = subtotalDiario * diasAlquiler;
-  const totalPagado = pagos.reduce((a, p) => a + p.monto, 0);
 
   return (
     <div className="fixed inset-0 z-[60] flex" style={{ backgroundColor: 'oklch(0 0 0 / 0.5)' }} onClick={onClose}>
@@ -87,26 +83,47 @@ export default function DetalleAlquilerModal({ contrato, onClose }) {
                 </thead>
                 <tbody>
                   {items.map((item, idx) => {
-                    const devStyle = DEVOLUCION_ICONS[item.estado_devolucion] || DEVOLUCION_ICONS['pendiente'];
-                    const DevIcon = devStyle.icon;
+                    const esGranel = !!item.id_item_granel;
+                    const devStyle = !esGranel ? (DEVOLUCION_ICONS[item.estado_devolucion] || DEVOLUCION_ICONS['pendiente']) : null;
+                    const DevIcon = devStyle?.icon;
                     return (
                       <tr key={idx} className="border-t" style={{ borderColor: 'var(--border)' }}>
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] px-1 py-0.5 rounded font-mono font-bold shrink-0"
-                              style={{ backgroundColor: 'oklch(0.40 0.12 240)', color: '#fff' }}>
-                              {item.item_codigo}
-                            </span>
+                            {esGranel ? (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                                style={{
+                                  backgroundColor: item.item_condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)',
+                                  color: item.item_condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)',
+                                }}>x{item.cantidad}</span>
+                            ) : (
+                              <span className="text-[9px] px-1 py-0.5 rounded font-mono font-bold shrink-0"
+                                style={{ backgroundColor: 'oklch(0.40 0.12 240)', color: '#fff' }}>
+                                {item.item_codigo}
+                              </span>
+                            )}
                             <span style={{ color: 'var(--ink)' }}>{item.item_nombre}</span>
                           </div>
                         </td>
                         <td className="text-center px-2 py-2 font-mono" style={{ color: 'var(--ink)' }}>{item.cantidad}</td>
                         <td className="text-right px-2 py-2 font-mono" style={{ color: 'var(--ink)' }}>S/ {item.precio_dia_aplicado.toFixed(2)}</td>
                         <td className="text-center px-2 py-2">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium">
-                            <DevIcon size={11} style={{ color: devStyle.color }} />
-                            <span style={{ color: devStyle.color }}>{item.estado_devolucion}</span>
-                          </span>
+                          {esGranel ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium flex-wrap justify-center">
+                              {(item.granel_dev_bien || 0) > 0 && <span style={{ color: 'var(--success)' }}>{item.granel_dev_bien} bien</span>}
+                              {(item.granel_dev_danada || 0) > 0 && <span style={{ color: 'oklch(0.55 0.13 70)' }}>{item.granel_dev_danada} dañ</span>}
+                              {(item.granel_dev_perdida || 0) > 0 && <span style={{ color: 'var(--danger)' }}>{item.granel_dev_perdida} perd</span>}
+                              {(item.granel_pendiente || 0) > 0
+                                ? <span style={{ color: 'var(--muted)' }}>pend: {item.granel_pendiente}</span>
+                                : <span className="font-medium" style={{ color: 'var(--success)' }}>Completo</span>
+                              }
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium">
+                              <DevIcon size={11} style={{ color: devStyle.color }} />
+                              <span style={{ color: devStyle.color }}>{item.estado_devolucion}</span>
+                            </span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -123,17 +140,40 @@ export default function DetalleAlquilerModal({ contrato, onClose }) {
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
                   <span style={{ color: 'var(--muted)' }}>Base ({diasAlquiler} días)</span>
-                  <span className="font-mono" style={{ color: 'var(--ink)' }}>S/ {totalBase.toFixed(2)}</span>
+                  <span className="font-mono" style={{ color: 'var(--ink)' }}>S/ {total_base.toFixed(2)}</span>
                 </div>
+                {total_atraso > 0 && (
+                  <div className="flex justify-between">
+                    <span style={{ color: 'var(--danger)' }}>Recargo por atraso</span>
+                    <span className="font-mono" style={{ color: 'var(--danger)' }}>+ S/ {total_atraso.toFixed(2)}</span>
+                  </div>
+                )}
+                {total_danos > 0 && (
+                  <div className="flex justify-between">
+                    <span style={{ color: 'var(--warning)' }}>Cobro por daños</span>
+                    <span className="font-mono" style={{ color: 'var(--warning)' }}>+ S/ {total_danos.toFixed(2)}</span>
+                  </div>
+                )}
+                {total_perdidas > 0 && (
+                  <div className="flex justify-between">
+                    <span style={{ color: 'var(--danger)' }}>Cobro por pérdidas</span>
+                    <span className="font-mono" style={{ color: 'var(--danger)' }}>+ S/ {total_perdidas.toFixed(2)}</span>
+                  </div>
+                )}
                 {c.deposito_monto > 0 && (
                   <div className="flex justify-between">
                     <span style={{ color: 'var(--muted)' }}>Depósito</span>
                     <span className="font-mono" style={{ color: 'var(--ink)' }}>S/ {c.deposito_monto.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="flex justify-between pt-1 border-t" style={{ borderColor: 'var(--border)' }}>
-                  <span className="font-semibold" style={{ color: 'var(--ink)' }}>Total pagado</span>
-                  <span className="font-mono font-semibold" style={{ color: 'var(--success)' }}>S/ {totalPagado.toFixed(2)}</span>
+                <hr style={{ borderColor: 'var(--border)', marginTop: 2, marginBottom: 2 }} />
+                <div className="flex justify-between font-semibold">
+                  <span style={{ color: 'var(--ink)' }}>Total</span>
+                  <span className="font-mono" style={{ color: 'var(--ink)' }}>S/ {total_general.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between pt-1" style={{ borderTop: '1px solid var(--border)' }}>
+                  <span className="font-semibold" style={{ color: 'var(--success)' }}>Pagado</span>
+                  <span className="font-mono font-semibold" style={{ color: 'var(--success)' }}>&minus; S/ {total_pagado.toFixed(2)}</span>
                 </div>
               </div>
             </div>

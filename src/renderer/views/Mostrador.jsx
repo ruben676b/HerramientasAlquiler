@@ -529,8 +529,12 @@ export default function Mostrador() {
                   >
                     <option value="">Seleccionar material...</option>
                     {granelCat.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.nombre} ({g.condicion}) — S/ {g.precio_dia.toFixed(2)}/día — {g.cantidad_disponible} disp.
+                      <option key={g.id} value={g.id}
+                        disabled={g.cantidad_disponible === 0}
+                        style={g.cantidad_disponible === 0 ? { color: 'var(--danger)', backgroundColor: 'oklch(0.96 0.04 20)' } : {}}>
+                        {g.cantidad_disponible > 0
+                          ? `${g.nombre} (${g.condicion}) — S/ ${g.precio_dia.toFixed(2)}/día — ${g.cantidad_disponible} disp.`
+                          : `${g.nombre} (${g.condicion}) — sin stock`}
                       </option>
                     ))}
                   </select>

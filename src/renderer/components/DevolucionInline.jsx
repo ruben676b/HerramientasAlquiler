@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { X, CheckCircle, AlertTriangle, Minus, Plus, ChevronRight } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, CheckCircle, AlertTriangle, Minus, Plus, ChevronRight, Clock } from 'lucide-react';
 import { useToast } from './Toast';
 import UnifiedPaymentModal from './UnifiedPaymentModal';
 import AnularPagoModal from './AnularPagoModal';
@@ -46,9 +46,60 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [perdidas, setPerdidas] = useState({});
   const [costosPerdida, setCostosPerdida] = useState({});
   const [editandoCostoPerd, setEditandoCostoPerd] = useState({});
+  const [editandoCantGranel, setEditandoCantGranel] = useState({});
+  const [costoPerdManual, setCostoPerdManual] = useState({});
+  const savingRef = useRef({});
+  const guardadosRef = useRef({});
+  const dirtyRef = useRef({});
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+  // Estado para historial de DEVOLUCION_GRANEL
+  const [historialGranelAbierto, setHistorialGranelAbierto] = useState({});
+  const [devolucionesGranel, setDevolucionesGranel] = useState({});
+  const [cargandoHistorial, setCargandoHistorial] = useState({});
+
+  const cargarHistorialGranel = async (idx, item) => {
+    if (!window.api || !item.id_item_granel) return;
+    if (devolucionesGranel[idx]) return; // ya cargado
+    setCargandoHistorial(p => ({ ...p, [idx]: true }));
+    try {
+      const rows = await window.api.getDevolucionesGranel(c.id, item.id_item_granel);
+      setDevolucionesGranel(p => ({ ...p, [idx]: rows }));
+    } catch (e) {
+      console.error('Error cargando historial granel:', e);
+    } finally {
+      setCargandoHistorial(p => ({ ...p, [idx]: false }));
+    }
+  };
+
+  const handleDeshacerGranel = async (idDevolucionGranel, idx) => {
+    if (!window.api) return;
+    try {
+      await window.api.revertirDevolucionGranel(idDevolucionGranel);
+      // Limpiar caché y recargar historial
+      setDevolucionesGranel(p => { const n = { ...p }; delete n[idx]; return n; });
+      toast('Devolución revertida');
+      onRecargar();
+      // Recargar historial automáticamente
+      const item = items[idx];
+      if (item) cargarHistorialGranel(idx, item);
+    } catch (e) {
+      toast('Error al revertir: ' + (e.message || e), 'error');
+    }
+  };
 
   const c = contrato;
   const items = c.items || [];
+  useEffect(() => {
+    const init = {};
+    items.forEach((item, idx) => {
+      if (!item.id_item_granel && item.estado_devolucion && item.estado_devolucion !== 'pendiente') {
+        init[idx] = true;
+        guardadosRef.current[idx] = true;
+      }
+    });
+    if (Object.keys(init).length) setGuardados(init);
+  }, []);
   const pagos = c.pagos || [];
   const totalPagado = c.total_pagado || 0;
   const garantia = c.garantia_retenida || 0;
@@ -64,12 +115,18 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
     return sum + (morasEditadas[idx] != null ? morasEditadas[idx] : sugerida);
   }, 0);
 
-  const totalDanos = Object.entries(costosRep).reduce((a, [idx, v]) => {
+  const costosDanosBackend = items.reduce((s, i) => s + (i.granel_dev_costo_reparacion || 0), 0);
+  const costosPerdBackend = items.reduce((s, i) => s + (i.granel_dev_costo_perdida || 0), 0);
+  const costosDanosLocal = Object.entries(costosRep).reduce((a, [idx, v]) => {
     if (estados[idx] === 'dañado' && v > 0) return a + parseFloat(v);
     return a;
   }, 0);
+  const costosPerdLocal = Object.values(costosPerdida).reduce((a, v) => a + (parseFloat(v) || 0), 0);
+  const totalDanos = costosDanosBackend + costosDanosLocal;
+  const totalPerdidas = costosPerdBackend + costosPerdLocal;
+  const totalCargosExtra = totalDanos + totalPerdidas;
 
-  const total = montoBase + montoAtraso + totalDanos + (c.deposito_monto || 0);
+  const total = montoBase + montoAtraso + totalCargosExtra + (c.deposito_monto || 0);
   const pendiente = Math.max(0, total - totalPagado);
   const montoCobrar = Math.max(0, pendiente - garantia);
   const montoDevolver = pendiente <= garantia ? Math.abs(pendiente - garantia) : 0;
@@ -106,6 +163,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
       setPerdidas(p => { const n = { ...p }; delete n[idx]; return n; });
       setCostosPerdida(p => { const n = { ...p }; delete n[idx]; return n; });
       setCostosRep(p => { const n = { ...p }; delete n[idx]; return n; });
+      delete guardadosRef.current[idx];
       toast('Devolución revertida');
       onRecargar();
     } catch (e) {
@@ -114,34 +172,38 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   };
 
   const setEstado = async (idx, e) => {
-    if (!window.api || guardados[idx]) return;
+    if (!window.api || guardadosRef.current[idx]) return;
+    guardadosRef.current[idx] = true;
     setEstados(p => ({ ...p, [idx]: e }));
     if (!e) {
-      // Desmarcar: revertir a pendiente en backend
       try {
         const hoy = new Date().toISOString().slice(0, 10);
+        savingRef.current[idx] = true;
         await window.api.registrarDevolucion({
           idContrato: c.id,
           fechaDevolucionReal: hoy,
           itemsDevueltos: [{ id_detalle: items[idx].id, estado_devolucion: 'bien' }],
         });
-      } catch {}
+      } catch {
+        guardadosRef.current[idx] = false;
+      }
+      delete savingRef.current[idx];
       return;
     }
-    // Guardar automáticamente marca Bien o Dañado
     const item = items[idx];
-    // Si es granel y cantidad a devolver es 0, prevenir y avisar
     if (item.id_item_granel) {
       const cantDevolver = parseInt(cantidades[idx]) || 0;
       if (cantDevolver <= 0) {
         toast('Indica cuántos devuelves primero.', 'warn');
         setEstados(p => { const n = { ...p }; delete n[idx]; return n; });
+        guardadosRef.current[idx] = false;
         return;
       }
     }
+    savingRef.current[idx] = true;
     try {
       const hoy = new Date().toISOString().slice(0, 10);
-      await window.api.registrarDevolucion({
+      const body = {
         idContrato: c.id,
         fechaDevolucionReal: hoy,
         itemsDevueltos: [{
@@ -153,39 +215,100 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
           costo_reparacion: e === 'dañado' ? (parseFloat(costosRep[idx]) || 0) : undefined,
         }],
         observaciones: notas[idx] ? { [item.id]: notas[idx] } : {},
-      });
-      setGuardados(p => ({ ...p, [idx]: true }));
-      toast(item.item_nombre || item.nombre + ' devuelta');
-      onRecargar();
+      };
+      await window.api.registrarDevolucion(body);
+      if (mountedRef.current) {
+        setGuardados(p => ({ ...p, [idx]: true }));
+        toast(item.item_nombre || item.nombre + ' devuelta');
+      }
     } catch (err) {
-      toast('Error al guardar: ' + (err.message || err), 'error');
-      setEstados(p => { const n = { ...p }; delete n[idx]; return n; });
+      if (mountedRef.current) {
+        toast('Error al guardar: ' + (err.message || err), 'error');
+        setEstados(p => { const n = { ...p }; delete n[idx]; return n; });
+        guardadosRef.current[idx] = false;
+      }
+    } finally {
+      if (mountedRef.current) delete savingRef.current[idx];
     }
   };
 
-  const setNota = (idx, v) => setNotas(p => ({ ...p, [idx]: v }));
-  const setCosto = (idx, v) => setCostosRep(p => ({ ...p, [idx]: v }));
+  const actualizarCostoDanos = async (idx, costo) => {
+    if (!window.api || !mountedRef.current) return;
+    const item = items[idx];
+    if (item.id_item_granel) return;
+    savingRef.current[idx] = true;
+    try {
+      const hoy = new Date().toISOString().slice(0, 10);
+      await window.api.registrarDevolucion({
+        idContrato: c.id,
+        fechaDevolucionReal: hoy,
+        itemsDevueltos: [{
+          id_detalle: item.id,
+          estado_devolucion: 'dañado',
+          costo_reparacion: parseFloat(costo) || 0,
+        }],
+        observaciones: notas[idx] ? { [item.id]: notas[idx] } : {},
+      });
+    } catch (err) {
+      if (mountedRef.current) toast('Error al guardar costo: ' + (err.message || err), 'error');
+    } finally {
+      if (mountedRef.current) delete savingRef.current[idx];
+    }
+  };
+
+  const setNota = (idx, v) => {
+    setNotas(p => ({ ...p, [idx]: v }));
+    if (guardadosRef.current[idx]) dirtyRef.current[idx] = true;
+  };
+  const setCosto = (idx, v) => {
+    setCostosRep(p => ({ ...p, [idx]: v }));
+    if (guardadosRef.current[idx]) dirtyRef.current[idx] = true;
+  };
   const setCantidad = (idx, v) => setCantidades(p => ({ ...p, [idx]: v }));
   const setMora = (idx, v) => setMoraEditadas(p => ({ ...p, [idx]: v }));
-  const setBuen = (idx, v) => setBuenas(p => ({ ...p, [idx]: Math.max(0, v) }));
-  const setDan = (idx, v) => setDanadas(p => ({ ...p, [idx]: Math.max(0, v) }));
-  const setPerd = (idx, v) => setPerdidas(p => ({ ...p, [idx]: Math.max(0, v) }));
+  const setBuen = (idx, v) => {
+    const item = items[idx];
+    const pend = item.granel_pendiente ?? item.cantidad;
+    const max = Math.max(0, pend - (danadas[idx] || 0) - (perdidas[idx] || 0));
+    setBuenas(p => ({ ...p, [idx]: Math.max(0, Math.min(v, max)) }));
+  };
+  const setDan = (idx, v) => {
+    const item = items[idx];
+    const pend = item.granel_pendiente ?? item.cantidad;
+    const max = Math.max(0, pend - (buenas[idx] || 0) - (perdidas[idx] || 0));
+    setDanadas(p => ({ ...p, [idx]: Math.max(0, Math.min(v, max)) }));
+  };
+  const setPerd = (idx, v) => {
+    const item = items[idx];
+    const pend = item.granel_pendiente ?? item.cantidad;
+    const max = Math.max(0, pend - (buenas[idx] || 0) - (danadas[idx] || 0));
+    const cappedVal = Math.max(0, Math.min(v, max));
+    setPerdidas(p => ({ ...p, [idx]: cappedVal }));
+    if (cappedVal === 0) {
+      setCostoPerdManual(p => ({ ...p, [idx]: false }));
+    }
+    if (!costoPerdManual[idx]) {
+      const unitPrice = item?.item_precio_venta || 0;
+      setCostoPerd(idx, cappedVal * unitPrice);
+    }
+  };
   const setCostoPerd = (idx, v) => setCostosPerdida(p => ({ ...p, [idx]: v }));
 
   /** Registra devolución parcial con múltiples outcomes para materiales */
   const registrarDevParcialGranel = async (idx) => {
-    if (!window.api || guardados[idx]) return;
+    if (!window.api) return;
     const item = items[idx];
-    const b = buenas[idx] || 0;
-    const d = danadas[idx] || 0;
-    const p_ = perdidas[idx] || 0;
+    const pend = item.granel_pendiente ?? item.cantidad;
+    const b = Math.min(buenas[idx] || 0, pend);
+    const d = Math.min(danadas[idx] || 0, pend - b);
+    const p_ = Math.min(perdidas[idx] || 0, pend - b - d);
     const total = b + d + p_;
     if (total <= 0) {
       toast('Indica cuántos devuelves primero.', 'warn');
       return;
     }
-    if (total > item.cantidad) {
-      toast('El total devuelto (' + total + ') supera la cantidad alquilada (' + item.cantidad + ').', 'error');
+    if (total > pend) {
+      toast('El total devuelto (' + total + ') supera lo pendiente (' + pend + ').', 'error');
       return;
     }
     try {
@@ -194,13 +317,22 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
       if (b > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'bien', cantidad_devuelta: b });
       if (d > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'dañado', cantidad_devuelta: d, costo_reparacion: parseFloat(costosRep[idx]) || 0 });
       if (p_ > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'perdido', cantidad_devuelta: p_, costo_perdida: parseFloat(costosPerdida[idx]) || null });
-      await window.api.registrarDevolucion({
+      window.api.log('[DEBUG registrarDevParcialGranel] outcomes: ' + JSON.stringify(outcomes) + ' contratoId: ' + c.id);
+      const devResp = await window.api.registrarDevolucion({
         idContrato: c.id,
         fechaDevolucionReal: hoy,
         itemsDevueltos: outcomes,
         observaciones: notas[idx] ? { [item.id]: notas[idx] } : {},
       });
-      setGuardados(p => ({ ...p, [idx]: true }));
+      window.api.log('[DEBUG registrarDevParcialGranel] respuesta: ' + JSON.stringify(devResp));
+      // Resetear contadores locales para permitir más devoluciones parciales
+      setBuenas(p => { const n = { ...p }; delete n[idx]; return n; });
+      setDanadas(p => { const n = { ...p }; delete n[idx]; return n; });
+      setPerdidas(p => { const n = { ...p }; delete n[idx]; return n; });
+      setCostosPerdida(p => { const n = { ...p }; delete n[idx]; return n; });
+      setCostosRep(p => { const n = { ...p }; delete n[idx]; return n; });
+      // Invalidar caché del historial para recargar
+      setDevolucionesGranel(p => { const n = { ...p }; delete n[idx]; return n; });
       toast((item.item_nombre || item.nombre) + ' — devuelto parcialmente');
       onRecargar();
     } catch (err) {
@@ -208,9 +340,46 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
     }
   };
 
-  const closeDevMode = () => {
+  /** Guarda costo/nota pendientes antes de cerrar */
+  const flushDirty = async () => {
+    const saves = [];
+    for (let idx = 0; idx < items.length; idx++) {
+      if (dirtyRef.current[idx]) {
+        dirtyRef.current[idx] = false;
+        saves.push(actualizarCostoDanos(idx, costosRep[idx]));
+      }
+    }
+    if (saves.length > 0) {
+      toast('Guardando cambios...', 'warn');
+      await Promise.all(saves);
+    }
+  };
+
+  /** Espera a que terminen saves que aún están en vuelo (de setEstado) */
+  const esperarSaves = () => new Promise(resolve => {
+    const check = () => {
+      if (Object.keys(savingRef.current).length === 0) return resolve();
+      setTimeout(check, 100);
+    };
+    check();
+  });
+
+  const closeDevMode = async () => {
     setError('');
-    const pendientes = items.some((item, idx) => !guardados[idx] && item.estado_devolucion === 'pendiente');
+    // 1. Flush costo/nota sucios
+    await flushDirty();
+    // 2. Esperar saves de setEstado aún en vuelo
+    if (Object.keys(savingRef.current).length > 0) {
+      toast('Esperando confirmación...', 'warn');
+      await esperarSaves();
+    }
+    // 3. Cerrar y recargar
+    const pendientes = items.some((item) => {
+      if (item.id_item_granel) {
+        return (item.granel_pendiente ?? item.cantidad) > 0;
+      }
+      return item.estado_devolucion === 'pendiente';
+    });
     if (pendientes) {
       toast('Quedan ítems sin devolver. El contrato continúa activo.', 'warning');
     }
@@ -263,8 +432,12 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                 <div key={idx}
                   className="rounded-lg border px-3 py-2 text-xs transition-all duration-150"
                   style={{
-                    borderColor: yaGuardado ? 'oklch(0.50 0.13 155)' : (est ? ESTADOS_OPC.find(o => o.id === est)?.bg + '60' : 'var(--border)'),
-                    backgroundColor: yaGuardado ? 'oklch(0.95 0.05 155)' : 'var(--surface)',
+                    borderColor: yaGuardado
+                      ? (item.saldo_item <= 0 ? 'oklch(0.50 0.13 155)' : 'oklch(0.55 0.13 70)')
+                      : (est ? ESTADOS_OPC.find(o => o.id === est)?.bg + '60' : 'var(--border)'),
+                    backgroundColor: yaGuardado
+                      ? (item.saldo_item <= 0 ? 'oklch(0.95 0.05 155)' : 'oklch(0.97 0.04 70)')
+                      : 'var(--surface)',
                   }}>
                   {/* Fila 1: Badge + nombre + atraso badge */}
                   <div className="flex items-center gap-2 mb-1">
@@ -282,107 +455,218 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                         &#9888; +{item.dias_atraso_item} día{item.dias_atraso_item !== 1 ? 's' : ''}
                       </span>
                     )}
-                    {yaGuardado && (
+                    {yaGuardado && (item.saldo_item <= 0 ? (
                       <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
                         style={{ backgroundColor: 'oklch(0.50 0.13 155)', color: '#fff' }}>
                         Devuelto
                       </span>
-                    )}
+                    ) : (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                        style={{ backgroundColor: 'oklch(0.55 0.13 70)', color: '#fff' }}>
+                        Pendiente pago
+                      </span>
+                    ))}
                   </div>
                   {/* Fila 2: Fechas del ítem */}
                   <div className="text-[10px] mb-1" style={{ color: 'var(--muted)' }}>
                     Salida: {fmtFecha(c.fecha_salida)} &middot; Pactada: {fmtFecha(fechaPactadaItem)}
                     <span style={{ color: 'var(--muted)' }}> &middot; Base: {diasItem} día{diasItem !== 1 ? 's' : ''}</span>
                   </div>
-                  {/* Fila 3: Cantidad para granel — multi-outcome */}
-                  {esGranel && (
-                    <div className="rounded-md p-2 mt-1 mb-1.5 space-y-1.5"
-                      style={{ backgroundColor: 'oklch(0.98 0.005 240)', border: '0.5px solid var(--border)' }}>
-                      {/* Buen estado */}
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-medium" style={{ color: 'var(--success)' }}>Buen estado:</span>
-                        <button onClick={() => setBuen(idx, Math.max(0, (buenas[idx] || 0) - 1))}
-                          className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Minus size={10} /></button>
-                        <span className="w-7 text-center font-mono text-xs font-semibold cursor-pointer"
-                          style={{ color: 'var(--ink)' }}
-                          onClick={() => { const v = prompt('Cantidad en buen estado:', buenas[idx] || 0); if (v !== null) setBuen(idx, parseInt(v) || 0); }}>
-                          {buenas[idx] || 0}
-                        </span>
-                        <button onClick={() => setBuen(idx, (buenas[idx] || 0) + 1)}
-                          className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Plus size={10} /></button>
-                      </div>
-                      {/* Dañadas */}
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-medium" style={{ color: 'oklch(0.55 0.13 70)' }}>Dañadas:</span>
-                        <button onClick={() => setDan(idx, Math.max(0, (danadas[idx] || 0) - 1))}
-                          className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Minus size={10} /></button>
-                        <span className="w-7 text-center font-mono text-xs font-semibold cursor-pointer"
-                          style={{ color: 'var(--ink)' }}
-                          onClick={() => { const v = prompt('Cantidad dañada:', danadas[idx] || 0); if (v !== null) setDan(idx, parseInt(v) || 0); }}>
-                          {danadas[idx] || 0}
-                        </span>
-                        <button onClick={() => setDan(idx, (danadas[idx] || 0) + 1)}
-                          className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Plus size={10} /></button>
-                        {(danadas[idx] || 0) > 0 && (
-                          <span className="flex items-center gap-0.5 ml-1">
-                            <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Costo S/</span>
-                            <input type="number" step="0.01" min="0" value={costosRep[idx] ?? ''}
-                              placeholder="0" onChange={e => setCosto(idx, e.target.value)}
-                              className="w-14 h-5 px-0.5 rounded text-[9px] border text-center font-mono dev-nospin"
-                              style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                  {/* Granel: resumen + historial */}
+                  {esGranel && (() => {
+                    window.api.log('[DEBUG DevolucionInline render] item: ' + item.id + ' id_item_granel: ' + item.id_item_granel + ' granel_pendiente: ' + item.granel_pendiente + ' granel_dev_bien: ' + item.granel_dev_bien + ' granel_dev_danada: ' + item.granel_dev_danada + ' granel_dev_perdida: ' + item.granel_dev_perdida + ' cantidad: ' + item.cantidad);
+                    const pend = item.granel_pendiente ?? item.cantidad;
+                    const bien = item.granel_dev_bien || 0;
+                    const dan = item.granel_dev_danada || 0;
+                    const perd = item.granel_dev_perdida || 0;
+                    const devTotal = bien + dan + perd;
+                    const completo = pend === 0;
+                    return (
+                      <div className="mt-1 mb-1.5 space-y-1.5">
+                        {/* Línea de resumen */}
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-semibold" style={{ color: 'var(--ink)' }}>
+                            Pendiente: {pend}
                           </span>
+                          {bien > 0 && <span style={{ color: 'var(--success)' }}>Bien: {bien}</span>}
+                          {dan > 0 && <span style={{ color: 'oklch(0.55 0.13 70)' }}>Dañ: {dan}</span>}
+                          {perd > 0 && <span style={{ color: 'var(--danger)' }}>Perd: {perd}</span>}
+                          {completo && (
+                            <span className="flex items-center gap-1 text-[10px] font-medium" style={{ color: 'var(--success)' }}>
+                              <CheckCircle size={12} /> Completo
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Costos registrados */}
+                        {(item.granel_dev_costo_reparacion || item.granel_dev_costo_perdida) ? (
+                          <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--faint)' }}>
+                            <span className="font-medium">Costos:</span>
+                            {item.granel_dev_costo_reparacion > 0 && (
+                              <span style={{ color: 'var(--warning)' }}>Daños S/ {item.granel_dev_costo_reparacion.toFixed(2)}</span>
+                            )}
+                            {item.granel_dev_costo_perdida > 0 && (
+                              <span style={{ color: 'var(--danger)' }}>Pérdidas S/ {item.granel_dev_costo_perdida.toFixed(2)}</span>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {/* Controles de devolución si aún hay pendiente */}
+                        {pend > 0 && (
+                          <div className="rounded-md p-2 space-y-1.5"
+                            style={{ backgroundColor: 'oklch(0.98 0.005 240)', border: '0.5px solid var(--border)' }}>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-medium" style={{ color: 'var(--success)' }}>Buen estado:</span>
+                              <button onClick={() => setBuen(idx, Math.max(0, (buenas[idx] || 0) - 1))}
+                                className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Minus size={10} /></button>
+                              {editandoCantGranel[idx] === 'buenas' ? (
+                                <input autoFocus
+                                  type="number" min="0"
+                                  defaultValue={buenas[idx] || 0}
+                                  onBlur={e => { setBuen(idx, parseInt(e.target.value) || 0); setEditandoCantGranel(p => ({ ...p, [idx]: undefined })); }}
+                                  onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditandoCantGranel(p => ({ ...p, [idx]: undefined })); }}
+                                  ref={el => el && el.select()}
+                                  className="w-12 h-5 text-center font-mono text-xs border rounded"
+                                  style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                              ) : (
+                                <span onClick={() => setEditandoCantGranel(p => ({ ...p, [idx]: 'buenas' }))}
+                                  className="w-7 text-center font-mono text-xs font-semibold cursor-pointer"
+                                  style={{ color: 'var(--ink)' }}>
+                                  {buenas[idx] || 0}
+                                </span>
+                              )}
+                              <button onClick={() => setBuen(idx, (buenas[idx] || 0) + 1)}
+                                className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Plus size={10} /></button>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-medium" style={{ color: 'oklch(0.55 0.13 70)' }}>Dañadas:</span>
+                              <button onClick={() => setDan(idx, Math.max(0, (danadas[idx] || 0) - 1))}
+                                className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Minus size={10} /></button>
+                              {editandoCantGranel[idx] === 'danadas' ? (
+                                <input autoFocus
+                                  type="number" min="0"
+                                  defaultValue={danadas[idx] || 0}
+                                  onBlur={e => { setDan(idx, parseInt(e.target.value) || 0); setEditandoCantGranel(p => ({ ...p, [idx]: undefined })); }}
+                                  onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditandoCantGranel(p => ({ ...p, [idx]: undefined })); }}
+                                  ref={el => el && el.select()}
+                                  className="w-12 h-5 text-center font-mono text-xs border rounded"
+                                  style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                              ) : (
+                                <span onClick={() => setEditandoCantGranel(p => ({ ...p, [idx]: 'danadas' }))}
+                                  className="w-7 text-center font-mono text-xs font-semibold cursor-pointer"
+                                  style={{ color: 'var(--ink)' }}>
+                                  {danadas[idx] || 0}
+                                </span>
+                              )}
+                              <button onClick={() => setDan(idx, (danadas[idx] || 0) + 1)}
+                                className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Plus size={10} /></button>
+                              {(danadas[idx] || 0) > 0 && (
+                                <span className="flex items-center gap-0.5 ml-1">
+                                  <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Costo S/</span>
+                                  <input type="number" step="0.01" min="0" value={costosRep[idx] ?? ''}
+                                    placeholder="0" onChange={e => setCosto(idx, e.target.value)}
+                                    className="w-14 h-5 px-0.5 rounded text-[9px] border text-center font-mono dev-nospin"
+                                    style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-medium" style={{ color: 'var(--danger)' }}>Perdidas:</span>
+                              <button onClick={() => setPerd(idx, Math.max(0, (perdidas[idx] || 0) - 1))}
+                                className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Minus size={10} /></button>
+                              {editandoCantGranel[idx] === 'perdidas' ? (
+                                <input autoFocus
+                                  type="number" min="0"
+                                  defaultValue={perdidas[idx] || 0}
+                                  onBlur={e => { setPerd(idx, parseInt(e.target.value) || 0); setEditandoCantGranel(p => ({ ...p, [idx]: undefined })); }}
+                                  onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditandoCantGranel(p => ({ ...p, [idx]: undefined })); }}
+                                  ref={el => el && el.select()}
+                                  className="w-12 h-5 text-center font-mono text-xs border rounded"
+                                  style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                              ) : (
+                                <span onClick={() => setEditandoCantGranel(p => ({ ...p, [idx]: 'perdidas' }))}
+                                  className="w-7 text-center font-mono text-xs font-semibold cursor-pointer"
+                                  style={{ color: 'var(--ink)' }}>
+                                  {perdidas[idx] || 0}
+                                </span>
+                              )}
+                              <button onClick={() => setPerd(idx, (perdidas[idx] || 0) + 1)}
+                                className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Plus size={10} /></button>
+                              {(perdidas[idx] || 0) > 0 && (
+                                <span className="flex items-center gap-0.5 ml-1">
+                                  <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Reponer S/</span>
+                                  <input type="number" step="0.01" min="0"
+                                    value={costosPerdida[idx] ?? (perdidas[idx] * (item.item_precio_venta || 0))}
+                                    onChange={e => { setCostoPerd(idx, parseFloat(e.target.value) || 0); setCostoPerdManual(p => ({ ...p, [idx]: true })); }}
+                                    onBlur={e => { if (parseFloat(e.target.value) === 0) setCostoPerdManual(p => ({ ...p, [idx]: false })); }}
+                                    onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                                    className="w-14 h-5 px-0.5 rounded text-[9px] border text-center font-mono dev-nospin"
+                                    style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between pt-1" style={{ borderTop: '0.5px solid var(--border)' }}>
+                              <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+                                Total: {(buenas[idx] || 0) + (danadas[idx] || 0) + (perdidas[idx] || 0)} de {pend}
+                              </span>
+                              <button onClick={() => registrarDevParcialGranel(idx)}
+                                className="px-2.5 h-6 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97]"
+                                style={{ backgroundColor: 'oklch(0.50 0.13 155)', color: '#fff', border: 'none' }}>
+                                Registrar devolución
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Historial de devoluciones (acordeón) */}
+                        {devTotal > 0 && (
+                          <div style={{ borderTop: '0.5px solid var(--border)' }}>
+                            <button onClick={() => {
+                              const nuevo = !historialGranelAbierto[idx];
+                              setHistorialGranelAbierto(p => ({ ...p, [idx]: nuevo }));
+                              if (nuevo) cargarHistorialGranel(idx, item);
+                            }}
+                              className="flex items-center gap-1 text-[9px] uppercase tracking-wider font-semibold w-full text-left pt-1.5 pb-0.5"
+                              style={{ color: 'var(--muted)' }}>
+                              <ChevronRight size={10}
+                                style={{ transform: historialGranelAbierto[idx] ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }} />
+                              Historial de devoluciones
+                            </button>
+                            {historialGranelAbierto[idx] && (
+                              <div className="space-y-1 pb-1">
+                                {cargandoHistorial[idx] ? (
+                                  <p className="text-[10px]" style={{ color: 'var(--faint)' }}>Cargando...</p>
+                                ) : (devolucionesGranel[idx] || []).length === 0 ? (
+                                  <p className="text-[10px]" style={{ color: 'var(--faint)' }}>Sin entradas</p>
+                                ) : (
+                                  (devolucionesGranel[idx] || []).map(dg => (
+                                    <div key={dg.id} className="flex items-center gap-1.5 text-[10px]"
+                                      style={{ opacity: dg.revertido ? 0.4 : 1 }}>
+                                      <span className="shrink-0 font-mono" style={{ color: 'var(--muted)' }}>{dg.fecha?.slice(5, 16)}</span>
+                                      {dg.cantidad_bien > 0 && <span style={{ color: 'var(--success)' }}>Bien:{dg.cantidad_bien}</span>}
+                                      {dg.cantidad_danada > 0 && <span style={{ color: 'oklch(0.55 0.13 70)' }}>Dañ:{dg.cantidad_danada}</span>}
+                                      {dg.cantidad_perdida > 0 && <span style={{ color: 'var(--danger)' }}>Perd:{dg.cantidad_perdida}</span>}
+                                      {(dg.costo_reparacion || 0) > 0 && (
+                                        <span className="text-[9px]" style={{ color: 'var(--faint)' }}>S/ {dg.costo_reparacion.toFixed(2)}</span>
+                                      )}
+                                      <span className="flex-1" />
+                                      {dg.revertido
+                                        ? <span className="text-[9px]" style={{ color: 'var(--faint)' }}>Revertido</span>
+                                        : <button onClick={() => handleDeshacerGranel(dg.id, idx)}
+                                            className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/10 text-[11px] font-bold"
+                                            style={{ color: 'var(--danger)' }}
+                                            title="Revertir esta devolución">×</button>
+                                      }
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
-                      {/* Perdidas */}
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-medium" style={{ color: 'var(--danger)' }}>Perdidas:</span>
-                        <button onClick={() => setPerd(idx, Math.max(0, (perdidas[idx] || 0) - 1))}
-                          className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Minus size={10} /></button>
-                        <span className="w-7 text-center font-mono text-xs font-semibold cursor-pointer"
-                          style={{ color: 'var(--ink)' }}
-                          onClick={() => { const v = prompt('Cantidad perdida:', perdidas[idx] || 0); if (v !== null) setPerd(idx, parseInt(v) || 0); }}>
-                          {perdidas[idx] || 0}
-                        </span>
-                        <button onClick={() => setPerd(idx, (perdidas[idx] || 0) + 1)}
-                          className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Plus size={10} /></button>
-                        {(perdidas[idx] || 0) > 0 && (
-                          <span className="flex items-center gap-0.5 ml-1">
-                            <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Reponer S/</span>
-                            <input type="number" step="0.01" min="0"
-                              defaultValue={costosPerdida[idx] ?? (item.item_precio_venta || 0)}
-                              onBlur={e => setCostoPerd(idx, parseFloat(e.target.value) || 0)}
-                              onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-                              className="w-14 h-5 px-0.5 rounded text-[9px] border text-center font-mono dev-nospin"
-                              style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
-                          </span>
-                        )}
-                      </div>
-                      {/* Total devuelto hoy + botón registrar */}
-                      <div className="flex items-center justify-between pt-1" style={{ borderTop: '0.5px solid var(--border)' }}>
-                        <span className="text-[9px]" style={{ color: 'var(--muted)' }}>
-                          Total: {(buenas[idx] || 0) + (danadas[idx] || 0) + (perdidas[idx] || 0)} de {item.cantidad}
-                        </span>
-                        <button onClick={() => registrarDevParcialGranel(idx)}
-                          className="px-2.5 h-6 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97]"
-                          style={{ backgroundColor: 'oklch(0.50 0.13 155)', color: '#fff', border: 'none' }}>
-                          Registrar devolución
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {/* Granel: estado devuelto + deshacer */}
-                  {esGranel && yaGuardado && (
-                    <div className="flex items-center justify-between mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
-                      <div className="flex items-center gap-1 text-[10px] font-medium" style={{ color: 'var(--success)' }}>
-                        <CheckCircle size={12} /> Devuelto parcialmente
-                      </div>
-                      <button onClick={() => handleDeshacer(idx)}
-                        className="text-[10px] px-2 h-5 rounded font-medium transition-all duration-150 hover:opacity-80"
-                        style={{ backgroundColor: 'oklch(0.92 0.03 25)', color: 'var(--danger)' }}>
-                        Deshacer
-                      </button>
-                    </div>
-                  )}
+                    );
+                  })()}
                   {/* Fila 4: Base + Mora + Pagado + Total */}
                   <hr style={{ borderColor: 'var(--border)', marginTop: 2, marginBottom: 4 }} />
                   <div className="flex justify-between items-center">
@@ -424,8 +708,12 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                   {/* Fila 5: Botones de estado — solo para items individuales */}
                   {!esGranel && (yaGuardado ? (
                     <div className="flex items-center justify-between mt-2 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
-                      <div className="flex items-center gap-1 text-[10px] font-medium" style={{ color: 'var(--success)' }}>
-                        <CheckCircle size={12} /> Devuelto correctamente
+                      <div className="flex items-center gap-1 text-[10px] font-medium">
+                        {item.saldo_item <= 0 ? (
+                          <span style={{ color: 'var(--success)' }}><CheckCircle size={12} /> Devuelto correctamente</span>
+                        ) : (
+                          <span style={{ color: 'oklch(0.55 0.13 70)' }}><Clock size={12} /> Falta pagar</span>
+                        )}
                       </div>
                       <button onClick={() => handleDeshacer(idx)}
                         className="text-[10px] px-2 h-5 rounded font-medium transition-all duration-150 hover:opacity-80"
@@ -457,10 +745,12 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                       <span className="text-[10px] shrink-0" style={{ color: 'var(--muted)' }}>Costo reparación: S/</span>
                       <input type="number" step="0.01" min="0" value={costosRep[idx] ?? ''}
                         placeholder="0" onChange={e => setCosto(idx, e.target.value)}
+                        onBlur={e => { if (guardados[idx]) actualizarCostoDanos(idx, e.target.value); }}
                         className="w-16 h-6 px-1 rounded text-xs border text-center font-mono dev-nospin"
                         style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
                       <input placeholder="Nota del daño..." value={notas[idx] || ''}
                         onChange={e => setNota(idx, e.target.value)}
+                        onBlur={e => { if (guardados[idx] && e.target.value) actualizarCostoDanos(idx, costosRep[idx]); }}
                         className="flex-1 h-6 px-1.5 rounded text-[10px] border"
                         style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
                     </div>
@@ -547,6 +837,13 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
               <div className="flex justify-between">
                 <span style={{ color: 'var(--warning)' }}>Cobro por daños</span>
                 <span className="font-mono tabular-nums" style={{ color: 'var(--warning)' }}>+ S/ {totalDanos.toFixed(2)}</span>
+              </div>
+            )}
+            {/* Pérdidas */}
+            {totalPerdidas > 0 && (
+              <div className="flex justify-between">
+                <span style={{ color: 'var(--danger)' }}>Cobro por pérdidas</span>
+                <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {totalPerdidas.toFixed(2)}</span>
               </div>
             )}
             

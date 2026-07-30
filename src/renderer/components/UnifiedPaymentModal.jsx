@@ -28,7 +28,7 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
   let total, pagado, saldoPendiente;
   if (!isItem) {
     pagado = contrato.total_pagado || 0;
-    total = baseEditada + atrasoEditado + (contrato.deposito_monto || 0);
+    total = baseEditada + atrasoEditado + (contrato.total_danos || 0) + (contrato.total_perdidas || 0) + (contrato.deposito_monto || 0);
     saldoPendiente = Math.max(0, total - pagado);
   }
 
@@ -169,6 +169,18 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
                   <div className="flex justify-between">
                     <span style={{ color: 'var(--muted)' }}>Dep&oacute;sito</span>
                     <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {(contrato.deposito_monto || 0).toFixed(2)}</span>
+                  </div>
+                )}
+                {(contrato.total_danos || 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span style={{ color: 'var(--warning)' }}>Cobro por da&ntilde;os</span>
+                    <span className="font-mono tabular-nums" style={{ color: 'var(--warning)' }}>+ S/ {(contrato.total_danos || 0).toFixed(2)}</span>
+                  </div>
+                )}
+                {(contrato.total_perdidas || 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span style={{ color: 'var(--danger)' }}>Cobro por p&eacute;rdidas</span>
+                    <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {(contrato.total_perdidas || 0).toFixed(2)}</span>
                   </div>
                 )}
                 <hr style={{ borderColor: 'var(--border)', marginTop: 4, marginBottom: 2 }} />

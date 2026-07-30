@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const { ipcMain, app, shell } = require('electron');
 const db = require('./db/database');
 const {
@@ -7,6 +8,8 @@ const {
   getContratos,
   registrarPagoAdicional,
   revertirDevolucionItem,
+  revertirDevolucionGranel,
+  getDevolucionesGranel,
   anularPago,
 } = require('./services/contratoService');
 const {
@@ -36,6 +39,8 @@ const {
   cambiarEstado,
   getHistorialUnidad,
   getHerramientasPorCategoria,
+  getAuditGranel,
+  revertirAuditGranel,
 } = require('./services/inventarioService');
 const { consultarDni } = require('./services/reniecService');
 const { generarPdf, guardarFirma, generarPdfDesdeDatos } = require('./services/contratoPdfService');
@@ -159,6 +164,14 @@ function registerIpcHandlers() {
     return revertirDevolucionItem(idDetalle);
   });
 
+  ipcMain.handle('get-devoluciones-granel', (_e, contratoId, itemGranelId) => {
+    return getDevolucionesGranel(contratoId, itemGranelId);
+  });
+
+  ipcMain.handle('revertir-devolucion-granel', (_e, idDevolucionGranel) => {
+    return revertirDevolucionGranel(idDevolucionGranel);
+  });
+
   ipcMain.handle('anular-pago', (_e, data) => {
     const { idPago, motivo } = data;
     return anularPago(idPago, motivo);
@@ -227,6 +240,14 @@ function registerIpcHandlers() {
 
   ipcMain.handle('dar-baja-granel', (_e, id, cantidad, motivo) => {
     return darBajaGranel(id, cantidad, motivo);
+  });
+
+  ipcMain.handle('get-audit-granel', (_e, itemId) => {
+    return getAuditGranel(itemId);
+  });
+
+  ipcMain.handle('revertir-audit-granel', (_e, auditId) => {
+    return revertirAuditGranel(auditId);
   });
 
   // --- RENIEC ---
@@ -356,6 +377,13 @@ function registerIpcHandlers() {
 
   ipcMain.handle('get-detalle-contrato', (_e, idContrato) => {
     return getDetalleContrato(idContrato);
+  });
+
+  ipcMain.handle('log', (_e, msg) => {
+    const logFile = '/tmp/sistema-alquiler-debug.log';
+    const line = `[${new Date().toISOString()}] ${msg}\n`;
+    fs.appendFileSync(logFile, line);
+    console.log('[RENDERER LOG]', msg);
   });
 
   console.log('[IPC] Manejadores IPC registrados.');

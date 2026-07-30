@@ -154,6 +154,43 @@ function initDatabase() {
       FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
       FOREIGN KEY (id_cliente) REFERENCES CLIENTE(id)
     );
+
+    CREATE TABLE IF NOT EXISTS AUDIT_GRANEL (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id INTEGER NOT NULL,
+      timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      accion TEXT NOT NULL,
+      cantidad INTEGER NOT NULL DEFAULT 0,
+      prev_total INTEGER NOT NULL DEFAULT 0,
+      prev_alquilada INTEGER NOT NULL DEFAULT 0,
+      prev_danada INTEGER NOT NULL DEFAULT 0,
+      prev_perdida INTEGER NOT NULL DEFAULT 0,
+      prev_vendida INTEGER NOT NULL DEFAULT 0,
+      prev_baja INTEGER NOT NULL DEFAULT 0,
+      new_total INTEGER NOT NULL DEFAULT 0,
+      new_alquilada INTEGER NOT NULL DEFAULT 0,
+      new_danada INTEGER NOT NULL DEFAULT 0,
+      new_perdida INTEGER NOT NULL DEFAULT 0,
+      new_vendida INTEGER NOT NULL DEFAULT 0,
+      new_baja INTEGER NOT NULL DEFAULT 0,
+      revertido INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (item_id) REFERENCES ITEM_GRANEL(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS DEVOLUCION_GRANEL (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id_contrato INTEGER NOT NULL,
+      id_item_granel INTEGER NOT NULL,
+      fecha TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      cantidad_bien INTEGER NOT NULL DEFAULT 0,
+      cantidad_danada INTEGER NOT NULL DEFAULT 0,
+      cantidad_perdida INTEGER NOT NULL DEFAULT 0,
+      costo_reparacion REAL,
+      costo_perdida REAL,
+      revertido INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
+      FOREIGN KEY (id_item_granel) REFERENCES ITEM_GRANEL(id)
+    );
   `);
 
   // Migración: agregar columnas de precio/mora a CATEGORIA_HERRAMIENTA
@@ -169,6 +206,9 @@ function initDatabase() {
 
   // Migración: agregar id_detalle a PAGO para pagos por ítem
   try { db.exec("ALTER TABLE PAGO ADD COLUMN id_detalle INTEGER REFERENCES DETALLE_CONTRATO(id)"); } catch {}
+
+  // Migración: agregar id_detalle a DEVOLUCION_GRANEL para vincular cada entrada al detalle exacto
+  try { db.exec("ALTER TABLE DEVOLUCION_GRANEL ADD COLUMN id_detalle INTEGER REFERENCES DETALLE_CONTRATO(id)"); } catch {}
 
   // Migración: agregar columnas de anulación a PAGO
   try { db.exec("ALTER TABLE PAGO ADD COLUMN anulado INTEGER DEFAULT 0 CHECK (anulado IN (0, 1))"); } catch {}
@@ -288,6 +328,38 @@ function initDatabase() {
     console.error('[DB] Error creando trigger trg_granel_disponible_insert:', err);
   }
 
+  // Migración: crear AUDIT_GRANEL si no existe (para bases de datos existentes)
+  try {
+    const hasAudit = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='AUDIT_GRANEL'").get();
+    if (!hasAudit) {
+      db.exec(`
+        CREATE TABLE AUDIT_GRANEL (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          item_id INTEGER NOT NULL,
+          timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+          accion TEXT NOT NULL,
+          cantidad INTEGER NOT NULL DEFAULT 0,
+          prev_total INTEGER NOT NULL DEFAULT 0,
+          prev_alquilada INTEGER NOT NULL DEFAULT 0,
+          prev_danada INTEGER NOT NULL DEFAULT 0,
+          prev_perdida INTEGER NOT NULL DEFAULT 0,
+          prev_vendida INTEGER NOT NULL DEFAULT 0,
+          prev_baja INTEGER NOT NULL DEFAULT 0,
+          new_total INTEGER NOT NULL DEFAULT 0,
+          new_alquilada INTEGER NOT NULL DEFAULT 0,
+          new_danada INTEGER NOT NULL DEFAULT 0,
+          new_perdida INTEGER NOT NULL DEFAULT 0,
+          new_vendida INTEGER NOT NULL DEFAULT 0,
+          new_baja INTEGER NOT NULL DEFAULT 0,
+          revertido INTEGER NOT NULL DEFAULT 0,
+          FOREIGN KEY (item_id) REFERENCES ITEM_GRANEL(id)
+        )
+      `);
+    }
+  } catch (err) {
+    console.error('[DB] Error creando AUDIT_GRANEL:', err);
+  }
+
   // Siempre actualizar cláusulas (pueden cambiar entre versiones)
   db.prepare(`INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion) VALUES (?, ?, ?)`)
     .run('contrato_clausulas', `Conste por el presente documento que celebra de una parte como ARRENDADORA la Sr(a). [ARRENDADORA_NOMBRE], identificada con DNI N° [ARRENDADORA_DNI], con domicilio en [ARRENDADORA_DIRECCION], y de la otra parte como ARRENDATARIO el Sr(a). [CLIENTE_NOMBRE], identificado con DNI N° [CLIENTE_DNI], con domicilio en [CLIENTE_DIRECCION], quienes convienen de mutuo acuerdo y regulado por las leyes vigentes sobre la materia, en los términos y condiciones siguientes:
@@ -395,6 +467,67 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
 
   for (const c of confsArrendadora) {
     insertConf.run(c[0], c[1], c[2]);
+  }
+
+  // Migración: DEVOLUCION_GRANEL desde datos existentes
+  const migradaDevolucion = db.prepare(
+    `SELECT valor FROM CONFIGURACION WHERE clave = 'devolucion_granel_migrada'`
+  ).get();
+  if (!migradaDevolucion) {
+    const filasSplit = db.prepare(`
+      SELECT d.id, d.id_contrato, d.id_item_granel, d.cantidad, d.estado_devolucion,
+             c.fecha_devolucion_real, c.fecha_creacion
+      FROM DETALLE_CONTRATO d
+      JOIN CONTRATO c ON c.id = d.id_contrato
+      WHERE d.tipo_item = 'granel' AND d.estado_devolucion != 'pendiente'
+    `).all();
+
+    const insertMig = db.prepare(`
+      INSERT INTO DEVOLUCION_GRANEL (id_contrato, id_item_granel, fecha,
+        cantidad_bien, cantidad_danada, cantidad_perdida)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const f of filasSplit) {
+      const fecha = f.fecha_devolucion_real || f.fecha_creacion;
+      const bien = f.estado_devolucion === 'bien' ? f.cantidad : 0;
+      const danada = f.estado_devolucion === 'dañado' ? f.cantidad : 0;
+      const perdida = f.estado_devolucion === 'no devuelto' ? f.cantidad : 0;
+      insertMig.run(f.id_contrato, f.id_item_granel, fecha, bien, danada, perdida);
+    }
+
+    db.prepare(
+      `INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion)
+       VALUES ('devolucion_granel_migrada', 'true', 'Migración de DEVOLUCION_GRANEL completada')`
+    ).run();
+  }
+
+  // Migración: backfill id_detalle en DEVOLUCION_GRANEL para entradas con un único detalle posible
+  try {
+    const sinDetalle = db.prepare(`
+      SELECT dg.id, dg.id_contrato, dg.id_item_granel, COUNT(d.id) AS matches
+      FROM DEVOLUCION_GRANEL dg
+      LEFT JOIN DETALLE_CONTRATO d ON d.id_contrato = dg.id_contrato AND d.id_item_granel = dg.id_item_granel AND d.tipo_item = 'granel'
+      WHERE dg.id_detalle IS NULL
+      GROUP BY dg.id
+    `).all();
+    const updateDetalle = db.prepare(`
+      UPDATE DEVOLUCION_GRANEL SET id_detalle = (
+        SELECT d.id FROM DETALLE_CONTRATO d
+        WHERE d.id_contrato = ? AND d.id_item_granel = ? AND d.tipo_item = 'granel'
+        LIMIT 1
+      ) WHERE id = ?
+    `);
+    for (const row of sinDetalle) {
+      if (row.matches === 1) {
+        updateDetalle.run(row.id_contrato, row.id_item_granel, row.id);
+      }
+    }
+    if (sinDetalle.length > 0) {
+      console.log('[DB] Backfill id_detalle DEVOLUCION_GRANEL: ' + sinDetalle.filter(r => r.matches === 1).length + ' actualizadas, ' + sinDetalle.filter(r => r.matches !== 1).length + ' omitidas (múltiples matches)');
+    }
+  } catch (e) {
+    console.log('[DB] Error en backfill id_detalle DEVOLUCION_GRANEL (no crítico):', e.message);
   }
 
   console.log('[DB] Base de datos inicializada correctamente.');

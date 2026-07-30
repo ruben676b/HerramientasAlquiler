@@ -85,7 +85,8 @@ function getDetalleContrato(idContrato) {
   const items = db.prepare(`
     SELECT d.*, COALESCE(h.nombre, ig.nombre) AS item_nombre,
            COALESCE(h.id, 'MAT') AS item_codigo,
-           ig.condicion AS item_condicion
+           ig.condicion AS item_condicion,
+           ig.precio_venta AS item_precio_venta
     FROM DETALLE_CONTRATO d
     LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id
     LEFT JOIN ITEM_GRANEL ig ON d.id_item_granel = ig.id
@@ -93,16 +94,89 @@ function getDetalleContrato(idContrato) {
   `).all(idContrato);
 
   const pagos = db.prepare(`
-    SELECT id, monto, metodo, tipo, fecha_pago
+    SELECT id, monto, metodo, tipo, fecha_pago, id_detalle, anulado
     FROM PAGO WHERE id_contrato = ?
-    ORDER BY fecha_pago ASC
+    ORDER BY fecha_pago DESC
   `).all(idContrato);
 
   const calificacion = db.prepare(
     'SELECT estrellas, comentario FROM CALIFICACION_CLIENTE WHERE id_contrato = ?'
   ).get(idContrato);
 
-  return { contrato, items, pagos, calificacion: calificacion || null };
+  // Enriquecer items con datos de devolución y mora
+  const hoy = new Date().toISOString().slice(0, 10);
+  let total_atraso = 0;
+  let total_danos = 0;
+  let total_perdidas = 0;
+
+  const itemsEnriched = items.map(item => {
+    if (item.id_item_granel) {
+      const dev = db.prepare(`
+        SELECT
+          COALESCE(SUM(cantidad_bien), 0) AS total_bien,
+          COALESCE(SUM(cantidad_danada), 0) AS total_danada,
+          COALESCE(SUM(cantidad_perdida), 0) AS total_perdida,
+          COALESCE(SUM(costo_reparacion), 0) AS total_costo_reparacion,
+          COALESCE(SUM(costo_perdida), 0) AS total_costo_perdida
+        FROM DEVOLUCION_GRANEL
+        WHERE id_detalle = ? AND (revertido IS NULL OR revertido = 0)
+      `).get(item.id);
+      item.granel_dev_bien = dev.total_bien;
+      item.granel_dev_danada = dev.total_danada;
+      item.granel_dev_perdida = dev.total_perdida;
+      item.granel_pendiente = Math.max(0, item.cantidad - dev.total_bien - dev.total_danada - dev.total_perdida);
+      item.granel_dev_costo_reparacion = dev.total_costo_reparacion || 0;
+      item.granel_dev_costo_perdida = dev.total_costo_perdida || 0;
+      total_danos += dev.total_costo_reparacion || 0;
+      total_perdidas += dev.total_costo_perdida || 0;
+    }
+
+    const fechaDevItem = item.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;
+    const diasItem = Math.max(1, Math.ceil(
+      (new Date(fechaDevItem + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
+    ) + 1);
+    const totalItem = diasItem * item.precio_dia_aplicado * item.cantidad;
+    const fechaPactadaItem = new Date(fechaDevItem + 'T00:00:00');
+    const refDate = item.fecha_devolucion_real
+      ? new Date(item.fecha_devolucion_real + 'T00:00:00')
+      : new Date(hoy + 'T00:00:00');
+    const diasAtrasoItem = Math.max(0, Math.ceil((refDate - fechaPactadaItem) / 86400000));
+    const montoAtrasoItem = diasAtrasoItem * item.precio_dia_aplicado * item.cantidad;
+    total_atraso += montoAtrasoItem;
+
+    const pagadoItem = db.prepare(
+      "SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = ? AND id_detalle = ? AND (anulado IS NULL OR anulado = 0)"
+    ).get(idContrato, item.id)['COALESCE(SUM(monto), 0)'];
+    const saldoItem = Math.max(0, totalItem + montoAtrasoItem - pagadoItem);
+
+    return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem, dias_item: diasItem, total_item: totalItem, pagado_item: pagadoItem, saldo_item: saldoItem };
+  });
+
+  // Sumar costos de reparación de MANTENIMIENTO para individuales dañados
+  const danosIndividuales = db.prepare(`
+    SELECT COALESCE(SUM(m.costo), 0) AS total
+    FROM MANTENIMIENTO m
+    JOIN DETALLE_CONTRATO d ON d.id_herramienta = m.id_herramienta
+    WHERE d.id_contrato = ? AND d.tipo_item = 'individual' AND d.estado_devolucion = 'dañado'
+  `).get(idContrato);
+  total_danos += danosIndividuales.total || 0;
+
+  const totalPagado = pagos.reduce((a, p) => (p.anulado ? a : a + p.monto), 0);
+  const totalBase = itemsEnriched.reduce((a, i) => a + i.total_item, 0);
+  const totalGeneral = totalBase + total_atraso + total_danos + total_perdidas + (contrato.deposito_monto || 0);
+
+  return {
+    contrato,
+    items: itemsEnriched,
+    pagos,
+    calificacion: calificacion || null,
+    total_atraso,
+    total_danos,
+    total_perdidas,
+    total_base: totalBase,
+    total_pagado: totalPagado,
+    total_general: totalGeneral,
+  };
 }
 
 module.exports = {

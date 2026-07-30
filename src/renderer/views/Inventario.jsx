@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Search, Plus, Pencil, Trash2, Wrench, Package, X,
+  Search, Plus, Pencil, Trash2, Wrench, Package, X, History,
   ChevronDown, ChevronRight, CheckCircle, AlertTriangle, MinusCircle,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -196,6 +196,10 @@ export default function Inventario() {
   };
   const handleDarBaja = async (id, cantidad, motivo) => {
     try { await window.api.darBajaGranel(id, cantidad, motivo); toast(cantidad + ' unidad(es) marcada(s) como ' + motivo); await cargar(); }
+    catch (e) { setError(e.message); }
+  };
+  const handleRevertirAudit = async (auditId) => {
+    try { await window.api.revertirAuditGranel(auditId); toast('Modificación revertida'); await cargar(); }
     catch (e) { setError(e.message); }
   };
   const handleBajaVariante = async (id) => {
@@ -420,7 +424,7 @@ export default function Inventario() {
                         <span className="text-right w-9 shrink-0">Baja</span>
                         <span className="text-right w-10 shrink-0">Total</span>
                         <span className="flex-1" />
-                        <span className="w-[52px] shrink-0" />
+                        <span className="w-[68px] shrink-0" />
                       </div>
                       {g.variantes.map((v) => {
                         const cb = SEMANTIC[v.condicion];
@@ -437,7 +441,13 @@ export default function Inventario() {
                             <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_baja || 0) > 0 ? 'var(--muted)' : 'var(--faint)' }}>{v.cantidad_baja || 0}</span>
                             <span className="w-10 text-right font-mono font-semibold" style={{ color: 'var(--ink)' }}>{v.cantidad_total}</span>
                             <span className="flex-1 text-[10px] text-right" style={{ color: 'var(--muted)' }}>S/ {v.precio_dia.toFixed(2)}/día</span>
-                            <div className="flex items-center gap-0.5 shrink-0 w-[52px] justify-end">
+                            <div className="flex items-center gap-0.5 shrink-0 w-[68px] justify-end">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setModal({ tipo: 'historial-granel', data: v }); }}
+                                className="w-5 h-5 rounded flex items-center justify-center transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5 active:scale-90"
+                                style={{ color: 'var(--muted)' }}
+                                title="Historial de modificaciones"
+                              ><History size={12} /></button>
                               <button
                                 onClick={(e) => { e.stopPropagation(); setModal({ tipo: 'baja-granel', data: v }); }}
                                 className="w-5 h-5 rounded flex items-center justify-center text-[13px] font-bold transition-colors duration-150 hover:bg-red-50 dark:hover:bg-red-950 active:scale-90"
@@ -471,6 +481,7 @@ export default function Inventario() {
       {modal?.tipo === 'editar-granel' && <ModalEditarGranel data={modal.data} onSave={handleEditarGranel} onClose={() => setModal(null)} />}
       {modal?.tipo === 'sumar-stock' && <StockModal data={modal.data} onApply={(d) => handleAjustarStock(modal.data.id, d)} onClose={() => setModal(null)} />}
       {modal?.tipo === 'baja-granel' && <BajaGranelModal data={modal.data} onSave={handleDarBaja} onClose={() => setModal(null)} />}
+      {modal?.tipo === 'historial-granel' && <HistorialGranelModal data={modal.data} onUndo={handleRevertirAudit} onClose={() => setModal(null)} />}
 
       <ConfirmModal
         open={!!confirm}
@@ -709,8 +720,8 @@ function BajaGranelModal({ data, onSave, onClose }) {
 
   return (
     <ModalShell title={'Dar de baja: ' + data.nombre + ' (' + data.condicion + ')'} onClose={onClose} onSubmit={aplicar}>
-      <p className="text-xs" style={{ color: 'var(--muted)' }}>
-        Disponible: {data.cantidad_disponible} | Total: {data.cantidad_total}
+      <p className="text-sm font-semibold text-center py-2 px-3 rounded-lg" style={{ color: 'var(--ink)', backgroundColor: 'var(--surface)' }}>
+        Total: {data.cantidad_disponible} de {data.cantidad_total}
       </p>
       <Field label="Motivo" req>
         <div className="space-y-1">
@@ -730,6 +741,86 @@ function BajaGranelModal({ data, onSave, onClose }) {
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicar(); } }} />
       </Field>
     </ModalShell>
+  );
+}
+
+function HistorialGranelModal({ data, onUndo, onClose }) {
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    window.api.getAuditGranel(data.id).then(setEntries).catch(() => {}).finally(() => setLoading(false));
+  }, [data.id]);
+
+  const filtradas = entries.filter(e => e.accion !== 'undo');
+
+  const ACCIONES = {
+    compra:     { label: 'Compra',     color: 'var(--success)' },
+    baja:       { label: 'Baja',       color: 'var(--muted)' },
+    perdido:    { label: 'Perdido',    color: 'var(--danger)' },
+    dañado:     { label: 'Dañado',     color: 'oklch(0.55 0.13 70)' },
+    vendido:    { label: 'Vendido',    color: 'var(--info)' },
+    reparacion: { label: 'Reparación', color: 'oklch(0.45 0.08 140)' },
+    ajuste:     { label: 'Ajuste',     color: 'var(--muted)' },
+  };
+
+  const masReciente = filtradas.length > 0 && !filtradas[0].revertido ? filtradas[0] : null;
+
+  const handleUndo = () => {
+    if (!masReciente) return;
+    onUndo(masReciente.id);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'oklch(0 0 0 / 0.4)' }} onClick={onClose}>
+      <div className="flex flex-col w-full max-w-sm max-h-[80vh] rounded-xl p-5" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border)' }} onClick={(e) => e.stopPropagation()}>
+        {/* Header fijo */}
+        <div className="flex items-center justify-between shrink-0 mb-3">
+          <h2 className="text-base font-bold" style={{ color: 'var(--ink)' }}>Historial: {data.nombre} ({data.condicion})</h2>
+          <button onClick={onClose} className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 active:scale-90" style={{ color: 'var(--muted)' }}><X size={15} /></button>
+        </div>
+
+        {/* Lista scrolleable */}
+        <div className="flex-1 min-h-0 space-y-1 overflow-y-auto">
+          {loading ? (
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Cargando...</p>
+          ) : filtradas.length === 0 ? (
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Sin modificaciones registradas.</p>
+          ) : filtradas.map((e) => {
+            const acc = ACCIONES[e.accion] || { label: e.accion, color: 'var(--muted)' };
+            const diff = e.accion === 'compra' || e.accion === 'ajuste'
+              ? '+' + e.cantidad
+              : '-' + e.cantidad;
+            return (
+              <div key={e.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg text-xs"
+                style={{ backgroundColor: e.revertido ? 'oklch(0.85 0 0 / 0.3)' : 'transparent', color: e.revertido ? 'var(--faint)' : 'var(--ink)' }}>
+                <span className="w-14 shrink-0 text-[10px] font-mono" style={{ color: 'var(--faint)' }}>
+                  {e.timestamp?.slice(11, 16) || '--:--'}
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0"
+                  style={{ backgroundColor: acc.color + '20', color: acc.color }}>{acc.label}</span>
+                <span className="font-mono font-medium w-10 text-right shrink-0" style={{ color: acc.color }}>{diff}</span>
+                <span className="flex-1 truncate" style={{ color: 'var(--faint)' }}>
+                  Disp {e.prev_total - e.prev_alquilada - e.prev_danada - e.prev_perdida - e.prev_vendida - e.prev_baja}
+                  {'→'}
+                  {e.new_total - e.new_alquilada - e.new_danada - e.new_perdida - e.new_vendida - e.new_baja}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer fijo con deshacer */}
+        {masReciente && (
+          <div className="shrink-0 pt-3">
+            <Button variant="danger" size="sm" className="w-full" onClick={handleUndo}>
+              Deshacer última modificación
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
