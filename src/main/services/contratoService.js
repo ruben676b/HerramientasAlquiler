@@ -529,9 +529,6 @@ function registrarPagoAdicional(idContrato, monto, metodo, tipo, idDetalle) {
 
   const contrato = db.prepare('SELECT estado FROM CONTRATO WHERE id = ?').get(idContrato);
   if (!contrato) throw new Error('Contrato no encontrado.');
-  if (contrato.estado === 'devuelto' || contrato.estado === 'cancelado') {
-    throw new Error('El contrato ya está cerrado. No se pueden registrar pagos adicionales.');
-  }
 
   const result = db.prepare(`
     INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle)

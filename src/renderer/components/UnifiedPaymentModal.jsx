@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useToast } from './Toast';
 
-export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendiente, itemBase, itemMora, idDetalle, onClose, onConfirm }) {
+export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendiente, itemBase, itemMora, idDetalle, pendienteExterno, danosExterno, perdidasExterno, onClose, onConfirm }) {
   const toast = useToast();
   const isItem = tipo === 'item';
   const garantia = contrato.garantia_retenida || 0;
@@ -25,11 +25,14 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
   const pagadoItem = isItem ? (item?.pagado_item || 0) : 0;
   const pendienteItem = Math.max(0, baseEditada + moraEditada - pagadoItem);
 
+  const danosTotal = (danosExterno != null ? danosExterno : (contrato.total_danos || 0));
+  const perdidasTotal = (perdidasExterno != null ? perdidasExterno : (contrato.total_perdidas || 0));
+
   let total, pagado, saldoPendiente;
   if (!isItem) {
     pagado = contrato.total_pagado || 0;
-    total = baseEditada + atrasoEditado + (contrato.total_danos || 0) + (contrato.total_perdidas || 0) + (contrato.deposito_monto || 0);
-    saldoPendiente = Math.max(0, total - pagado);
+    total = baseEditada + atrasoEditado + danosTotal + perdidasTotal + (contrato.deposito_monto || 0);
+    saldoPendiente = pendienteExterno != null ? pendienteExterno : Math.max(0, total - pagado);
   }
 
   const montoMaximo = isItem ? pendienteItem : saldoPendiente;
@@ -171,16 +174,16 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
                     <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {(contrato.deposito_monto || 0).toFixed(2)}</span>
                   </div>
                 )}
-                {(contrato.total_danos || 0) > 0 && (
+                {danosTotal > 0 && (
                   <div className="flex justify-between">
                     <span style={{ color: 'var(--warning)' }}>Cobro por da&ntilde;os</span>
-                    <span className="font-mono tabular-nums" style={{ color: 'var(--warning)' }}>+ S/ {(contrato.total_danos || 0).toFixed(2)}</span>
+                    <span className="font-mono tabular-nums" style={{ color: 'var(--warning)' }}>+ S/ {danosTotal.toFixed(2)}</span>
                   </div>
                 )}
-                {(contrato.total_perdidas || 0) > 0 && (
+                {perdidasTotal > 0 && (
                   <div className="flex justify-between">
                     <span style={{ color: 'var(--danger)' }}>Cobro por p&eacute;rdidas</span>
-                    <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {(contrato.total_perdidas || 0).toFixed(2)}</span>
+                    <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {perdidasTotal.toFixed(2)}</span>
                   </div>
                 )}
                 <hr style={{ borderColor: 'var(--border)', marginTop: 4, marginBottom: 2 }} />

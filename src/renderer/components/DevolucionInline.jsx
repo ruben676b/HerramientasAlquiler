@@ -430,7 +430,8 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
             items.map((item, idx) => {
               const est = estados[idx] || null;
               const esGranel = !!item.id_item_granel;
-              const yaGuardado = guardados[idx];
+              const devueltoEnDB = item.estado_devolucion && item.estado_devolucion !== 'pendiente';
+              const yaGuardado = guardados[idx] || devueltoEnDB;
               const fechaPactadaItem = item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada;
               const diasItem = item.dias_item || 0;
               const moraActual = morasEditadas[idx] != null ? morasEditadas[idx] : ((item.dias_atraso_item || 0) * (item.precio_dia_aplicado || 0) * (item.cantidad || 1));
@@ -439,11 +440,11 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                   className="rounded-lg border px-3 py-2 text-xs transition-all duration-150"
                   style={{
                     borderColor: yaGuardado
-                      ? (item.saldo_item <= 0 ? 'oklch(0.50 0.13 155)' : 'oklch(0.55 0.13 70)')
+                      ? 'oklch(0.50 0.13 155)'
                       : (est ? ESTADOS_OPC.find(o => o.id === est)?.bg + '60' : 'var(--border)'),
                     backgroundColor: yaGuardado
-                      ? (item.saldo_item <= 0 ? 'oklch(0.95 0.05 155)' : 'oklch(0.97 0.04 70)')
-                      : 'var(--surface)',
+                      ? 'oklch(0.95 0.05 155)'
+                      : (est ? 'oklch(0.97 0.04 70)' : 'var(--surface)'),
                   }}>
                   {/* Fila 1: Badge + nombre + botones estado + precio */}
                   <div className="flex items-center gap-2 mb-1">
@@ -900,6 +901,9 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
         itemBase={pagoItemState.baseItem}
         itemMora={pagoItemState.moraItem}
         idDetalle={pagoItemState.idDetalle}
+        pendienteExterno={pagoItemState.esTotal ? pendiente : undefined}
+        danosExterno={pagoItemState.esTotal ? totalDanos : undefined}
+        perdidasExterno={pagoItemState.esTotal ? totalPerdidas : undefined}
         onClose={() => setPagoItemState(null)}
         onConfirm={() => { setPagoItemState(null); onRecargar(); }}
       />
