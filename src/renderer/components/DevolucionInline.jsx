@@ -25,7 +25,6 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [costosRep, setCostosRep] = useState({});
   const [cantidades, setCantidades] = useState({});
   const [morasEditadas, setMoraEditadas] = useState({});
-  const [editandoMora, setEditandoMora] = useState({});
   const [editandoCant, setEditandoCant] = useState({});
   const inputCantRefs = useRef({});
   const [mostrarPago, setMostrarPago] = useState(false);
@@ -267,7 +266,6 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
     if (guardadosRef.current[idx]) dirtyRef.current[idx] = true;
   };
   const setCantidad = (idx, v) => setCantidades(p => ({ ...p, [idx]: v }));
-  const setMora = (idx, v) => setMoraEditadas(p => ({ ...p, [idx]: v }));
   const setBuen = (idx, v) => {
     const item = items[idx];
     const pend = item.granel_pendiente ?? item.cantidad;
@@ -436,9 +434,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
               const yaGuardado = guardados[idx];
               const fechaPactadaItem = item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada;
               const diasItem = item.dias_item || 0;
-              const baseItem = (item.precio_dia_aplicado || 0) * diasItem * (item.cantidad || 1);
-              const moraCalc = (item.dias_atraso_item || 0) * (item.precio_dia_aplicado || 0) * (item.cantidad || 1);
-              const moraActual = morasEditadas[idx] != null ? morasEditadas[idx] : moraCalc;
+              const moraActual = morasEditadas[idx] != null ? morasEditadas[idx] : ((item.dias_atraso_item || 0) * (item.precio_dia_aplicado || 0) * (item.cantidad || 1));
               return (
                 <div key={idx}
                   className="rounded-lg border px-3 py-2 text-xs transition-all duration-150"
@@ -450,13 +446,32 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                       ? (item.saldo_item <= 0 ? 'oklch(0.95 0.05 155)' : 'oklch(0.97 0.04 70)')
                       : 'var(--surface)',
                   }}>
-                  {/* Fila 1: Badge + nombre + atraso badge */}
+                  {/* Fila 1: Badge + nombre + botones estado + precio */}
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
                       style={{ backgroundColor: 'oklch(0.40 0.12 240)', color: '#fff' }}>
                       {esGranel ? 'x' + (item.cantidad || 1) : item.item_codigo || item.id}
                     </span>
                     <span className="font-medium text-[13px] truncate flex-1" style={{ color: 'var(--ink)' }}>{item.item_nombre || item.nombre}</span>
+                    {/* Botones Bien/Dañado solo para items individuales no guardados */}
+                    {!esGranel && !yaGuardado && (
+                      <div className="flex gap-0.5 shrink-0">
+                        {ESTADOS_OPC.map(op => {
+                          const sel = est === op.id;
+                          return (
+                            <button key={op.id} onClick={() => seleccionarEstado(idx, op.id)}
+                              className="flex items-center gap-0.5 px-1.5 h-5 rounded text-[9px] font-medium transition-all duration-150"
+                              style={{
+                                backgroundColor: sel ? op.bg : 'var(--bg)',
+                                color: sel ? op.ink : 'var(--muted)',
+                                border: sel ? 'none' : '0.5px solid var(--border)',
+                              }}>
+                              <op.icon size={10} /> {op.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                     <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
                       S/ {item.precio_dia_aplicado?.toFixed(2)}/día{esGranel ? ' c/u' : ''}
                     </span>
@@ -466,17 +481,19 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                         &#9888; +{item.dias_atraso_item} día{item.dias_atraso_item !== 1 ? 's' : ''}
                       </span>
                     )}
-                    {yaGuardado && (item.saldo_item <= 0 ? (
+                    {yaGuardado && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
                         style={{ backgroundColor: 'oklch(0.50 0.13 155)', color: '#fff' }}>
                         Devuelto
                       </span>
-                    ) : (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                        style={{ backgroundColor: 'oklch(0.55 0.13 70)', color: '#fff' }}>
-                        Pendiente pago
-                      </span>
-                    ))}
+                    )}
+                    {!esGranel && yaGuardado && (
+                      <button onClick={() => handleDeshacer(idx)}
+                        className="text-[9px] px-1.5 h-5 rounded font-medium transition-all duration-150 hover:opacity-80 shrink-0"
+                        style={{ backgroundColor: 'oklch(0.92 0.03 25)', color: 'var(--danger)' }}>
+                        Deshacer
+                      </button>
+                    )}
                   </div>
                   {/* Fila 2: Fechas del ítem */}
                   <div className="text-[10px] mb-1" style={{ color: 'var(--muted)' }}>
@@ -678,104 +695,18 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                       </div>
                     );
                   })()}
-                  {/* Fila 4: Base + Mora + Pagado + Total */}
-                  <hr style={{ borderColor: 'var(--border)', marginTop: 2, marginBottom: 4 }} />
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-baseline gap-3">
-                      <span style={{ color: 'var(--muted)' }}>Base <span className="font-mono" style={{ color: 'var(--ink)' }}>S/ {baseItem.toFixed(2)}</span></span>
-                      {item.dias_atraso_item > 0 && (
-                        <span className="flex items-center gap-1">
-                          <span style={{ color: 'var(--danger)' }}>Mora </span>
-                          {editandoMora[idx] ? (
-                            <input type="number" step="0.01" min="0"
-                              defaultValue={moraActual}
-                              onBlur={e => { setMora(idx, parseFloat(e.target.value) || 0); setEditandoMora(p => ({ ...p, [idx]: false })); }}
-                              onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-                              className="w-20 h-6 px-1 rounded text-xs border font-mono text-right dev-nospin"
-                              style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--danger)' }}
-                              autoFocus
-                            />
-                          ) : (
-                            <span onClick={() => setEditandoMora(p => ({ ...p, [idx]: true }))}
-                              className="font-mono cursor-pointer px-1 rounded hover:bg-black/5"
-                              style={{ color: 'var(--danger)' }}>
-                              S/ {moraActual.toFixed(2)}
-                            </span>
-                          )}
-                        </span>
-                      )}
-                      {(item.pagado_item || 0) > 0 && (
-                        <span style={{ color: 'var(--success)' }}>
-                          Pagado <span className="font-mono">&minus;S/ {item.pagado_item.toFixed(2)}</span>
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="font-mono font-bold text-sm tabular-nums" style={{ color: 'var(--ink)' }}>
-                        S/ {(baseItem + moraActual - (item.pagado_item || 0)).toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                  {/* Fila 5: Botones de estado — solo para items individuales */}
-                  {!esGranel && (yaGuardado ? (
-                    <div className="flex items-center justify-between mt-2 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
-                      <div className="flex items-center gap-1 text-[10px] font-medium">
-                        {item.saldo_item <= 0 ? (
-                          <span style={{ color: 'var(--success)' }}><CheckCircle size={12} /> Devuelto correctamente</span>
-                        ) : (
-                          <span style={{ color: 'oklch(0.55 0.13 70)' }}><Clock size={12} /> Falta pagar</span>
-                        )}
-                      </div>
-                      <button onClick={() => handleDeshacer(idx)}
-                        className="text-[10px] px-2 h-5 rounded font-medium transition-all duration-150 hover:opacity-80"
-                        style={{ backgroundColor: 'oklch(0.92 0.03 25)', color: 'var(--danger)' }}>
-                        Deshacer
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-1 mt-2 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
-                      {ESTADOS_OPC.map(op => {
-                        const sel = est === op.id;
-                        return (
-                          <button key={op.id} onClick={() => seleccionarEstado(idx, op.id)}
-                            className="flex items-center gap-1 px-2.5 h-7 rounded text-[10px] font-medium transition-all duration-150"
-                            style={{
-                              backgroundColor: sel ? op.bg : 'var(--bg)',
-                              color: sel ? op.ink : 'var(--muted)',
-                              border: sel ? 'none' : '0.5px solid var(--border)',
-                            }}>
-                            <op.icon size={11} /> {op.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ))}
                   {/* Dañado: costo + nota — solo individual */}
                   {!esGranel && est === 'dañado' && (
                     <div className="flex items-center gap-2 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
                       <span className="text-[10px] shrink-0" style={{ color: 'var(--muted)' }}>Costo reparación: S/</span>
                       <input type="number" step="0.01" min="0" value={costosRep[idx] ?? ''}
                         placeholder="0" onChange={e => setCosto(idx, e.target.value)}
-                        onBlur={e => { if (guardados[idx]) actualizarCostoDanos(idx, e.target.value); }}
                         className="w-16 h-6 px-1 rounded text-xs border text-center font-mono dev-nospin"
                         style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
                       <input placeholder="Nota del daño..." value={notas[idx] || ''}
                         onChange={e => setNota(idx, e.target.value)}
-                        onBlur={e => { if (guardados[idx] && e.target.value) actualizarCostoDanos(idx, costosRep[idx]); }}
                         className="flex-1 h-6 px-1.5 rounded text-[10px] border"
                         style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
-                    </div>
-                  )}
-                  {/* Pagar por ítem */}
-                  {item.saldo_item > 0 && (
-                    <div className="mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
-                      <button onClick={() => setPagoItemState({ item, pendiente: item.saldo_item, baseItem, moraItem: moraActual, idDetalle: item.id })}
-                        className="w-full h-6 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-1"
-                        style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}>
-                        Pagar S/ {item.saldo_item.toFixed(2)}
-                      </button>
                     </div>
                   )}
                   {/* Historial de pagos del item */}
