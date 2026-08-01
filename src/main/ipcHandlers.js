@@ -1,3 +1,4 @@
+const os = require('os');
 const fs = require('fs');
 const path = require('path');
 const { ipcMain, app, shell, dialog } = require('electron');
@@ -17,7 +18,6 @@ const {
   crearHerramienta,
   actualizarHerramienta,
   bajaHerramienta,
-  getGranelFull,
   crearGranel,
   actualizarGranel,
   bajaGranel,
@@ -372,7 +372,7 @@ function registerIpcHandlers() {
   });
 
 ipcMain.handle('log', (_e, msg) => {
-    const logFile = '/tmp/sistema-alquiler-debug.log';
+    const logFile = path.join(os.tmpdir(), 'sistema-alquiler-debug.log');
     const line = `[${new Date().toISOString()}] ${msg}\n`;
     fs.appendFileSync(logFile, line);
     console.log('[RENDERER LOG]', msg);

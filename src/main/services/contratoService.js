@@ -1,7 +1,9 @@
+const os = require('os');
 const fs = require('fs');
+const path = require('path');
 const db = require('../db/database');
 
-const LOG_FILE = '/tmp/sistema-alquiler-debug.log';
+const LOG_FILE = path.join(os.tmpdir(), 'sistema-alquiler-debug.log');
 function log(msg) {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
   try { fs.appendFileSync(LOG_FILE, line); } catch(e) {}
@@ -286,11 +288,9 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
               costo_reparacion: 0,
               costo_perdida: null,
             };
-            log('[DEBUG registrarDevolucion] CREADO nuevo granelAccum para id_detalle: ' + item.id_detalle);
           }
           const acc = granelAccum[item.id_detalle];
           const cant = item.cantidad_devuelta || detalle.cantidad;
-          log('[DEBUG registrarDevolucion] ANTES de acumular granelAccum[' + item.id_detalle + ']: bien=' + acc.bien + ' danada=' + acc.danada + ' perdida=' + acc.perdida + ' cant=' + cant + ' estado=' + item.estado_devolucion);
           if (item.estado_devolucion === 'bien') {
             acc.bien += cant;
           } else if (item.estado_devolucion === 'dañado') {
@@ -300,7 +300,6 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
             acc.perdida += cant;
             acc.costo_perdida = item.costo_perdida != null ? item.costo_perdida : null;
           }
-          log('[DEBUG registrarDevolucion] DESPUES de acumular granelAccum[' + item.id_detalle + ']: bien=' + acc.bien + ' danada=' + acc.danada + ' perdida=' + acc.perdida);
         }
       }
     }
@@ -489,7 +488,7 @@ function getContratos(filtros = {}) {
         ? new Date(item.fecha_devolucion_real + 'T00:00:00')
         : new Date(hoy + 'T00:00:00');
       const diasAtrasoItem = Math.max(0, Math.ceil((refDate - fechaPactadaItem) / 86400000));
-      const montoAtrasoItem = diasAtrasoItem * item.precio_dia_aplicado * item.cantidad;
+    const montoAtrasoItem = diasAtrasoItem * item.precio_dia_aplicado * item.cantidad;
 
       if (diasAtrasoItem > max_dias_atraso) max_dias_atraso = diasAtrasoItem;
       total_atraso += montoAtrasoItem;

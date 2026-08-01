@@ -173,66 +173,66 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
     }
   };
 
-  const setEstado = async (idx, e) => {
-    if (!window.api || guardadosRef.current[idx]) return;
-    guardadosRef.current[idx] = true;
-    setEstados(p => ({ ...p, [idx]: e }));
-    if (!e) {
+  const seleccionarEstado = (idx, e) => {
+    if (guardadosRef.current[idx]) return;
+    setEstados(p => {
+      const actual = p[idx];
+      if (actual === e) return { ...p, [idx]: null };
+      return { ...p, [idx]: e };
+    });
+  };
+
+  const guardarDevolucionBatch = async () => {
+    if (!window.api) return;
+    const pendientes = items
+      .map((item, idx) => ({ item, idx }))
+      .filter(({ item, idx }) => !item.id_item_granel && !guardadosRef.current[idx] && estados[idx]);
+
+    if (pendientes.length === 0) {
+      toast('No hay devoluciones pendientes para confirmar.', 'warn');
+      return;
+    }
+
+    setCobrando(true);
+    let exitos = 0;
+    let fallos = 0;
+
+    for (const { item, idx } of pendientes) {
+      const estado = estados[idx];
+      guardadosRef.current[idx] = true;
       try {
         const hoy = new Date().toISOString().slice(0, 10);
-        savingRef.current[idx] = true;
         await window.api.registrarDevolucion({
           idContrato: c.id,
           fechaDevolucionReal: hoy,
-          itemsDevueltos: [{ id_detalle: items[idx].id, estado_devolucion: 'bien' }],
+          itemsDevueltos: [{
+            id_detalle: item.id,
+            estado_devolucion: estado,
+            costo_reparacion: estado === 'dañado' ? (parseFloat(costosRep[idx]) || 0) : undefined,
+          }],
+          observaciones: notas[idx] ? { [item.id]: notas[idx] } : {},
         });
-      } catch {
+        if (mountedRef.current) {
+          setGuardados(p => ({ ...p, [idx]: true }));
+        }
+        exitos++;
+      } catch (err) {
         guardadosRef.current[idx] = false;
-      }
-      delete savingRef.current[idx];
-      return;
-    }
-    const item = items[idx];
-    if (item.id_item_granel) {
-      const cantDevolver = parseInt(cantidades[idx]) || 0;
-      if (cantDevolver <= 0) {
-        toast('Indica cuántos devuelves primero.', 'warn');
-        setEstados(p => { const n = { ...p }; delete n[idx]; return n; });
-        guardadosRef.current[idx] = false;
-        return;
+        fallos++;
       }
     }
-    savingRef.current[idx] = true;
-    try {
-      const hoy = new Date().toISOString().slice(0, 10);
-      const body = {
-        idContrato: c.id,
-        fechaDevolucionReal: hoy,
-        itemsDevueltos: [{
-          id_detalle: item.id,
-          estado_devolucion: e,
-          cantidad_devuelta: item.id_item_granel
-            ? (parseInt(cantidades[idx]) || 0)
-            : undefined,
-          costo_reparacion: e === 'dañado' ? (parseFloat(costosRep[idx]) || 0) : undefined,
-        }],
-        observaciones: notas[idx] ? { [item.id]: notas[idx] } : {},
-      };
-      await window.api.registrarDevolucion(body);
-      if (mountedRef.current) {
-        setGuardados(p => ({ ...p, [idx]: true }));
-        toast(item.item_nombre || item.nombre + ' devuelta');
-      }
-    } catch (err) {
-      if (mountedRef.current) {
-        toast('Error al guardar: ' + (err.message || err), 'error');
-        setEstados(p => { const n = { ...p }; delete n[idx]; return n; });
-        guardadosRef.current[idx] = false;
-      }
-    } finally {
-      if (mountedRef.current) delete savingRef.current[idx];
+
+    if (mountedRef.current) {
+      setCobrando(false);
+      if (exitos > 0) toast(exitos + ' herramienta' + (exitos !== 1 ? 's' : '') + ' devuelta' + (exitos !== 1 ? 's' : ''));
+      if (fallos > 0) toast(fallos + ' error' + (fallos !== 1 ? 'es' : '') + ' al procesar.', 'error');
+      onRecargar();
     }
   };
+
+  const individualesPendientes = items.filter((item, idx) =>
+    !item.id_item_granel && !guardadosRef.current[idx] && estados[idx]
+  ).length;
 
   const actualizarCostoDanos = async (idx, costo) => {
     if (!window.api || !mountedRef.current) return;
@@ -737,7 +737,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                       {ESTADOS_OPC.map(op => {
                         const sel = est === op.id;
                         return (
-                          <button key={op.id} onClick={() => setEstado(idx, op.id === est ? null : op.id)}
+                          <button key={op.id} onClick={() => seleccionarEstado(idx, op.id)}
                             className="flex items-center gap-1 px-2.5 h-7 rounded text-[10px] font-medium transition-all duration-150"
                             style={{
                               backgroundColor: sel ? op.bg : 'var(--bg)',
@@ -820,6 +820,18 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                 </div>
               );
             })
+          )}
+          {individualesPendientes > 0 && (
+            <div className="px-4 pb-2">
+              <button onClick={guardarDevolucionBatch} disabled={cobrando}
+                className="w-full h-9 rounded-lg text-xs font-bold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-2 disabled:opacity-50"
+                style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}>
+                <CheckCircle size={14} />
+                {cobrando ? 'Procesando...' : `Confirmar devolución (${individualesPendientes} herramienta${individualesPendientes !== 1 ? 's' : ''})`}
+              </button>
+            </div>
           )}
         </div>
         

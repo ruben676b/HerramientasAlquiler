@@ -197,12 +197,8 @@ function initDatabase() {
   try { db.exec("ALTER TABLE CATEGORIA_HERRAMIENTA ADD COLUMN precio_dia REAL NOT NULL DEFAULT 0"); } catch {}
   try { db.exec("ALTER TABLE CATEGORIA_HERRAMIENTA ADD COLUMN mora_dia REAL NOT NULL DEFAULT 0"); } catch {}
 
-  // Migración: agregar fecha_modificacion y fecha_devolucion_real a CONTRATO
+  // Migración: agregar fecha_modificacion a CONTRATO
   try { db.exec("ALTER TABLE CONTRATO ADD COLUMN fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"); } catch {}
-  try { db.exec("ALTER TABLE CONTRATO ADD COLUMN fecha_devolucion_real TEXT"); } catch {}
-  
-  // Migración: agregar fecha_devolucion_real a DETALLE_CONTRATO
-  try { db.exec("ALTER TABLE DETALLE_CONTRATO ADD COLUMN fecha_devolucion_real TEXT"); } catch {}
 
   // Migración: agregar id_detalle a PAGO para pagos por ítem
   try { db.exec("ALTER TABLE PAGO ADD COLUMN id_detalle INTEGER REFERENCES DETALLE_CONTRATO(id)"); } catch {}
@@ -445,7 +441,7 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     ['arrendadora_telefono', '985618849', 'Teléfono principal'],
     ['arrendadora_telefono2', '936719836', 'Teléfono secundario'],
     ['arrendadora_firma_base64', '', 'Firma de la arrendadora en base64'],
-    ['api_reniec_key', '0fcd1cebbc5801a8f374999685f4293a', 'API Key de PeruAPI para consulta RENIEC'],
+    ['api_reniec_key', '', 'API Key de PeruAPI para consulta RENIEC (configurar en opciones)'],
     ['contrato_clausulas', `Conste por el presente documento que celebra de una parte como ARRENDADORA la Sr(a). [ARRENDADORA_NOMBRE], identificada con DNI N° [ARRENDADORA_DNI], con domicilio en [ARRENDADORA_DIRECCION], y de la otra parte como ARRENDATARIO el Sr(a). [CLIENTE_NOMBRE], identificado con DNI N° [CLIENTE_DNI], con domicilio en [CLIENTE_DIRECCION], quienes convienen de mutuo acuerdo y regulado por las leyes vigentes sobre la materia, en los términos y condiciones siguientes:
 
 PRIMERO: EL ARRENDADOR es propietario de los equipos y maquinarias de construcción civil ubicado en [ARRENDADORA_DIRECCION], del distrito y provincia de Andahuaylas.

@@ -35,9 +35,6 @@
     "vite": "^6.0.7",
     "wait-on": "^8.0.1"
   },
-  "allowScripts": {
-    "electron@33.4.11": true
-  },
   "build": {
     "appId": "com.sistema.alquiler.herramientas",
     "productName": "SistemaAlquilerHerramientas",
