@@ -89,9 +89,6 @@ function crearContrato(
 
     const idContrato = resultado.lastInsertRowid;
 
-    // Registrar ítems y recolectar IDs + totales para distribuir pagos
-    const itemsInsertados = [];
-
     for (const item of items) {
       if (item.tipo_item === 'individual') {
         const herramienta = db
@@ -116,7 +113,7 @@ function crearContrato(
         }
 
         const fechaDevItem = item.fecha_devolucion_pactada || null;
-        const { lastInsertRowid: detalleId } = insertDetalle.run(
+        insertDetalle.run(
           idContrato,
           'individual',
           item.id_herramienta,
@@ -127,11 +124,6 @@ function crearContrato(
           fechaDevItem,
           item.total_item_snapshot != null ? item.total_item_snapshot : null
         );
-
-        const diasCalcI = Math.max(1, Math.ceil(
-          (new Date((fechaDevItem || fechaDevolucionPactada) + 'T00:00:00') - new Date(fechaSalida + 'T00:00:00')) / 86400000
-        ) + 1);
-        itemsInsertados.push({ id: detalleId, total: diasCalcI * herramienta.precio_dia });
 
         db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(
           'alquilado',
@@ -163,7 +155,7 @@ function crearContrato(
         }
 
         const fechaDevItemG = item.fecha_devolucion_pactada || null;
-        const { lastInsertRowid: detalleIdG } = insertDetalle.run(
+        insertDetalle.run(
           idContrato,
           'granel',
           null,
@@ -175,49 +167,20 @@ function crearContrato(
           item.total_item_snapshot != null ? item.total_item_snapshot : null
         );
 
-        const diasCalcG = Math.max(1, Math.ceil(
-          (new Date((fechaDevItemG || fechaDevolucionPactada) + 'T00:00:00') - new Date(fechaSalida + 'T00:00:00')) / 86400000
-        ) + 1);
-        itemsInsertados.push({ id: detalleIdG, total: diasCalcG * granel.precio_dia * item.cantidad });
-
         db.prepare(
           'UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?'
         ).run(item.cantidad, item.id_item_granel);
       }
     }
 
-    // Insertar pagos distribuidos a cada ítem según su peso en el total
-    if (pagos && pagos.length > 0 && itemsInsertados.length > 0) {
-      const insertPagoDetalle = db.prepare(`
-        INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle, grupo_pago)
-        VALUES (?, ?, ?, ?, ?, ?)
+    // Insertar pagos
+    if (pagos && pagos.length > 0) {
+      const insertPago = db.prepare(`
+        INSERT INTO PAGO (id_contrato, monto, metodo, tipo)
+        VALUES (?, ?, ?, ?)
       `);
-      const totalGeneral = itemsInsertados.reduce((a, i) => a + i.total, 0);
-
       for (const p of pagos) {
-        if (p.monto <= 0) continue;
-        const grupoPago = require('crypto').randomUUID();
-        let restante = p.monto;
-
-        for (let i = 0; i < itemsInsertados.length; i++) {
-          if (restante <= 0) break;
-          const esUltimo = i === itemsInsertados.length - 1;
-          const proporcion = totalGeneral > 0 ? itemsInsertados[i].total / totalGeneral : 1 / itemsInsertados.length;
-          const asignado = esUltimo
-            ? Math.round(restante * 100) / 100
-            : Math.round(p.monto * proporcion * 100) / 100;
-          const montoFinal = Math.min(asignado, restante);
-
-          if (montoFinal > 0) {
-            insertPagoDetalle.run(idContrato, montoFinal, p.metodo, p.tipo || 'saldo', itemsInsertados[i].id, grupoPago);
-            restante -= montoFinal;
-          }
-        }
-
-        // Si sobró algo (redondeo), asignarlo al último item
-        if (restante > 0) {
-          insertPagoDetalle.run(idContrato, Math.round(restante * 100) / 100, p.metodo, p.tipo || 'saldo', itemsInsertados[itemsInsertados.length - 1].id, grupoPago);
-        }
+        insertPago.run(idContrato, p.monto, p.metodo, p.tipo || 'saldo');
       }
     }
 
@@ -555,73 +518,9 @@ function getContratos(filtros = {}) {
 }
 
 /**
- * Distribuye un pago general en cascada a los ítems del contrato.
- * Cada ítem recibe una porción del pago hasta cubrir su saldo,
- * y se crea un PAGO por ítem con el mismo grupo_pago (UUID).
- */
-function distribuirPagoItems(idContrato, monto, metodo, tipo) {
-  const hoy = new Date().toISOString().slice(0, 10);
-  const c = db.prepare('SELECT * FROM CONTRATO WHERE id = ?').get(idContrato);
-  if (!c) throw new Error('Contrato no encontrado.');
-
-  const items = db.prepare(`
-    SELECT d.*,
-      (SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = ? AND id_detalle = d.id AND (anulado IS NULL OR anulado = 0)) AS pagado_item
-    FROM DETALLE_CONTRATO d WHERE d.id_contrato = ?
-    ORDER BY d.id ASC
-  `).all(idContrato, idContrato);
-
-  // Calcular saldo por ítem (misma lógica que getContratos)
-  const itemsConSaldo = items.map(item => {
-    const fechaDevItem = item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada;
-    const diasItem = Math.max(1, Math.ceil(
-      (new Date(fechaDevItem + 'T00:00:00') - new Date(c.fecha_salida + 'T00:00:00')) / 86400000
-    ) + 1);
-    const totalItem = diasItem * item.precio_dia_aplicado * item.cantidad;
-    const fechaPactadaItem = new Date(fechaDevItem + 'T00:00:00');
-    const refDate = item.fecha_devolucion_real
-      ? new Date(item.fecha_devolucion_real + 'T00:00:00')
-      : new Date(hoy + 'T00:00:00');
-    const diasAtrasoItem = Math.max(0, Math.ceil((refDate - fechaPactadaItem) / 86400000));
-    const montoAtrasoItem = diasAtrasoItem * item.precio_dia_aplicado * item.cantidad;
-    const saldo = Math.max(0, totalItem + montoAtrasoItem - (item.pagado_item || 0));
-    return { ...item, saldo };
-  }).filter(i => i.saldo > 0);
-
-  if (itemsConSaldo.length === 0) {
-    throw new Error('No hay items con saldo pendiente.');
-  }
-
-  const totalPendiente = itemsConSaldo.reduce((a, i) => a + i.saldo, 0);
-  if (monto > totalPendiente) {
-    throw new Error('El monto excede el saldo total pendiente (S/ ' + totalPendiente.toFixed(2) + ').');
-  }
-
-  const grupoPago = require('crypto').randomUUID();
-  let restante = monto;
-  const ids = [];
-
-  const ejecutar = db.transaction(() => {
-    for (const item of itemsConSaldo) {
-      if (restante <= 0) break;
-      const take = Math.min(restante, item.saldo);
-      const r = db.prepare(`
-        INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle, grupo_pago)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(idContrato, take, metodo, tipo || 'saldo', item.id, grupoPago);
-      ids.push(r.lastInsertRowid);
-      restante -= take;
-    }
-  });
-
-  ejecutar();
-  return { ids, grupo: grupoPago, monto: monto - restante };
-}
-
-/**
- * Registra un pago adicional para un contrato existente.
+ * Registra un pago para un contrato existente.
  * Si se proporciona idDetalle, el pago se aplica directamente a ese ítem.
- * Si no, se distribuye en cascada a todos los items con saldo pendiente.
+ * Si no, se registra como pago general del contrato.
  */
 function registrarPagoAdicional(idContrato, monto, metodo, tipo, idDetalle) {
   if (!idContrato || !monto || monto <= 0) {
@@ -634,17 +533,11 @@ function registrarPagoAdicional(idContrato, monto, metodo, tipo, idDetalle) {
     throw new Error('El contrato ya está cerrado. No se pueden registrar pagos adicionales.');
   }
 
-  if (idDetalle) {
-    // Pago directo a un ítem específico
-    const result = db.prepare(`
-      INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(idContrato, monto, metodo, tipo || 'saldo', idDetalle);
-    return { id: result.lastInsertRowid, monto, metodo };
-  }
-
-  // Pago general: distribuir en cascada a los ítems
-  return distribuirPagoItems(idContrato, monto, metodo, tipo);
+  const result = db.prepare(`
+    INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(idContrato, monto, metodo, tipo || 'saldo', idDetalle || null);
+  return { id: result.lastInsertRowid, monto, metodo };
 }
 
 /**

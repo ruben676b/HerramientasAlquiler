@@ -35,7 +35,6 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [guardados, setGuardados] = useState({});
   const [pagoItemState, setPagoItemState] = useState(null);
   const [anulandoPago, setAnulandoPago] = useState(null);
-  const [historialItemAbierto, setHistorialItemAbierto] = useState({});
   const [historialPagosAbierto, setHistorialPagosAbierto] = useState(false);
   const [devolviendoGarantia, setDevolviendoGarantia] = useState(false);
   const [devGarMonto, setDevGarMonto] = useState('');
@@ -709,45 +708,6 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                         style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
                     </div>
                   )}
-                  {/* Historial de pagos del item */}
-                  {(() => {
-                    const pagosItem = pagos.filter(p => p.id_detalle === item.id);
-                    if (pagosItem.length === 0) return null;
-                    const abierto = historialItemAbierto[idx];
-                    return (
-                      <div className="mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
-                        <button onClick={() => setHistorialItemAbierto(p => ({ ...p, [idx]: !p[idx] }))}
-                          className="flex items-center gap-1 text-[9px] uppercase tracking-wider font-semibold w-full text-left"
-                          style={{ color: 'var(--muted)' }}>
-                          <ChevronRight size={10}
-                            style={{ transform: abierto ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }} />
-                          Pagos de este item ({pagosItem.length})
-                        </button>
-                        {abierto && (
-                          <div className="space-y-1 pt-1">
-                            {pagosItem.map(p => {
-                              const anulado = p.anulado === 1;
-                              return (
-                                <div key={p.id} className="flex items-center gap-1.5 text-[10px]"
-                                  style={{ opacity: anulado ? 0.4 : 1, textDecoration: anulado ? 'line-through' : 'none' }}>
-<span className="shrink-0" style={{ color: 'var(--muted)' }}>{p.fecha_pago?.slice(5, 10)}</span>
-                              <span className="font-mono" style={{ color: anulado ? 'var(--muted)' : 'var(--success)' }}>S/ {p.monto.toFixed(2)}</span>
-                              <span className="text-[8px] capitalize" style={{ color: 'var(--muted)' }}>{p.metodo}</span>
-                              <span className="flex-1" />
-                              {anulado
-                                ? <span className="text-[8px]" style={{ color: 'var(--muted)' }}>Anulado</span>
-                                    : <button onClick={() => setAnulandoPago(p)}
-                                        className="text-[9px] underline hover:opacity-70 shrink-0"
-                                        style={{ color: 'var(--danger)' }}>Anular</button>
-                                  }
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
                 </div>
               );
             })
