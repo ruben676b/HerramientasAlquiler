@@ -89,6 +89,9 @@ function crearContrato(
 
     const idContrato = resultado.lastInsertRowid;
 
+    // Registrar ítems y recolectar IDs + totales para distribuir pagos
+    const itemsInsertados = [];
+
     for (const item of items) {
       if (item.tipo_item === 'individual') {
         const herramienta = db
@@ -113,7 +116,7 @@ function crearContrato(
         }
 
         const fechaDevItem = item.fecha_devolucion_pactada || null;
-        insertDetalle.run(
+        const { lastInsertRowid: detalleId } = insertDetalle.run(
           idContrato,
           'individual',
           item.id_herramienta,
@@ -124,6 +127,11 @@ function crearContrato(
           fechaDevItem,
           item.total_item_snapshot != null ? item.total_item_snapshot : null
         );
+
+        const diasCalcI = Math.max(1, Math.ceil(
+          (new Date((fechaDevItem || fechaDevolucionPactada) + 'T00:00:00') - new Date(fechaSalida + 'T00:00:00')) / 86400000
+        ) + 1);
+        itemsInsertados.push({ id: detalleId, total: diasCalcI * herramienta.precio_dia });
 
         db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(
           'alquilado',
@@ -155,7 +163,7 @@ function crearContrato(
         }
 
         const fechaDevItemG = item.fecha_devolucion_pactada || null;
-        insertDetalle.run(
+        const { lastInsertRowid: detalleIdG } = insertDetalle.run(
           idContrato,
           'granel',
           null,
@@ -167,20 +175,49 @@ function crearContrato(
           item.total_item_snapshot != null ? item.total_item_snapshot : null
         );
 
+        const diasCalcG = Math.max(1, Math.ceil(
+          (new Date((fechaDevItemG || fechaDevolucionPactada) + 'T00:00:00') - new Date(fechaSalida + 'T00:00:00')) / 86400000
+        ) + 1);
+        itemsInsertados.push({ id: detalleIdG, total: diasCalcG * granel.precio_dia * item.cantidad });
+
         db.prepare(
           'UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?'
         ).run(item.cantidad, item.id_item_granel);
       }
     }
 
-    // Insertar pagos
-    if (pagos && pagos.length > 0) {
-      const insertPago = db.prepare(`
-        INSERT INTO PAGO (id_contrato, monto, metodo, tipo)
-        VALUES (?, ?, ?, ?)
+    // Insertar pagos distribuidos a cada ítem según su peso en el total
+    if (pagos && pagos.length > 0 && itemsInsertados.length > 0) {
+      const insertPagoDetalle = db.prepare(`
+        INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle, grupo_pago)
+        VALUES (?, ?, ?, ?, ?, ?)
       `);
+      const totalGeneral = itemsInsertados.reduce((a, i) => a + i.total, 0);
+
       for (const p of pagos) {
-        insertPago.run(idContrato, p.monto, p.metodo, p.tipo || 'saldo');
+        if (p.monto <= 0) continue;
+        const grupoPago = require('crypto').randomUUID();
+        let restante = p.monto;
+
+        for (let i = 0; i < itemsInsertados.length; i++) {
+          if (restante <= 0) break;
+          const esUltimo = i === itemsInsertados.length - 1;
+          const proporcion = totalGeneral > 0 ? itemsInsertados[i].total / totalGeneral : 1 / itemsInsertados.length;
+          const asignado = esUltimo
+            ? Math.round(restante * 100) / 100
+            : Math.round(p.monto * proporcion * 100) / 100;
+          const montoFinal = Math.min(asignado, restante);
+
+          if (montoFinal > 0) {
+            insertPagoDetalle.run(idContrato, montoFinal, p.metodo, p.tipo || 'saldo', itemsInsertados[i].id, grupoPago);
+            restante -= montoFinal;
+          }
+        }
+
+        // Si sobró algo (redondeo), asignarlo al último item
+        if (restante > 0) {
+          insertPagoDetalle.run(idContrato, Math.round(restante * 100) / 100, p.metodo, p.tipo || 'saldo', itemsInsertados[itemsInsertados.length - 1].id, grupoPago);
+        }
       }
     }
 
