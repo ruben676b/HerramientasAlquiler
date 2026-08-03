@@ -5,6 +5,7 @@ import UnifiedPaymentModal from './UnifiedPaymentModal';
 import AnularPagoModal from './AnularPagoModal';
 import CalificarContratoModal from './CalificarContratoModal';
 import { gruparPagos } from '../lib/gruparPagos';
+import { localDate } from '../lib/date';
 
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const fmtFecha = (iso) => {
@@ -199,7 +200,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
       const estado = estados[idx];
       guardadosRef.current[idx] = true;
       try {
-        const hoy = new Date().toISOString().slice(0, 10);
+        const hoy = localDate();
         await window.api.registrarDevolucion({
           idContrato: c.id,
           fechaDevolucionReal: hoy,
@@ -238,7 +239,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
     if (item.id_item_granel) return;
     savingRef.current[idx] = true;
     try {
-      const hoy = new Date().toISOString().slice(0, 10);
+      const hoy = localDate();
       await window.api.registrarDevolucion({
         idContrato: c.id,
         fechaDevolucionReal: hoy,
@@ -311,7 +312,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
       return;
     }
     try {
-      const hoy = new Date().toISOString().slice(0, 10);
+      const hoy = localDate();
       const outcomes = [];
       if (b > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'bien', cantidad_devuelta: b });
       if (d > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'dañado', cantidad_devuelta: d, costo_reparacion: parseFloat(costosRep[idx]) || 0 });

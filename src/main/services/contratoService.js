@@ -2,6 +2,7 @@ const os = require('os');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db/database');
+const { localDate } = require('../utils/date');
 
 const LOG_FILE = path.join(os.tmpdir(), 'sistema-alquiler-debug.log');
 function log(msg) {
@@ -53,7 +54,7 @@ function crearContrato(
       }
     }
     if (!idClienteReal && nombreCliente) {
-      const r = db.prepare('INSERT INTO CLIENTE (tipo, nombre, dni, telefono) VALUES (?, ?, ?, ?)')
+      const r = db.prepare('INSERT INTO CLIENTE (tipo, nombre, dni, telefono, fecha_registro) VALUES (?, ?, ?, ?, date(\'now\', \'localtime\'))')
         .run('persona', nombreCliente, dniCliente || null, telefonoCliente || null);
       idClienteReal = r.lastInsertRowid;
     }
@@ -66,8 +67,8 @@ function crearContrato(
     const insertContrato = db.prepare(`
       INSERT INTO CONTRATO (
         id_cliente, id_usuario, fecha_salida, fecha_devolucion_pactada,
-        deposito_monto, deposito_dni, fecha_modificacion
-      ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        deposito_monto, deposito_dni, fecha_creacion, fecha_modificacion
+      ) VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
     `);
 
     const insertDetalle = db.prepare(`
@@ -176,8 +177,8 @@ function crearContrato(
     // Insertar pagos
     if (pagos && pagos.length > 0) {
       const insertPago = db.prepare(`
-        INSERT INTO PAGO (id_contrato, monto, metodo, tipo)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO PAGO (id_contrato, monto, metodo, tipo, fecha_pago)
+        VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
       `);
       for (const p of pagos) {
         insertPago.run(idContrato, p.monto, p.metodo, p.tipo || 'saldo');
@@ -262,7 +263,7 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
 
           if (item.estado_devolucion === 'dañado') {
             totalDanos += item.costo_reparacion || 0;
-            const hoy = new Date().toISOString().slice(0, 10);
+            const hoy = localDate();
             const desc = observaciones?.[item.id_detalle] || 'Dañado en devolución';
             db.prepare('INSERT INTO MANTENIMIENTO (id_herramienta, fecha_inicio, descripcion, tipo, costo) VALUES (?, ?, ?, ?, ?)')
               .run(detalle.id_herramienta, hoy, 'Devolucion: ' + desc, 'correctivo', item.costo_reparacion || 0);
@@ -363,10 +364,10 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
 
     const completado = (individualesPendientes.cnt + granelPendientes.cnt) === 0;
     if (completado) {
-      db.prepare("UPDATE CONTRATO SET estado = ?, fecha_devolucion_real = ?, fecha_modificacion = datetime('now') WHERE id = ?")
+      db.prepare("UPDATE CONTRATO SET estado = ?, fecha_devolucion_real = ?, fecha_modificacion = datetime('now', 'localtime') WHERE id = ?")
         .run('devuelto', fechaDevolucionReal, idContrato);
     } else {
-      db.prepare("UPDATE CONTRATO SET estado = ?, fecha_modificacion = datetime('now') WHERE id = ?")
+      db.prepare("UPDATE CONTRATO SET estado = ?, fecha_modificacion = datetime('now', 'localtime') WHERE id = ?")
         .run('devolución incompleta', idContrato);
     }
 
@@ -379,7 +380,7 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
 }
 
 function getContratos(filtros = {}) {
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = localDate();
 
   let sql = `
     SELECT DISTINCT c.*, cl.nombre AS cliente_nombre, cl.dni AS cliente_dni,
@@ -531,8 +532,8 @@ function registrarPagoAdicional(idContrato, monto, metodo, tipo, idDetalle) {
   if (!contrato) throw new Error('Contrato no encontrado.');
 
   const result = db.prepare(`
-    INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle, fecha_pago)
+    VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))
   `).run(idContrato, monto, metodo, tipo || 'saldo', idDetalle || null);
   return { id: result.lastInsertRowid, monto, metodo };
 }
@@ -657,10 +658,10 @@ function revertirDevolucionItem(idDetalle) {
     const hayPendientes = (individualesPendientes.cnt + granelPendientes.cnt) > 0;
 
     if (hayPendientes) {
-      db.prepare("UPDATE CONTRATO SET estado = 'devolución incompleta', fecha_modificacion = datetime('now') WHERE id = ?")
+      db.prepare("UPDATE CONTRATO SET estado = 'devolución incompleta', fecha_modificacion = datetime('now', 'localtime') WHERE id = ?")
         .run(detalle.id_contrato);
     } else {
-      db.prepare("UPDATE CONTRATO SET estado = 'alquilado', fecha_devolucion_real = NULL, fecha_modificacion = datetime('now') WHERE id = ?")
+      db.prepare("UPDATE CONTRATO SET estado = 'alquilado', fecha_devolucion_real = NULL, fecha_modificacion = datetime('now', 'localtime') WHERE id = ?")
         .run(detalle.id_contrato);
     }
 
@@ -740,10 +741,10 @@ function revertirDevolucionGranel(idDevolucionGranel) {
     const hayPendientes = (individualesPendientes.cnt + granelPendientes.cnt) > 0;
 
     if (hayPendientes) {
-      db.prepare("UPDATE CONTRATO SET estado = 'devolución incompleta', fecha_modificacion = datetime('now') WHERE id = ?")
+      db.prepare("UPDATE CONTRATO SET estado = 'devolución incompleta', fecha_modificacion = datetime('now', 'localtime') WHERE id = ?")
         .run(entry.id_contrato);
     } else {
-      db.prepare("UPDATE CONTRATO SET estado = 'devuelto', fecha_modificacion = datetime('now') WHERE id = ?")
+      db.prepare("UPDATE CONTRATO SET estado = 'devuelto', fecha_modificacion = datetime('now', 'localtime') WHERE id = ?")
         .run(entry.id_contrato);
     }
   });
@@ -775,7 +776,7 @@ function anularPago(idPago, motivo) {
     const ejecutar = db.transaction(() => {
       for (const id of ids) {
         db.prepare(`
-          UPDATE PAGO SET anulado = 1, fecha_anulacion = datetime('now'), motivo_anulacion = ?
+          UPDATE PAGO SET anulado = 1, fecha_anulacion = datetime('now', 'localtime'), motivo_anulacion = ?
           WHERE id = ?
         `).run(motivo || null, id);
       }
@@ -786,7 +787,7 @@ function anularPago(idPago, motivo) {
 
   // Pago individual (per-item o depósito directo)
   db.prepare(`
-    UPDATE PAGO SET anulado = 1, fecha_anulacion = datetime('now'), motivo_anulacion = ?
+    UPDATE PAGO SET anulado = 1, fecha_anulacion = datetime('now', 'localtime'), motivo_anulacion = ?
     WHERE id = ?
   `).run(motivo || null, idPago);
 

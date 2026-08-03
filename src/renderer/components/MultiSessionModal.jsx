@@ -186,7 +186,7 @@ function SessionForm({ session }) {
     setDni(nuevoDni);
     setNombre(nuevoNombre);
     setTelefono(data.telefono || '');
-    setFechaSalida(data.fechaSalida || new Date().toISOString().slice(0, 10));
+    setFechaSalida(data.fechaSalida || fmtLocalDate(new Date()));
     setFechaDevolucionRaw(data.fechaDevolucion || fmtLocalDate(new Date()));
     setClienteSeleccionado(data.clienteSeleccionado || null);
     setItems(data.items || []);

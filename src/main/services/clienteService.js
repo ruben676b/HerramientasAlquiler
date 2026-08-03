@@ -1,4 +1,5 @@
 const db = require('../db/database');
+const { localDate } = require('../utils/date');
 
 /**
  * Lista todos los clientes activos con promedio de estrellas y total de alquileres.
@@ -104,7 +105,7 @@ function getDetalleContrato(idContrato) {
   ).get(idContrato);
 
   // Enriquecer items con datos de devolución y mora
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = localDate();
   let total_atraso = 0;
   let total_danos = 0;
   let total_perdidas = 0;

@@ -1,4 +1,5 @@
 const db = require('../db/database');
+const { localDate } = require('../utils/date');
 
 /**
  * Obtiene el resumen de caja para una fecha específica.
@@ -8,7 +9,7 @@ const db = require('../db/database');
  */
 function getResumenCaja(fecha) {
   if (!fecha) {
-    fecha = new Date().toISOString().slice(0, 10);
+    fecha = localDate();
   }
 
   // 1. Totales por método de pago

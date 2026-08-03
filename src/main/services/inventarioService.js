@@ -1,4 +1,5 @@
 const db = require('../db/database');
+const { localDate } = require('../utils/date');
 
 /* ================================================================
    HERRAMIENTAS
@@ -691,7 +692,7 @@ function cambiarEstado(id, nuevoEstado) {
     db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(nuevoEstado, id);
 
     // Registrar en bitácora de mantenimiento
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = localDate();
 
     if (nuevoEstado === 'mantenimiento') {
       db.prepare(`

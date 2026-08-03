@@ -59,7 +59,7 @@ function initDatabase() {
       email TEXT,
       en_lista_negra INTEGER NOT NULL DEFAULT 0 CHECK (en_lista_negra IN (0, 1)),
       notas_riesgo TEXT,
-      fecha_registro TEXT NOT NULL DEFAULT CURRENT_DATE,
+      fecha_registro TEXT NOT NULL DEFAULT (date('now', 'localtime')),
       activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
       CHECK (
         (tipo = 'persona' AND dni NOT NULL AND ruc IS NULL) OR
@@ -79,7 +79,7 @@ function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       id_cliente INTEGER NOT NULL,
       id_usuario INTEGER NOT NULL,
-      fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      fecha_creacion TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       fecha_salida TEXT NOT NULL,
       fecha_devolucion_pactada TEXT NOT NULL,
       fecha_devolucion_real TEXT,
@@ -88,7 +88,7 @@ function initDatabase() {
       deposito_monto REAL NOT NULL DEFAULT 0 CHECK (deposito_monto >= 0),
       firma_digital_path TEXT,
       notas TEXT,
-      fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      fecha_modificacion TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       FOREIGN KEY (id_cliente) REFERENCES CLIENTE(id),
       FOREIGN KEY (id_usuario) REFERENCES USUARIO(id)
     );
@@ -120,7 +120,7 @@ function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       id_contrato INTEGER NOT NULL,
       monto REAL NOT NULL CHECK (monto >= 0),
-      fecha_pago TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      fecha_pago TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       metodo TEXT NOT NULL CHECK (metodo IN ('efectivo', 'yape', 'plin')),
       tipo TEXT NOT NULL CHECK (tipo IN ('adelanto', 'saldo', 'mora', 'deposito', 'devolucion_deposito')),
       comprobante TEXT NOT NULL DEFAULT 'recibo interno' CHECK (comprobante IN ('recibo interno', 'boleta_sunat', 'factura_sunat')),
@@ -198,7 +198,7 @@ function initDatabase() {
   try { db.exec("ALTER TABLE CATEGORIA_HERRAMIENTA ADD COLUMN mora_dia REAL NOT NULL DEFAULT 0"); } catch {}
 
   // Migración: agregar fecha_modificacion a CONTRATO
-  try { db.exec("ALTER TABLE CONTRATO ADD COLUMN fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"); } catch {}
+  try { db.exec("ALTER TABLE CONTRATO ADD COLUMN fecha_modificacion TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))"); } catch {}
 
   // Migración: agregar id_detalle a PAGO para pagos por ítem
   try { db.exec("ALTER TABLE PAGO ADD COLUMN id_detalle INTEGER REFERENCES DETALLE_CONTRATO(id)"); } catch {}
@@ -222,6 +222,42 @@ function initDatabase() {
   try { db.exec("ALTER TABLE ITEM_GRANEL ADD COLUMN cantidad_perdida INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_perdida >= 0)"); } catch {}
   try { db.exec("ALTER TABLE ITEM_GRANEL ADD COLUMN cantidad_vendida INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_vendida >= 0)"); } catch {}
   try { db.exec("ALTER TABLE ITEM_GRANEL ADD COLUMN cantidad_baja INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_baja >= 0)"); } catch {}
+
+  // Migración: convertir timestamps guardados en UTC a hora local (una sola vez).
+  // Los valores con hora fueron generados por CURRENT_TIMESTAMP / datetime('now'), que devuelven UTC.
+  // Aplica datetime(..., 'localtime') para desplazarlos a la hora local del equipo (ej. Perú, UTC-5).
+  try {
+    const tzMigrado = db.prepare(
+      `SELECT valor FROM CONFIGURACION WHERE clave = 'tz_local_migrated'`
+    ).get();
+    if (!tzMigrado) {
+      const colPago = new Set(db.prepare('PRAGMA table_info(PAGO)').all().map(c => c.name));
+      const colContrato = new Set(db.prepare('PRAGMA table_info(CONTRATO)').all().map(c => c.name));
+
+      const updates = [];
+      if (colPago.has('fecha_pago')) {
+        updates.push("UPDATE PAGO SET fecha_pago = datetime(fecha_pago, 'localtime') WHERE fecha_pago LIKE '____-__-__ __:%'");
+      }
+      if (colPago.has('fecha_anulacion')) {
+        updates.push("UPDATE PAGO SET fecha_anulacion = datetime(fecha_anulacion, 'localtime') WHERE fecha_anulacion LIKE '____-__-__ __:%'");
+      }
+      if (colContrato.has('fecha_creacion')) {
+        updates.push("UPDATE CONTRATO SET fecha_creacion = datetime(fecha_creacion, 'localtime') WHERE fecha_creacion LIKE '____-__-__ __:%'");
+      }
+      if (colContrato.has('fecha_modificacion')) {
+        updates.push("UPDATE CONTRATO SET fecha_modificacion = datetime(fecha_modificacion, 'localtime') WHERE fecha_modificacion LIKE '____-__-__ __:%'");
+      }
+
+      for (const sql of updates) db.exec(sql);
+
+      db.prepare(
+        `INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion) VALUES (?, ?, ?)`
+      ).run('tz_local_migrated', 'true', 'Timestamps convertidos de UTC a hora local');
+      console.log('[DB] Migración de zona horaria completada (UTC → local).');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración de zona horaria:', err);
+  }
 
   // Inicializar cantidad_alquilada desde contratos activos (migración única)
   try {
@@ -287,7 +323,7 @@ function initDatabase() {
       CREATE TRIGGER IF NOT EXISTS trg_update_contrato_mod
       AFTER UPDATE ON CONTRATO
       BEGIN
-        UPDATE CONTRATO SET fecha_modificacion = CURRENT_TIMESTAMP WHERE id = NEW.id;
+        UPDATE CONTRATO SET fecha_modificacion = datetime('now', 'localtime') WHERE id = NEW.id;
       END;
     `);
   } catch (err) {

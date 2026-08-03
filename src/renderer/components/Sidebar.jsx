@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   { id: 'inventario', label: 'Inventario', icon: Package },
   { id: 'clientes', label: 'Clientes', icon: Users },
   { id: 'caja', label: 'Caja', icon: DollarSign },
-  { id: 'reportes', label: 'Reportes', icon: BarChart3 },
+  // { id: 'reportes', label: 'Reportes', icon: BarChart3 },
   { id: 'configuracion', label: 'Configuración', icon: Settings },
 ];
 
@@ -75,41 +75,41 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggle })
               collapsed ? 'justify-center py-3' : 'px-3.5 py-3 gap-3'
             )}
           >
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                style={{ backgroundColor: 'var(--primary)' }}
-              >
-                <Wrench size={15} style={{ color: 'var(--primary-text)' }} />
-              </div>
-
-              {!collapsed && (
-                <>
-                  <div className="flex-1 min-w-0 leading-tight">
-                    <p
-                      className="text-[10px] uppercase tracking-[0.15em] font-medium"
-                      style={{ color: 'var(--sidebar-muted)' }}
-                    >
-                      Sistema de Alquiler
-                    </p>
-                    <p
-                      className="text-[13px] font-semibold mt-0.5"
-                      style={{ color: 'var(--sidebar-ink)' }}
-                    >
-                      {SHOP_NAME}
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={onToggle}
-                    className="p-1 rounded-md transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 shrink-0"
-                    style={{ color: 'var(--sidebar-muted)' }}
-                    aria-label="Colapsar menú"
-                  >
-                    <ChevronLeft size={15} />
-                  </button>
-                </>
-              )}
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+              style={{ backgroundColor: 'var(--primary)' }}
+            >
+              <Wrench size={15} style={{ color: 'var(--primary-text)' }} />
             </div>
+
+            {!collapsed && (
+              <>
+                <div className="flex-1 min-w-0 leading-tight">
+                  <p
+                    className="text-[10px] uppercase tracking-[0.15em] font-medium"
+                    style={{ color: 'var(--sidebar-muted)' }}
+                  >
+                    Sistema de Alquiler
+                  </p>
+                  <p
+                    className="text-[13px] font-semibold mt-0.5"
+                    style={{ color: 'var(--sidebar-ink)' }}
+                  >
+                    {SHOP_NAME}
+                  </p>
+                </div>
+
+                <button
+                  onClick={onToggle}
+                  className="p-1 rounded-md transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 shrink-0"
+                  style={{ color: 'var(--sidebar-muted)' }}
+                  aria-label="Colapsar menú"
+                >
+                  <ChevronLeft size={15} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {collapsed && (

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, X, Plus, Package, Wrench, Star, Info } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { localDate } from '../lib/date';
 import Button from '../components/ui/button';
 import StarRating, { CalificacionBadge } from '../components/StarRating';
 import DetalleClienteModal from '../components/DetalleClienteModal';
@@ -18,8 +19,8 @@ export default function Mostrador() {
   const [detalleCliente, setDetalleCliente] = useState(null);
 
   // --- Fechas ---
-  const hoy = new Date().toISOString().slice(0, 10);
-  const manana = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const hoy = localDate();
+  const manana = localDate(new Date(Date.now() + 86400000));
   const [fechaSalida, setFechaSalida] = useState(hoy);
   const [fechaDevolucion, setFechaDevolucion] = useState(manana);
 

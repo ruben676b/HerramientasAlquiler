@@ -6,6 +6,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { localDate } from '../lib/date';
 
 /* ================================================================
    CAJA — Resumen financiero diario
@@ -73,7 +74,7 @@ const METODO_CONFIG = {
    ================================================================ */
 
 export default function Caja() {
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = localDate();
   const [fecha, setFecha] = useState(hoy);
   const [resumen, setResumen] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -100,7 +101,7 @@ export default function Caja() {
   const cambiarFecha = (delta) => {
     const d = new Date(fecha + 'T12:00:00');
     d.setDate(d.getDate() + delta);
-    const nueva = d.toISOString().slice(0, 10);
+    const nueva = localDate(d);
     if (nueva <= hoy) setFecha(nueva);
   };
 
