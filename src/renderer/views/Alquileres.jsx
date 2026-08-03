@@ -245,7 +245,10 @@ const handleDevolverGarantia = async () => {
             let borderColor = 'var(--border)';
             let badges = [];
 
-            const itemsAtrasados = (c.items || []).filter(i => (i.dias_atraso_item || 0) > 0).length;
+            const itemsAtrasados = (c.items || []).filter(i => {
+              if (i.id_item_granel) return (i.granel_pendiente || 0) > 0 && (i.dias_atraso_item || 0) > 0;
+              return i.estado_devolucion === 'pendiente' && (i.dias_atraso_item || 0) > 0;
+            }).length;
 
             if (c.estado === 'devuelto' && pendiente <= 0) {
               borderColor = 'var(--muted)';
