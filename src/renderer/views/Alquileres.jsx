@@ -243,8 +243,30 @@ const handleDevolverGarantia = async () => {
             const pagos = c.pagos || [];
 
             let borderColor = 'var(--border)';
-            if (c.estado === 'atrasado' || c.dias_atraso > 0) borderColor = 'var(--danger)';
-            else if (c.estado === 'alquilado' || c.estado === 'reservado') borderColor = 'var(--success)';
+            let badges = [];
+
+            const itemsAtrasados = (c.items || []).filter(i => (i.dias_atraso_item || 0) > 0).length;
+
+            if (c.estado === 'devuelto' && pendiente <= 0) {
+              borderColor = 'var(--muted)';
+            } else if (c.estado === 'devolución incompleta' || (c.estado === 'devuelto' && pendiente > 0)) {
+              borderColor = 'var(--danger)';
+              if (itemsAtrasados > 0) {
+                badges.push({ text: `Atrasado ${itemsAtrasados} herramienta${itemsAtrasados !== 1 ? 's' : ''}`, bg: 'oklch(0.95 0.015 25)', color: 'var(--danger)', icon: true });
+              }
+              if (pendiente > 0) {
+                badges.push({ text: `Debe S/ ${pendiente.toFixed(2)}`, bg: 'oklch(0.95 0.015 25)', color: 'var(--danger)', icon: true });
+              }
+            } else if (c.estado === 'atrasado' || c.dias_atraso > 0) {
+              borderColor = 'var(--danger)';
+              badges.push({ text: `Atrasado ${itemsAtrasados} herramienta${itemsAtrasados !== 1 ? 's' : ''}`, bg: 'oklch(0.95 0.015 25)', color: 'var(--danger)', icon: true });
+              if (pendiente > 0) {
+                badges.push({ text: `Debe S/ ${pendiente.toFixed(2)}`, bg: 'oklch(0.95 0.015 25)', color: 'var(--danger)', icon: true });
+              }
+            } else if (c.estado === 'alquilado' || c.estado === 'reservado') {
+              borderColor = 'var(--success)';
+              badges.push({ text: c.estado === 'alquilado' ? 'Alquilado' : 'Reservado', bg: 'oklch(0.93 0.05 160)', color: 'var(--success)', icon: false });
+            }
 
             return (
               <div key={c.id} className="overflow-hidden"
@@ -269,20 +291,17 @@ const handleDevolverGarantia = async () => {
                         style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)' }}>
                         {fmtFechaCorta(c.fecha_salida)} &mdash; {fmtFecha(c.fecha_devolucion_pactada)}
                       </span>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[10px] text-[11px] font-medium"
-                        style={{
-                          backgroundColor: c.dias_atraso > 0 || c.estado === 'atrasado' ? 'oklch(0.95 0.015 25)' :
-                            (c.estado === 'alquilado' || c.estado === 'reservado') ? 'oklch(0.93 0.05 160)' : 'var(--surface)',
-                          color: c.dias_atraso > 0 || c.estado === 'atrasado' ? 'var(--danger)' :
-                            (c.estado === 'alquilado' || c.estado === 'reservado') ? 'var(--success)' : 'var(--muted)',
-                        }}>
-                        {c.dias_atraso > 0 || c.estado === 'atrasado' ? (
-                          <><AlertTriangle size={11} /> Atrasado {c.dias_atraso} dia{c.dias_atraso !== 1 ? 's' : ''}</>
-                        ) : c.estado === 'alquilado' ? 'Alquilado' :
-                          c.estado === 'reservado' ? 'Reservado' :
-                          c.estado === 'devuelto' ? 'Devuelto' :
-                          c.estado === 'devolucion incompleta' ? 'Dev. incompleta' : c.estado}
-                      </span>
+                      {badges.length > 0 && (
+                        <span className="inline-flex items-center gap-1.5 flex-wrap">
+                          {badges.map((b, i) => (
+                            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[10px] text-[11px] font-medium"
+                              style={{ backgroundColor: b.bg, color: b.color }}>
+                              {b.icon && <AlertTriangle size={11} />}
+                              {b.text}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <span className="text-[15px] font-medium shrink-0" style={{ color: 'var(--ink)' }}>S/ {total.toFixed(2)}</span>

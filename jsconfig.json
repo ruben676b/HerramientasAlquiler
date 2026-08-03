@@ -2,7 +2,9 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/renderer/*"]
+      "@/*": [
+        "./src/renderer/*"
+      ]
     },
     "jsx": "react-jsx",
     "module": "ESNext",
@@ -12,5 +14,7 @@
     "checkJs": false,
     "noEmit": true
   },
-  "include": ["src/renderer/**/*"]
+  "include": [
+    "src/renderer/**/*"
+  ]
 }
