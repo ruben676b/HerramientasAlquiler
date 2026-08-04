@@ -123,26 +123,38 @@ const handleDevolverGarantia = async () => {
     };
   }, []);
 
-  const conteo = useMemo(() => {
-    const c = {};
-    ['atrasado','alquilado','devuelto','devolucion incompleta'].forEach(e => {
-      if (e === 'atrasado') {
-        c[e] = todosContratos.filter(x => x.estado === 'atrasado' || x.dias_atraso > 0).length;
-      } else {
-        c[e] = todosContratos.filter(x => x.estado === e).length;
-      }
+  const contratosConPendiente = useMemo(() => {
+    return todosContratos.map(c => {
+      const dias = Math.max(1, Math.ceil(
+        (new Date(c.fecha_devolucion_pactada + 'T00:00:00') - new Date(c.fecha_salida + 'T00:00:00')) / 86400000
+      ) + 1);
+      const montoBase = c.total_contrato ? c.total_contrato : (c.subtotal_diario || 0) * dias;
+      const total = montoBase + (c.total_atraso || 0) + (c.total_danos || 0) + (c.total_perdidas || 0);
+      const pendiente = Math.max(0, total - (c.total_pagado || 0));
+      return { ...c, _pendiente: pendiente };
     });
-    c[''] = todosContratos.length;
-    return c;
   }, [todosContratos]);
 
-  const contratosFiltrados = useMemo(() => {
-    if (!estadoFiltro) return todosContratos;
-    if (estadoFiltro === 'atrasado') return todosContratos.filter(c => c.estado === 'atrasado' || c.dias_atraso > 0);
-    return todosContratos.filter(c => c.estado === estadoFiltro);
-  }, [todosContratos, estadoFiltro]);
+  const conteo = useMemo(() => {
+    const c = {};
+    c[''] = contratosConPendiente.length;
+    c['deudores'] = contratosConPendiente.filter(x => x._pendiente > 0).length;
+    c['atrasado'] = contratosConPendiente.filter(x => x.estado === 'atrasado' || x.dias_atraso > 0).length;
+    c['alquilado'] = contratosConPendiente.filter(x => x.estado === 'alquilado').length;
+    c['devuelto'] = contratosConPendiente.filter(x => x.estado === 'devuelto' && x._pendiente <= 0).length;
+    c['devolucion incompleta'] = contratosConPendiente.filter(x => x.estado === 'devolucion incompleta').length;
+    return c;
+  }, [contratosConPendiente]);
 
-  const atrasados = todosContratos.filter(c => c.estado === 'atrasado' || c.dias_atraso > 0);
+  const contratosFiltrados = useMemo(() => {
+    if (!estadoFiltro) return contratosConPendiente;
+    if (estadoFiltro === 'deudores') return contratosConPendiente.filter(c => c._pendiente > 0);
+    if (estadoFiltro === 'atrasado') return contratosConPendiente.filter(c => c.estado === 'atrasado' || c.dias_atraso > 0);
+    if (estadoFiltro === 'devuelto') return contratosConPendiente.filter(c => c.estado === 'devuelto' && c._pendiente <= 0);
+    return contratosConPendiente.filter(c => c.estado === estadoFiltro);
+  }, [contratosConPendiente, estadoFiltro]);
+
+  const atrasados = contratosConPendiente.filter(c => c.estado === 'atrasado' || c.dias_atraso > 0);
 
   const toggleExpand = (id) => setExpandido(prev => prev === id ? null : id);
 
@@ -194,6 +206,7 @@ const handleDevolverGarantia = async () => {
       <div className="flex gap-1.5 flex-wrap">
         {[
           { id: '', label: 'Todos' },
+          { id: 'deudores', label: 'Deudores', danger: true },
           { id: 'atrasado', label: 'Atrasado', danger: true },
           ...['alquilado','devuelto','devolucion incompleta']
             .filter(e => conteo[e] > 0)
@@ -237,7 +250,7 @@ const handleDevolverGarantia = async () => {
             const total = montoBase + montoAtraso + totalDanos + totalPerdidas;
             const pagado = c.total_pagado || 0;
             const garantia = c.garantia_retenida || 0;
-            const pendiente = Math.max(0, total - pagado);
+            const pendiente = c._pendiente;
             const montoCobrar = Math.max(0, pendiente - garantia);
             const montoDevolver = pendiente <= garantia ? Math.abs(pendiente - garantia) : 0;
             const pagos = c.pagos || [];

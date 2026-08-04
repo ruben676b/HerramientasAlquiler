@@ -456,6 +456,7 @@ function SessionForm({ session }) {
     if (step === 0) {
       if (!dni && !nombre) return setError('Ingrese el DNI o el nombre del cliente.');
       if (dni && dni.length !== 8) return setError('El DNI debe tener 8 dígitos.');
+      if (!telefono || telefono.length < 9) return setError('El teléfono es obligatorio (9 dígitos).');
       if (fechaDevolucion < fechaSalida) return setError('La devolución debe ser posterior a la salida.');
     }
     if (step === 1) {
@@ -741,7 +742,7 @@ function SessionForm({ session }) {
 
             {/* Teléfono */}
             <div>
-              <label className="text-[13px] font-medium mb-1.5 block" style={{ color: 'var(--ink)' }}>Teléfono</label>
+              <label className="text-[13px] font-medium mb-1.5 block" style={{ color: 'var(--ink)' }}>Teléfono <span style={{ color: 'var(--danger)' }}>*</span></label>
               <input value={telefono} onChange={(e) => setTelefono(e.target.value.replace(/\D/g, '').slice(0, 9))}
                 className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }}
                 placeholder="9 dígitos" maxLength={9} />
