@@ -127,7 +127,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const totalPerdidas = costosPerdBackend + costosPerdLocal;
   const totalCargosExtra = totalDanos + totalPerdidas;
 
-  const total = montoBase + montoAtraso + totalCargosExtra + (c.deposito_monto || 0);
+  const total = montoBase + montoAtraso + totalCargosExtra;
   const pendiente = Math.max(0, total - totalPagado);
   const montoCobrar = Math.max(0, pendiente - garantia);
   const montoDevolver = pendiente <= garantia ? Math.abs(pendiente - garantia) : 0;

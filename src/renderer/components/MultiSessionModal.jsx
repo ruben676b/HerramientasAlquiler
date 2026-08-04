@@ -504,14 +504,15 @@ function SessionForm({ session }) {
       const diasItem = Math.max(1, Math.ceil(
         (new Date(devDate + 'T00:00:00') - new Date(fechaSalida + 'T00:00:00')) / 86400000
       ) + 1);
-      return { ...item, dias_item: diasItem };
+      const usarMes = item.id_item_granel && item.usar_precio_mes && item.precio_mes != null;
+      const subCalc = usarMes
+        ? item.precio_mes * item.cantidad
+        : (item.precio_dia || 0) * diasItem * item.cantidad;
+      return { ...item, dias_item: diasItem, sub_calc: subCalc };
     });
   }, [itemsConMaximo, fechaSalida, fechaDevolucion]);
 
-  const totalEquipos = itemsConDias.reduce((a, item) => {
-    const usarMes = item.id_item_granel && item.usar_precio_mes && item.precio_mes != null;
-    return a + (usarMes ? item.precio_mes * item.cantidad : item.precio_dia * item.dias_item * item.cantidad);
-  }, 0);
+  const totalEquipos = itemsConDias.reduce((a, item) => a + item.sub_calc, 0);
   const pendiente = Math.max(0, totalEquipos - totalPagado);
   const guardar = async () => {
     if (!window.api) return;
@@ -537,7 +538,7 @@ function SessionForm({ session }) {
           id_item_granel: item.id_item_granel || undefined,
           cantidad: item.cantidad || 1,
           fecha_devolucion_pactada: item.fecha_devolucion_item || undefined,
-          total_item_snapshot: item.total_editado || undefined,
+          total_item_snapshot: item.total_editado != null ? item.total_editado : item.sub_calc,
         })),
         pagos: [
           ...pagos.map(p => ({
@@ -903,18 +904,10 @@ function SessionForm({ session }) {
                 <>
                   {itemsConDias.map((item, idx) => {
                     const esGranel = !!item.id_item_granel;
-                    // Cálculo base según tarifa manual o automática
-                    let subCalc, refPrice, refLabel;
                     const usarMes = esGranel && item.usar_precio_mes && item.precio_mes != null;
-                    if (usarMes) {
-                      refPrice = item.precio_mes;
-                      refLabel = 'mes c/u';
-                      subCalc = refPrice * item.cantidad;
-                    } else {
-                      refPrice = item.precio_dia || 0;
-                      refLabel = esGranel ? 'día c/u' : (item.dias_item >= 30 && item.precio_mes ? 'mes' : 'día');
-                      subCalc = refPrice * item.dias_item * item.cantidad;
-                    }
+                    const refPrice = usarMes ? item.precio_mes : (item.precio_dia || 0);
+                    const refLabel = usarMes ? 'mes c/u' : (esGranel ? 'día c/u' : (item.dias_item >= 30 && item.precio_mes ? 'mes' : 'día'));
+                    const subCalc = item.sub_calc;
                     const sub = item.total_editado != null ? item.total_editado : subCalc;
                     const bajoMinimo = item.precio_minimo != null && sub < item.precio_minimo * (usarMes ? 1 : item.dias_item) * item.cantidad;
                     return (

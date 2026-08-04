@@ -10,4 +10,19 @@ function localDate(d = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-module.exports = { localDate };
+/**
+ * Devuelve la fecha y hora local en formato YYYY-MM-DD HH:MM:SS.SSS.
+ * Reemplaza datetime('now','localtime') de SQLite para evitar inconsistencias.
+ */
+function localDateTime(d = new Date()) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  const ms = String(d.getMilliseconds()).padStart(3, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${ms}`;
+}
+
+module.exports = { localDate, localDateTime };

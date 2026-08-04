@@ -319,15 +319,9 @@ function initDatabase() {
   }
 
   try {
-    db.exec(`
-      CREATE TRIGGER IF NOT EXISTS trg_update_contrato_mod
-      AFTER UPDATE ON CONTRATO
-      BEGIN
-        UPDATE CONTRATO SET fecha_modificacion = datetime('now', 'localtime') WHERE id = NEW.id;
-      END;
-    `);
+    db.exec(`DROP TRIGGER IF EXISTS trg_update_contrato_mod`);
   } catch (err) {
-    console.error('[DB] Error creando trigger trg_update_contrato_mod:', err);
+    console.error('[DB] Error eliminando trigger trg_update_contrato_mod:', err);
   }
 
   // Trigger: recalcular cantidad_disponible automáticamente en ITEM_GRANEL

@@ -31,7 +31,7 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
   let total, pagado, saldoPendiente;
   if (!isItem) {
     pagado = contrato.total_pagado || 0;
-    total = baseEditada + atrasoEditado + danosTotal + perdidasTotal + (contrato.deposito_monto || 0);
+    total = baseEditada + atrasoEditado + danosTotal + perdidasTotal;
     saldoPendiente = pendienteExterno != null ? pendienteExterno : Math.max(0, total - pagado);
   }
 

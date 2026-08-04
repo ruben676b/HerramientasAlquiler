@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
 const db = require('../db/database');
+const { localDateTime } = require('../utils/date');
 
 const CONTRATOS_DIR = path.join(app.getPath('documents'), 'AlquilerContratos');
 
@@ -327,7 +328,7 @@ function guardarFirma(idContrato, firmaBase64) {
   const buffer = Buffer.from(firmaBase64.replace(/^data:image\/\w+;base64,/, ''), 'base64');
   const filePath = path.join(CONTRATOS_DIR, `firma_${idContrato}.png`);
   fs.writeFileSync(filePath, buffer);
-  db.prepare('UPDATE CONTRATO SET firma_digital_path = ? WHERE id = ?').run(filePath, idContrato);
+  db.prepare('UPDATE CONTRATO SET firma_digital_path = ?, fecha_modificacion = ? WHERE id = ?').run(filePath, localDateTime(), idContrato);
   return filePath;
 }
 

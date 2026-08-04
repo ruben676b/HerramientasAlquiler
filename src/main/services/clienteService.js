@@ -56,7 +56,7 @@ function getContratosCliente(idCliente) {
            c.estado, c.deposito_monto, c.deposito_dni, c.notas,
            (SELECT COUNT(*) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS total_items,
            (SELECT SUM(precio_dia_aplicado * cantidad) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS subtotal_diario,
-           (SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = c.id) AS total_pagado,
+           (SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = c.id AND tipo NOT IN ('deposito', 'devolucion_deposito') AND (anulado IS NULL OR anulado = 0)) AS total_pagado,
            cal.estrellas, cal.comentario AS calificacion_comentario
     FROM CONTRATO c
     LEFT JOIN CALIFICACION_CLIENTE cal ON cal.id_contrato = c.id
@@ -136,7 +136,9 @@ function getDetalleContrato(idContrato) {
     const diasItem = Math.max(1, Math.ceil(
       (new Date(fechaDevItem + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
     ) + 1);
-    const totalItem = diasItem * item.precio_dia_aplicado * item.cantidad;
+    const totalItem = item.total_item_snapshot != null
+      ? item.total_item_snapshot
+      : diasItem * item.precio_dia_aplicado * item.cantidad;
     const fechaPactadaItem = new Date(fechaDevItem + 'T00:00:00');
     const refDate = item.fecha_devolucion_real
       ? new Date(item.fecha_devolucion_real + 'T00:00:00')
@@ -162,7 +164,7 @@ function getDetalleContrato(idContrato) {
   `).get(idContrato);
   total_danos += danosIndividuales.total || 0;
 
-  const totalPagado = pagos.reduce((a, p) => (p.anulado ? a : a + p.monto), 0);
+  const totalPagado = pagos.reduce((a, p) => (p.anulado || p.tipo === 'deposito' || p.tipo === 'devolucion_deposito' ? a : a + p.monto), 0);
   const totalBase = itemsEnriched.reduce((a, i) => a + i.total_item, 0);
   const totalGeneral = totalBase + total_atraso + total_danos + total_perdidas + (contrato.deposito_monto || 0);
 

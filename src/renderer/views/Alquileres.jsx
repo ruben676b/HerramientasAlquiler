@@ -338,7 +338,7 @@ const handleDevolverGarantia = async () => {
                               </p>
                               {c.items?.map((item, idx) => {
                                 const esGranel = item.item_condicion;
-                                const sub = ((item.precio_dia_aplicado || 0) * (item.dias_item || dias) * (item.cantidad || 1)) + (item.monto_atraso_item || 0);
+                                const sub = (item.total_item || ((item.precio_dia_aplicado || 0) * (item.dias_item || dias) * (item.cantidad || 1))) + (item.monto_atraso_item || 0);
                                 return (
                                   <div key={idx} className="space-y-0.5">
                                     {/* Fila 1: Badge + Nombre + Tarifa + Atraso badge */}
