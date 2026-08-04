@@ -1145,7 +1145,7 @@ function SessionForm({ session }) {
                       const pdfPath = await window.api.generarPdfPreview({
                         arrendadora: { nombre: 'SOLEDAD SUPANTA QUISPE', dni: '72094861', ruc: '10720948619', direccion: 'Av. Los Pinos N° 348', telefono: '985618849' },
                         cliente: { nombre: nombre || '—', dni: dni || '—', telefono: telefono || '—', direccion: '' },
-                        items: itemsConDias.map(item => ({ codigo: item.id_herramienta || (item.nombre + ' (' + item.condicion + ')'), nombre: item.nombre, cantidad: item.cantidad, precio_dia: item.precio_dia, mora_dia: 0, fecha_devolucion_pactada: item.fecha_devolucion_item || fechaDevolucion })),
+                        items: itemsConDias.map(item => ({ codigo: item.id_herramienta || (item.nombre + ' (' + item.condicion + ')'), nombre: item.nombre, cantidad: item.cantidad, precio_dia: item.precio_dia, fecha_devolucion_pactada: item.fecha_devolucion_item || fechaDevolucion })),
                         fechas: { salida: fechaSalida, devolucion: fechaDevolucion },
                         total, firmaBase64: firmaBase64 || null,
                       });

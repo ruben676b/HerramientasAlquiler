@@ -74,9 +74,9 @@ function crearContrato(
     const insertDetalle = db.prepare(`
       INSERT INTO DETALLE_CONTRATO (
         id_contrato, tipo_item, id_herramienta, id_item_granel,
-        cantidad, precio_dia_aplicado, mora_dia_aplicada,
+        cantidad, precio_dia_aplicado,
         fecha_devolucion_pactada_item, total_item_snapshot
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const resultado = insertContrato.run(
@@ -96,7 +96,7 @@ function crearContrato(
       if (item.tipo_item === 'individual') {
         const herramienta = db
           .prepare(
-            'SELECT precio_dia, mora_dia, estado FROM HERRAMIENTA WHERE id = ? AND activo = 1'
+            'SELECT precio_dia, estado FROM HERRAMIENTA WHERE id = ? AND activo = 1'
           )
           .get(item.id_herramienta);
 
@@ -123,7 +123,6 @@ function crearContrato(
           null,
           1,
           herramienta.precio_dia,
-          herramienta.mora_dia,
           fechaDevItem,
           item.total_item_snapshot != null ? item.total_item_snapshot : null
         );
@@ -139,7 +138,7 @@ function crearContrato(
 
         const granel = db
           .prepare(
-            'SELECT precio_dia, mora_dia, cantidad_disponible FROM ITEM_GRANEL WHERE id = ? AND activo = 1'
+            'SELECT precio_dia, cantidad_disponible FROM ITEM_GRANEL WHERE id = ? AND activo = 1'
           )
           .get(item.id_item_granel);
 
@@ -165,7 +164,6 @@ function crearContrato(
           item.id_item_granel,
           item.cantidad,
           granel.precio_dia,
-          granel.mora_dia,
           fechaDevItemG,
           item.total_item_snapshot != null ? item.total_item_snapshot : null
         );

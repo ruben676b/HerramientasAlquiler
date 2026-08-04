@@ -21,7 +21,6 @@ function initDatabase() {
       precio_minimo REAL CHECK (precio_minimo >= 0),
       precio_mes REAL CHECK (precio_mes >= 0),
       precio_venta REAL CHECK (precio_venta >= 0),
-      mora_dia REAL NOT NULL CHECK (mora_dia >= 0),
       valor_reposicion REAL CHECK (valor_reposicion >= 0),
       estado TEXT NOT NULL CHECK (estado IN ('disponible', 'alquilado', 'mantenimiento', 'malogrado')),
       fecha_adquisicion TEXT,
@@ -37,7 +36,6 @@ function initDatabase() {
       precio_minimo REAL CHECK (precio_minimo >= 0),
       precio_mes REAL CHECK (precio_mes >= 0),
       precio_venta REAL CHECK (precio_venta >= 0),
-      mora_dia REAL NOT NULL CHECK (mora_dia >= 0),
       cantidad_total INTEGER NOT NULL CHECK (cantidad_total >= 0),
       cantidad_disponible INTEGER NOT NULL CHECK (cantidad_disponible >= 0 AND cantidad_disponible <= cantidad_total),
       cantidad_danada INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_danada >= 0),
@@ -101,7 +99,6 @@ function initDatabase() {
       id_item_granel INTEGER,
       cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
       precio_dia_aplicado REAL NOT NULL CHECK (precio_dia_aplicado >= 0),
-      mora_dia_aplicada REAL NOT NULL CHECK (mora_dia_aplicada >= 0),
       estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto', 'perdido')),
       fecha_devolucion_real TEXT,
       fecha_devolucion_pactada_item TEXT,
@@ -195,7 +192,6 @@ function initDatabase() {
 
   // Migración: agregar columnas de precio/mora a CATEGORIA_HERRAMIENTA
   try { db.exec("ALTER TABLE CATEGORIA_HERRAMIENTA ADD COLUMN precio_dia REAL NOT NULL DEFAULT 0"); } catch {}
-  try { db.exec("ALTER TABLE CATEGORIA_HERRAMIENTA ADD COLUMN mora_dia REAL NOT NULL DEFAULT 0"); } catch {}
 
   // Migración: agregar fecha_modificacion a CONTRATO
   try { db.exec("ALTER TABLE CONTRATO ADD COLUMN fecha_modificacion TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))"); } catch {}
@@ -294,7 +290,6 @@ function initDatabase() {
           id_item_granel INTEGER,
           cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
           precio_dia_aplicado REAL NOT NULL CHECK (precio_dia_aplicado >= 0),
-          mora_dia_aplicada REAL NOT NULL CHECK (mora_dia_aplicada >= 0),
           estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto', 'perdido')),
           fecha_devolucion_real TEXT,
           fecha_devolucion_pactada_item TEXT,
@@ -440,14 +435,14 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     }
 
     db.prepare(
-      `INSERT OR IGNORE INTO ITEM_GRANEL (nombre, condicion, precio_dia, mora_dia, cantidad_total, cantidad_disponible)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run('Tabla 3m', 'nuevo', 5.0, 2.0, 100, 100);
+      `INSERT OR IGNORE INTO ITEM_GRANEL (nombre, condicion, precio_dia, cantidad_total, cantidad_disponible)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run('Tabla 3m', 'nuevo', 5.0, 100, 100);
 
     db.prepare(
-      `INSERT OR IGNORE INTO ITEM_GRANEL (nombre, condicion, precio_dia, mora_dia, cantidad_total, cantidad_disponible)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run('Tabla 3m', 'usado', 3.0, 1.5, 80, 80);
+      `INSERT OR IGNORE INTO ITEM_GRANEL (nombre, condicion, precio_dia, cantidad_total, cantidad_disponible)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run('Tabla 3m', 'usado', 3.0, 80, 80);
 
     db.prepare(
       `INSERT OR IGNORE INTO USUARIO (nombre, password_hash, rol, activo)

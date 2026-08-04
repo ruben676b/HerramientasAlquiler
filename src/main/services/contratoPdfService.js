@@ -120,9 +120,9 @@ function generarPdfDesdeDatos(datos) {
   doc.fontSize(9).font('Helvetica-Bold').text('EQUIPOS ALQUILADOS:');
   doc.moveDown(0.3);
 
-  const colX = [45, 105, 185, 255, 340, 430];
-  const colWidths = [55, 75, 25, 55, 55, 55];
-  const headers = ['Código', 'Descripción', 'Cant.', 'Precio/día', 'Mora/día', 'Subtotal'];
+  const colX = [45, 115, 200, 290, 410];
+  const colWidths = [65, 80, 55, 55, 55];
+  const headers = ['Código', 'Descripción', 'Precio/día', 'Cant.', 'Subtotal'];
   const tableTop = doc.y;
 
   doc.fontSize(6.5).font('Helvetica-Bold');
@@ -144,10 +144,9 @@ function generarPdfDesdeDatos(datos) {
     const codigo = esGranel ? 'Material' : (item.codigo || '—');
     doc.text(codigo, colX[0], y, { width: colWidths[0] });
     doc.text(item.nombre || '—', colX[1], y, { width: colWidths[1] });
-    doc.text(String(item.cantidad), colX[2], y, { width: colWidths[2], align: 'center' });
-    doc.text(`S/ ${item.precio_dia.toFixed(2)}`, colX[3], y, { width: colWidths[3], align: 'right' });
-    doc.text(`S/ ${(item.mora_dia || 0).toFixed(2)}`, colX[4], y, { width: colWidths[4], align: 'right' });
-    doc.text(`S/ ${sub.toFixed(2)}`, colX[5], y, { width: colWidths[5], align: 'right' });
+    doc.text(`S/ ${item.precio_dia.toFixed(2)}`, colX[2], y, { width: colWidths[2], align: 'right' });
+    doc.text(String(item.cantidad), colX[3], y, { width: colWidths[3], align: 'center' });
+    doc.text(`S/ ${sub.toFixed(2)}`, colX[4], y, { width: colWidths[4], align: 'right' });
     y += 11;
   });
 
@@ -265,8 +264,7 @@ function generarPdf(idContrato) {
 
   const detalles = db.prepare(`
     SELECT d.*, COALESCE(h.nombre, i.nombre) AS item_nombre,
-           COALESCE(h.id, i.nombre || ' (' || i.condicion || ')') AS item_codigo,
-           COALESCE(h.mora_dia, i.mora_dia) AS item_mora
+           COALESCE(h.id, i.nombre || ' (' || i.condicion || ')') AS item_codigo
     FROM DETALLE_CONTRATO d
     LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id
     LEFT JOIN ITEM_GRANEL i ON d.id_item_granel = i.id
@@ -308,7 +306,6 @@ function generarPdf(idContrato) {
         nombre: d.item_nombre,
         cantidad: d.cantidad,
         precio_dia: d.precio_dia_aplicado,
-        mora_dia: d.item_mora || d.mora_dia_aplicada || 0,
         fecha_devolucion_pactada: fechaDevItem,
       };
     }),

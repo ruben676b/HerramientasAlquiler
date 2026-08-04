@@ -32,16 +32,16 @@ function getHerramientas(filtros = {}) {
   return db.prepare(sql).all(...params);
 }
 
-function crearHerramienta({ id, id_categoria, nombre, descripcion, precio_dia, mora_dia, valor_reposicion, fecha_adquisicion }) {
+function crearHerramienta({ id, id_categoria, nombre, descripcion, precio_dia, valor_reposicion, fecha_adquisicion }) {
   if (!id || !id_categoria || !nombre) throw new Error('Código, categoría y nombre son obligatorios.');
 
   const existente = db.prepare('SELECT id FROM HERRAMIENTA WHERE id = ?').get(id);
   if (existente) throw new Error('Ya existe una herramienta con el código ' + id);
 
   db.prepare(`
-    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, mora_dia, valor_reposicion, fecha_adquisicion)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, id_categoria, nombre, descripcion || null, precio_dia || 0, mora_dia || 0, valor_reposicion || null, fecha_adquisicion || null);
+    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, valor_reposicion, fecha_adquisicion)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, id_categoria, nombre, descripcion || null, precio_dia || 0, valor_reposicion || null, fecha_adquisicion || null);
 
   return { id };
 }
@@ -54,7 +54,7 @@ function actualizarHerramienta(id, datos) {
   const params = [];
 
   for (const [k, v] of Object.entries(datos)) {
-    const allowed = ['nombre', 'descripcion', 'precio_dia', 'mora_dia', 'valor_reposicion', 'estado', 'fecha_adquisicion', 'id_categoria'];
+    const allowed = ['nombre', 'descripcion', 'precio_dia', 'valor_reposicion', 'estado', 'fecha_adquisicion', 'id_categoria'];
     if (allowed.includes(k) && v !== undefined) {
       fields.push(k + ' = ?');
       params.push(v);
@@ -87,13 +87,13 @@ function getGranelFull() {
   `).all();
 }
 
-function crearGranel({ nombre, condicion, precio_dia, mora_dia, cantidad_total }) {
+function crearGranel({ nombre, condicion, precio_dia, cantidad_total }) {
   if (!nombre || !condicion) throw new Error('Nombre y condición son obligatorios.');
 
   const r = db.prepare(`
-    INSERT INTO ITEM_GRANEL (nombre, condicion, precio_dia, mora_dia, cantidad_total, cantidad_disponible)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(nombre, condicion, precio_dia || 0, mora_dia || 0, cantidad_total || 0, cantidad_total || 0);
+    INSERT INTO ITEM_GRANEL (nombre, condicion, precio_dia, cantidad_total, cantidad_disponible)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(nombre, condicion, precio_dia || 0, cantidad_total || 0, cantidad_total || 0);
 
   return { id: r.lastInsertRowid };
 }
@@ -106,7 +106,7 @@ function actualizarGranel(id, datos) {
   const params = [];
 
   for (const [k, v] of Object.entries(datos)) {
-    const allowed = ['nombre', 'condicion', 'precio_dia', 'mora_dia', 'cantidad_total'];
+    const allowed = ['nombre', 'condicion', 'precio_dia', 'cantidad_total'];
     if (allowed.includes(k) && v !== undefined) {
       fields.push(k + ' = ?');
       params.push(v);
@@ -165,25 +165,23 @@ function getGranelAgrupado() {
   return Object.values(mapa);
 }
 
-function crearMaterial({ nombre, precio_nuevo, precio_minimo_nuevo, precio_mes_nuevo, precio_venta_nuevo, mora_nuevo, precio_usado, precio_minimo_usado, precio_mes_usado, precio_venta_usado, mora_usado }) {
+function crearMaterial({ nombre, precio_nuevo, precio_minimo_nuevo, precio_mes_nuevo, precio_venta_nuevo, precio_usado, precio_minimo_usado, precio_mes_usado, precio_venta_usado }) {
   if (!nombre) throw new Error('El nombre del material es obligatorio.');
 
   const insert = db.prepare(`
-    INSERT INTO ITEM_GRANEL (nombre, condicion, precio_dia, precio_minimo, precio_mes, precio_venta, mora_dia, cantidad_total, cantidad_disponible)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
+    INSERT INTO ITEM_GRANEL (nombre, condicion, precio_dia, precio_minimo, precio_mes, precio_venta, cantidad_total, cantidad_disponible)
+    VALUES (?, ?, ?, ?, ?, ?, 0, 0)
   `);
 
   const tx = db.transaction(() => {
     insert.run(nombre, 'nuevo', precio_nuevo || 0,
       precio_minimo_nuevo != null ? precio_minimo_nuevo : null,
       precio_mes_nuevo != null ? precio_mes_nuevo : null,
-      precio_venta_nuevo != null ? precio_venta_nuevo : null,
-      mora_nuevo || 0);
+      precio_venta_nuevo != null ? precio_venta_nuevo : null);
     insert.run(nombre, 'usado', precio_usado || 0,
       precio_minimo_usado != null ? precio_minimo_usado : null,
       precio_mes_usado != null ? precio_mes_usado : null,
-      precio_venta_usado != null ? precio_venta_usado : null,
-      mora_usado || 0);
+      precio_venta_usado != null ? precio_venta_usado : null);
   });
   tx();
 
@@ -233,7 +231,7 @@ function agregarStockGranel(id, cantidad) {
   return { id, agregado: cantidad };
 }
 
-function editarGranelFull(nombreOriginal, { nombre, precio_nuevo, precio_minimo_nuevo, precio_mes_nuevo, precio_venta_nuevo, mora_nuevo, precio_usado, precio_minimo_usado, precio_mes_usado, precio_venta_usado, mora_usado }) {
+function editarGranelFull(nombreOriginal, { nombre, precio_nuevo, precio_minimo_nuevo, precio_mes_nuevo, precio_venta_nuevo, precio_usado, precio_minimo_usado, precio_mes_usado, precio_venta_usado }) {
   if (!nombre) throw new Error('El nombre es obligatorio.');
 
   const tx = db.transaction(() => {
@@ -253,14 +251,12 @@ function editarGranelFull(nombreOriginal, { nombre, precio_nuevo, precio_minimo_
       precio_minimo: precio_minimo_nuevo,
       precio_mes: precio_mes_nuevo,
       precio_venta: precio_venta_nuevo,
-      mora_dia: mora_nuevo,
     });
     updateCond('usado', {
       precio_dia: precio_usado,
       precio_minimo: precio_minimo_usado,
       precio_mes: precio_mes_usado,
       precio_venta: precio_venta_usado,
-      mora_dia: mora_usado,
     });
   });
   tx();
@@ -483,7 +479,7 @@ function crearCategoria({ nombre, descripcion }) {
    FAMILIAS — lote, unidades, edición masiva
    ================================================================ */
 
-function crearLote({ id_categoria, nombre, precio_dia, precio_minimo, precio_mes, precio_venta, mora_dia, cantidad, descripcion }) {
+function crearLote({ id_categoria, nombre, precio_dia, precio_minimo, precio_mes, precio_venta, cantidad, descripcion }) {
   if (!id_categoria || !nombre || !cantidad || cantidad < 1) {
     throw new Error('Categoría, nombre y cantidad son obligatorios.');
   }
@@ -494,9 +490,9 @@ function crearLote({ id_categoria, nombre, precio_dia, precio_minimo, precio_mes
   // Guardar precios en la categoría para persistencia
   db.prepare(`
     UPDATE CATEGORIA_HERRAMIENTA
-    SET nombre = ?, precio_dia = ?, mora_dia = ?, precio_minimo = ?, precio_mes = ?, precio_venta = ?
+    SET nombre = ?, precio_dia = ?, precio_minimo = ?, precio_mes = ?, precio_venta = ?
     WHERE id = ?
-  `).run(nombre, precio_dia || 0, mora_dia || 0,
+  `).run(nombre, precio_dia || 0,
     precio_minimo != null ? precio_minimo : null,
     precio_mes != null ? precio_mes : null,
     precio_venta != null ? precio_venta : null,
@@ -513,8 +509,8 @@ function crearLote({ id_categoria, nombre, precio_dia, precio_minimo, precio_mes
   }
 
   const insert = db.prepare(`
-    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, precio_minimo, precio_mes, precio_venta, mora_dia, estado)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'disponible')
+    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, precio_minimo, precio_mes, precio_venta, estado)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'disponible')
   `);
 
   const creadas = [];
@@ -526,8 +522,7 @@ function crearLote({ id_categoria, nombre, precio_dia, precio_minimo, precio_mes
         precio_dia || 0,
         precio_minimo != null ? precio_minimo : null,
         precio_mes != null ? precio_mes : null,
-        precio_venta != null ? precio_venta : null,
-        mora_dia || 0);
+        precio_venta != null ? precio_venta : null);
       creadas.push(id);
     }
   });
@@ -543,7 +538,7 @@ function agregarUnidades(id_categoria, cantidad) {
   if (!cat) throw new Error('Categoría no encontrada.');
 
   const ultima = db
-    .prepare("SELECT id, nombre, precio_dia, mora_dia, descripcion FROM HERRAMIENTA WHERE id_categoria = ? AND activo = 1 ORDER BY CAST(SUBSTR(id, INSTR(id, '-') + 1) AS INTEGER) DESC LIMIT 1")
+    .prepare("SELECT id, nombre, precio_dia, descripcion FROM HERRAMIENTA WHERE id_categoria = ? AND activo = 1 ORDER BY CAST(SUBSTR(id, INSTR(id, '-') + 1) AS INTEGER) DESC LIMIT 1")
     .get(id_categoria);
 
   let inicio = 1;
@@ -553,8 +548,8 @@ function agregarUnidades(id_categoria, cantidad) {
   }
 
   const insert = db.prepare(`
-    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, mora_dia, estado)
-    VALUES (?, ?, ?, ?, ?, ?, 'disponible')
+    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, estado)
+    VALUES (?, ?, ?, ?, ?, 'disponible')
   `);
 
   const creadas = [];
@@ -564,8 +559,7 @@ function agregarUnidades(id_categoria, cantidad) {
       const id = id_categoria + '-' + num;
       const nombre = ultima?.nombre || cat.nombre;
       const precio = ultima?.precio_dia ?? cat.precio_dia ?? 0;
-      const mora = ultima?.mora_dia ?? cat.mora_dia ?? 0;
-      insert.run(id, id_categoria, nombre, null, precio, mora);
+      insert.run(id, id_categoria, nombre, null, precio);
       creadas.push(id);
     }
   });
@@ -574,13 +568,13 @@ function agregarUnidades(id_categoria, cantidad) {
   return { creadas, cantidad: creadas.length };
 }
 
-function editarFamilia(id_categoria, { nombre, precio_dia, precio_minimo, precio_mes, precio_venta, mora_dia, descripcion, valor_reposicion }) {
+function editarFamilia(id_categoria, { nombre, precio_dia, precio_minimo, precio_mes, precio_venta, descripcion, valor_reposicion }) {
   const cat = db.prepare('SELECT * FROM CATEGORIA_HERRAMIENTA WHERE id = ?').get(id_categoria);
   if (!cat) throw new Error('Categoría no encontrada.');
 
   // Todos los campos editables, incluyendo nullables
   const updates = {};
-  const POSSIBLE = ['nombre', 'precio_dia', 'precio_minimo', 'precio_mes', 'precio_venta', 'mora_dia', 'descripcion', 'valor_reposicion'];
+  const POSSIBLE = ['nombre', 'precio_dia', 'precio_minimo', 'precio_mes', 'precio_venta', 'descripcion', 'valor_reposicion'];
   for (const k of POSSIBLE) {
     if (arguments[1][k] !== undefined) {
       updates[k] = arguments[1][k];
@@ -596,7 +590,7 @@ function editarFamilia(id_categoria, { nombre, precio_dia, precio_minimo, precio
 
     // Actualizar categoría (solo campos que aplican a categoría)
     const catValues = {};
-    for (const k of ['nombre', 'precio_dia', 'mora_dia', 'precio_minimo', 'precio_mes', 'precio_venta']) {
+    for (const k of ['nombre', 'precio_dia', 'precio_minimo', 'precio_mes', 'precio_venta']) {
       if (updates[k] !== undefined) catValues[k] = updates[k];
     }
     if (Object.keys(catValues).length > 0) {
@@ -753,7 +747,6 @@ function getHerramientasPorCategoria() {
       conteo,
       herramientas,
       precio_dia: herramientas[0]?.precio_dia ?? cat.precio_dia ?? 0,
-      mora_dia: herramientas[0]?.mora_dia ?? cat.mora_dia ?? 0,
       precio_minimo: herramientas[0]?.precio_minimo ?? cat.precio_minimo ?? null,
       precio_mes: herramientas[0]?.precio_mes ?? cat.precio_mes ?? null,
       precio_venta: herramientas[0]?.precio_venta ?? cat.precio_venta ?? null,

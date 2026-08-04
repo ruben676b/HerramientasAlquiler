@@ -113,7 +113,6 @@ export default function Inventario() {
         id_categoria: prefix.id,
         nombre: data.nombre,
         precio_dia: data.precio_dia,
-        mora_dia: data.mora_dia,
         cantidad: data.cantidad,
       });
       toast(r.cantidad + ' herramienta(s) de ' + data.nombre + ' creada(s)');
@@ -866,7 +865,6 @@ function ModalCrearFamilia({ onSave, onClose }) {
       precio_minimo: f.precio_minimo !== '' ? parseFloat(f.precio_minimo) : undefined,
       precio_mes: f.precio_mes !== '' ? parseFloat(f.precio_mes) : undefined,
       precio_venta: f.precio_venta !== '' ? parseFloat(f.precio_venta) : undefined,
-      mora_dia: parseFloat(f.precio_dia) || 0,
       cantidad: parseInt(f.cantidad, 10) || 1,
     });
   };
@@ -933,7 +931,6 @@ function ModalEditarFamilia({ familia, onSave, onClose }) {
     precio_minimo: f.precio_minimo !== '' ? parseFloat(f.precio_minimo) : undefined,
     precio_mes: f.precio_mes !== '' ? parseFloat(f.precio_mes) : undefined,
     precio_venta: f.precio_venta !== '' ? parseFloat(f.precio_venta) : undefined,
-    mora_dia: parseFloat(f.precio_dia) || 0,
   }, familia.nombre);
   return (
     <ModalShell title={'Editar ' + familia.nombre} onClose={onClose} onSubmit={submit}>
@@ -974,12 +971,10 @@ function ModalCrearGranel({ onSave, onClose }) {
       precio_minimo_nuevo: f.precio_minimo_nuevo !== '' ? parseFloat(f.precio_minimo_nuevo) : undefined,
       precio_mes_nuevo: f.precio_mes_nuevo !== '' ? parseFloat(f.precio_mes_nuevo) : undefined,
       precio_venta_nuevo: f.precio_venta_nuevo !== '' ? parseFloat(f.precio_venta_nuevo) : undefined,
-      mora_nuevo: parseFloat(f.precio_nuevo) || 0,
       precio_usado: parseFloat(f.precio_usado) || 0,
       precio_minimo_usado: f.precio_minimo_usado !== '' ? parseFloat(f.precio_minimo_usado) : undefined,
       precio_mes_usado: f.precio_mes_usado !== '' ? parseFloat(f.precio_mes_usado) : undefined,
       precio_venta_usado: f.precio_venta_usado !== '' ? parseFloat(f.precio_venta_usado) : undefined,
-      mora_usado: parseFloat(f.precio_usado) || 0,
     });
   };
   return (
@@ -1026,12 +1021,10 @@ function ModalEditarGranel({ data, onSave, onClose }) {
     precio_minimo_nuevo: f.precio_minimo_nuevo !== '' ? parseFloat(f.precio_minimo_nuevo) : undefined,
     precio_mes_nuevo: f.precio_mes_nuevo !== '' ? parseFloat(f.precio_mes_nuevo) : undefined,
     precio_venta_nuevo: f.precio_venta_nuevo !== '' ? parseFloat(f.precio_venta_nuevo) : undefined,
-    mora_nuevo: parseFloat(f.precio_nuevo) || 0,
     precio_usado: parseFloat(f.precio_usado) || 0,
     precio_minimo_usado: f.precio_minimo_usado !== '' ? parseFloat(f.precio_minimo_usado) : undefined,
     precio_mes_usado: f.precio_mes_usado !== '' ? parseFloat(f.precio_mes_usado) : undefined,
     precio_venta_usado: f.precio_venta_usado !== '' ? parseFloat(f.precio_venta_usado) : undefined,
-    mora_usado: parseFloat(f.precio_usado) || 0,
   });
   return (
     <ModalShell title="Editar material" onClose={onClose} onSubmit={submit}>
