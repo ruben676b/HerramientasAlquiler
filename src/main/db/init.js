@@ -7,6 +7,7 @@ function initDatabase() {
       id TEXT PRIMARY KEY NOT NULL,
       nombre TEXT NOT NULL,
       descripcion TEXT,
+      precio_dia REAL NOT NULL DEFAULT 0,
       precio_minimo REAL CHECK (precio_minimo >= 0),
       precio_mes REAL CHECK (precio_mes >= 0),
       precio_venta REAL CHECK (precio_venta >= 0)
@@ -122,6 +123,11 @@ function initDatabase() {
       tipo TEXT NOT NULL CHECK (tipo IN ('adelanto', 'saldo', 'mora', 'deposito', 'devolucion_deposito')),
       comprobante TEXT NOT NULL DEFAULT 'recibo interno' CHECK (comprobante IN ('recibo interno', 'boleta_sunat', 'factura_sunat')),
       notas TEXT,
+      id_detalle INTEGER REFERENCES DETALLE_CONTRATO(id),
+      anulado INTEGER DEFAULT 0 CHECK (anulado IN (0, 1)),
+      fecha_anulacion TEXT,
+      motivo_anulacion TEXT,
+      grupo_pago TEXT,
       FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id)
     );
 
@@ -178,6 +184,7 @@ function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       id_contrato INTEGER NOT NULL,
       id_item_granel INTEGER NOT NULL,
+      id_detalle INTEGER REFERENCES DETALLE_CONTRATO(id),
       fecha TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       cantidad_bien INTEGER NOT NULL DEFAULT 0,
       cantidad_danada INTEGER NOT NULL DEFAULT 0,
@@ -189,135 +196,6 @@ function initDatabase() {
       FOREIGN KEY (id_item_granel) REFERENCES ITEM_GRANEL(id)
     );
   `);
-
-  // Migración: agregar columnas de precio/mora a CATEGORIA_HERRAMIENTA
-  try { db.exec("ALTER TABLE CATEGORIA_HERRAMIENTA ADD COLUMN precio_dia REAL NOT NULL DEFAULT 0"); } catch {}
-
-  // Migración: agregar fecha_modificacion a CONTRATO
-  try { db.exec("ALTER TABLE CONTRATO ADD COLUMN fecha_modificacion TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))"); } catch {}
-
-  // Migración: agregar id_detalle a PAGO para pagos por ítem
-  try { db.exec("ALTER TABLE PAGO ADD COLUMN id_detalle INTEGER REFERENCES DETALLE_CONTRATO(id)"); } catch {}
-
-  // Migración: agregar id_detalle a DEVOLUCION_GRANEL para vincular cada entrada al detalle exacto
-  try { db.exec("ALTER TABLE DEVOLUCION_GRANEL ADD COLUMN id_detalle INTEGER REFERENCES DETALLE_CONTRATO(id)"); } catch {}
-
-  // Migración: agregar columnas de anulación a PAGO
-  try { db.exec("ALTER TABLE PAGO ADD COLUMN anulado INTEGER DEFAULT 0 CHECK (anulado IN (0, 1))"); } catch {}
-  try { db.exec("ALTER TABLE PAGO ADD COLUMN fecha_anulacion TEXT"); } catch {}
-  try { db.exec("ALTER TABLE PAGO ADD COLUMN motivo_anulacion TEXT"); } catch {}
-
-  // Migración: agregar grupo_pago a PAGO para pagos distribuidos
-  try { db.exec("ALTER TABLE PAGO ADD COLUMN grupo_pago TEXT"); } catch {}
-
-  // Migración: agregar cantidad_danada a ITEM_GRANEL para control de dañados
-  try { db.exec("ALTER TABLE ITEM_GRANEL ADD COLUMN cantidad_danada INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_danada >= 0)"); } catch {}
-
-  // Migración: agregar cantidad_alquilada, cantidad_perdida, cantidad_vendida, cantidad_baja
-  try { db.exec("ALTER TABLE ITEM_GRANEL ADD COLUMN cantidad_alquilada INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_alquilada >= 0)"); } catch {}
-  try { db.exec("ALTER TABLE ITEM_GRANEL ADD COLUMN cantidad_perdida INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_perdida >= 0)"); } catch {}
-  try { db.exec("ALTER TABLE ITEM_GRANEL ADD COLUMN cantidad_vendida INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_vendida >= 0)"); } catch {}
-  try { db.exec("ALTER TABLE ITEM_GRANEL ADD COLUMN cantidad_baja INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_baja >= 0)"); } catch {}
-
-  // Migración: convertir timestamps guardados en UTC a hora local (una sola vez).
-  // Los valores con hora fueron generados por CURRENT_TIMESTAMP / datetime('now'), que devuelven UTC.
-  // Aplica datetime(..., 'localtime') para desplazarlos a la hora local del equipo (ej. Perú, UTC-5).
-  try {
-    const tzMigrado = db.prepare(
-      `SELECT valor FROM CONFIGURACION WHERE clave = 'tz_local_migrated'`
-    ).get();
-    if (!tzMigrado) {
-      const colPago = new Set(db.prepare('PRAGMA table_info(PAGO)').all().map(c => c.name));
-      const colContrato = new Set(db.prepare('PRAGMA table_info(CONTRATO)').all().map(c => c.name));
-
-      const updates = [];
-      if (colPago.has('fecha_pago')) {
-        updates.push("UPDATE PAGO SET fecha_pago = datetime(fecha_pago, 'localtime') WHERE fecha_pago LIKE '____-__-__ __:%'");
-      }
-      if (colPago.has('fecha_anulacion')) {
-        updates.push("UPDATE PAGO SET fecha_anulacion = datetime(fecha_anulacion, 'localtime') WHERE fecha_anulacion LIKE '____-__-__ __:%'");
-      }
-      if (colContrato.has('fecha_creacion')) {
-        updates.push("UPDATE CONTRATO SET fecha_creacion = datetime(fecha_creacion, 'localtime') WHERE fecha_creacion LIKE '____-__-__ __:%'");
-      }
-      if (colContrato.has('fecha_modificacion')) {
-        updates.push("UPDATE CONTRATO SET fecha_modificacion = datetime(fecha_modificacion, 'localtime') WHERE fecha_modificacion LIKE '____-__-__ __:%'");
-      }
-
-      for (const sql of updates) db.exec(sql);
-
-      db.prepare(
-        `INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion) VALUES (?, ?, ?)`
-      ).run('tz_local_migrated', 'true', 'Timestamps convertidos de UTC a hora local');
-      console.log('[DB] Migración de zona horaria completada (UTC → local).');
-    }
-  } catch (err) {
-    console.error('[DB] Error en migración de zona horaria:', err);
-  }
-
-  // Inicializar cantidad_alquilada desde contratos activos (migración única)
-  try {
-    db.exec(`
-      UPDATE ITEM_GRANEL
-      SET cantidad_alquilada = COALESCE((
-        SELECT SUM(dc.cantidad)
-        FROM DETALLE_CONTRATO dc
-        JOIN CONTRATO c ON dc.id_contrato = c.id
-        WHERE dc.id_item_granel = ITEM_GRANEL.id
-          AND dc.estado_devolucion = 'pendiente'
-          AND c.estado IN ('alquilado', 'atrasado', 'reservado')
-      ), 0)
-      WHERE activo = 1
-    `);
-  } catch (err) {
-    console.error('[DB] Error inicializando cantidad_alquilada:', err);
-  }
-
-  // Migración: agregar costo_perdida a DETALLE_CONTRATO
-  try { db.exec("ALTER TABLE DETALLE_CONTRATO ADD COLUMN costo_perdida REAL CHECK (costo_perdida >= 0)"); } catch {}
-
-  // Migración: agregar estado 'perdido' a DETALLE_CONTRATO (recrear tabla si el CHECK no lo incluye)
-  try {
-    const ddl = db.prepare("SELECT sql FROM sqlite_master WHERE name='DETALLE_CONTRATO' AND type='table'").get();
-    if (ddl && !ddl.sql.includes("'perdido'")) {
-      db.exec("PRAGMA foreign_keys = OFF");
-      db.exec(`
-        CREATE TABLE DETALLE_CONTRATO_NEW (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          id_contrato INTEGER NOT NULL,
-          tipo_item TEXT NOT NULL CHECK (tipo_item IN ('individual', 'granel')),
-          id_herramienta TEXT,
-          id_item_granel INTEGER,
-          cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
-          precio_dia_aplicado REAL NOT NULL CHECK (precio_dia_aplicado >= 0),
-          estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto', 'perdido')),
-          fecha_devolucion_real TEXT,
-          fecha_devolucion_pactada_item TEXT,
-          total_item_snapshot REAL,
-          costo_perdida REAL CHECK (costo_perdida >= 0),
-          FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
-          FOREIGN KEY (id_herramienta) REFERENCES HERRAMIENTA(id),
-          FOREIGN KEY (id_item_granel) REFERENCES ITEM_GRANEL(id),
-          CHECK (
-            (tipo_item = 'individual' AND id_herramienta NOT NULL AND id_item_granel IS NULL AND cantidad = 1) OR
-            (tipo_item = 'granel' AND id_item_granel NOT NULL AND id_herramienta IS NULL)
-          )
-        )
-      `);
-      db.exec("INSERT INTO DETALLE_CONTRATO_NEW SELECT * FROM DETALLE_CONTRATO");
-      db.exec("DROP TABLE DETALLE_CONTRATO");
-      db.exec("ALTER TABLE DETALLE_CONTRATO_NEW RENAME TO DETALLE_CONTRATO");
-      db.exec("PRAGMA foreign_keys = ON");
-    }
-  } catch (err) {
-    console.error('[DB] Error migrando DETALLE_CONTRATO (perdido):', err);
-  }
-
-  try {
-    db.exec(`DROP TRIGGER IF EXISTS trg_update_contrato_mod`);
-  } catch (err) {
-    console.error('[DB] Error eliminando trigger trg_update_contrato_mod:', err);
-  }
 
   // Trigger: recalcular cantidad_disponible automáticamente en ITEM_GRANEL
   try {
