@@ -139,7 +139,7 @@ const handleDevolverGarantia = async () => {
     const c = {};
     c[''] = contratosConPendiente.length;
     c['deudores'] = contratosConPendiente.filter(x => x._pendiente > 0).length;
-    c['atrasado'] = contratosConPendiente.filter(x => x.estado === 'atrasado' || x.dias_atraso > 0).length;
+    c['atrasado'] = contratosConPendiente.filter(x => x.dias_atraso > 0 && !(x.estado === 'devuelto' && x._pendiente <= 0)).length;
     c['alquilado'] = contratosConPendiente.filter(x => x.estado === 'alquilado').length;
     c['devuelto'] = contratosConPendiente.filter(x => x.estado === 'devuelto' && x._pendiente <= 0).length;
     c['devolucion incompleta'] = contratosConPendiente.filter(x => x.estado === 'devolucion incompleta').length;
@@ -149,12 +149,12 @@ const handleDevolverGarantia = async () => {
   const contratosFiltrados = useMemo(() => {
     if (!estadoFiltro) return contratosConPendiente;
     if (estadoFiltro === 'deudores') return contratosConPendiente.filter(c => c._pendiente > 0);
-    if (estadoFiltro === 'atrasado') return contratosConPendiente.filter(c => c.estado === 'atrasado' || c.dias_atraso > 0);
+    if (estadoFiltro === 'atrasado') return contratosConPendiente.filter(c => c.dias_atraso > 0 && !(c.estado === 'devuelto' && c._pendiente <= 0));
     if (estadoFiltro === 'devuelto') return contratosConPendiente.filter(c => c.estado === 'devuelto' && c._pendiente <= 0);
     return contratosConPendiente.filter(c => c.estado === estadoFiltro);
   }, [contratosConPendiente, estadoFiltro]);
 
-  const atrasados = contratosConPendiente.filter(c => c.estado === 'atrasado' || c.dias_atraso > 0);
+  const atrasados = contratosConPendiente.filter(c => c.dias_atraso > 0 && !(c.estado === 'devuelto' && c._pendiente <= 0));
 
   const toggleExpand = (id) => setExpandido(prev => prev === id ? null : id);
 
@@ -279,9 +279,16 @@ const handleDevolverGarantia = async () => {
               if (pendiente > 0) {
                 badges.push({ text: `Debe S/ ${pendiente.toFixed(2)}`, bg: 'oklch(0.95 0.015 25)', color: 'var(--danger)', icon: true });
               }
-            } else if (c.estado === 'alquilado' || c.estado === 'reservado') {
+            } else if (pendiente > 0 || itemsAtrasados > 0) {
+              borderColor = 'var(--danger)';
+              if (itemsAtrasados > 0) {
+                badges.push({ text: `Atrasado ${itemsAtrasados} herramienta${itemsAtrasados !== 1 ? 's' : ''}`, bg: 'oklch(0.95 0.015 25)', color: 'var(--danger)', icon: true });
+              }
+              if (pendiente > 0) {
+                badges.push({ text: `Debe S/ ${pendiente.toFixed(2)}`, bg: 'oklch(0.95 0.015 25)', color: 'var(--danger)', icon: true });
+              }
+            } else {
               borderColor = 'var(--success)';
-              badges.push({ text: c.estado === 'alquilado' ? 'Alquilado' : 'Reservado', bg: 'oklch(0.93 0.05 160)', color: 'var(--success)', icon: false });
             }
 
             return (
