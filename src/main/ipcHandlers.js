@@ -13,6 +13,7 @@ const {
   getDevolucionesGranel,
   anularPago,
 } = require('./services/contratoService');
+const { checkActivation, activateLicense, getMachineId } = require('./services/licenseService');
 const {
   getHerramientas,
   crearHerramienta,
@@ -437,6 +438,14 @@ ipcMain.handle('log', (_e, msg) => {
       console.error('[Restaurar Error]', error);
       return { success: false, error: error.message };
     }
+  });
+
+  ipcMain.handle('license:check', () => checkActivation());
+  ipcMain.handle('license:activate', (_e, key) => activateLicense(key));
+  ipcMain.handle('license:getMachineId', () => getMachineId());
+  ipcMain.handle('license:getRawMachineId', () => {
+    const { machineIdSync } = require('node-machine-id');
+    return machineIdSync({ original: true });
   });
 
   console.log('[IPC] Manejadores IPC registrados.');

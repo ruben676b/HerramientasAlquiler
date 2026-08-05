@@ -84,4 +84,12 @@ contextBridge.exposeInMainWorld('api', {
   // Backup
   crearBackup: () => ipcRenderer.invoke('crear-backup'),
   restaurarBackup: () => ipcRenderer.invoke('restaurar-backup'),
+
+  // Licencia
+  license: {
+    check: () => ipcRenderer.invoke('license:check'),
+    activate: (key) => ipcRenderer.invoke('license:activate', key),
+    getMachineId: () => ipcRenderer.invoke('license:getMachineId'),
+    getRawMachineId: () => ipcRenderer.invoke('license:getRawMachineId'),
+  },
 });
