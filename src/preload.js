@@ -71,6 +71,12 @@ contextBridge.exposeInMainWorld('api', {
   eliminarImagenGranel: (nombre) => ipcRenderer.invoke('eliminar-imagen-granel', nombre),
   getImagenItem: (tipo, id) => ipcRenderer.invoke('get-imagen-item', tipo, id),
   leerImagen: (ruta) => ipcRenderer.invoke('leer-imagen', ruta),
+
+  // Daños predefinidos
+  getDañosPredefinidos: (tipoItem, ref) => ipcRenderer.invoke('get-danos-predefinidos', tipoItem, ref),
+  guardarDañoPredefinido: (datos) => ipcRenderer.invoke('guardar-dano-predefinido', datos),
+  eliminarDañoPredefinido: (id) => ipcRenderer.invoke('eliminar-dano-predefinido', id),
+  getDañosItem: (tipo, id) => ipcRenderer.invoke('get-danos-item', tipo, id),
   getAllConfig: () => ipcRenderer.invoke('get-all-config'),
   saveConfig: (clave, valor) => ipcRenderer.invoke('save-config', clave, valor),
 

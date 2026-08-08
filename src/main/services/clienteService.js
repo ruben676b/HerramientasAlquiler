@@ -57,6 +57,7 @@ function getContratosCliente(idCliente) {
            (SELECT COUNT(*) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS total_items,
            (SELECT SUM(precio_dia_aplicado * cantidad) FROM DETALLE_CONTRATO WHERE id_contrato = c.id) AS subtotal_diario,
            (SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = c.id AND tipo NOT IN ('deposito', 'devolucion_deposito') AND (anulado IS NULL OR anulado = 0)) AS total_pagado,
+           (SELECT COALESCE(SUM(costo), 0) FROM DAÑO_DEVOLUCION WHERE id_contrato = c.id AND revertido = 0) AS total_danos,
            cal.estrellas, cal.comentario AS calificacion_comentario
     FROM CONTRATO c
     LEFT JOIN CALIFICACION_CLIENTE cal ON cal.id_contrato = c.id
@@ -155,12 +156,11 @@ function getDetalleContrato(idContrato) {
     return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem, dias_item: diasItem, total_item: totalItem, pagado_item: pagadoItem, saldo_item: saldoItem };
   });
 
-  // Sumar costos de reparación de MANTENIMIENTO para individuales dañados
+  // Sumar costos de DAÑO_DEVOLUCION para individuales dañados
   const danosIndividuales = db.prepare(`
-    SELECT COALESCE(SUM(m.costo), 0) AS total
-    FROM MANTENIMIENTO m
-    JOIN DETALLE_CONTRATO d ON d.id_herramienta = m.id_herramienta
-    WHERE d.id_contrato = ? AND d.tipo_item = 'individual' AND d.estado_devolucion = 'dañado'
+    SELECT COALESCE(SUM(costo), 0) AS total
+    FROM DAÑO_DEVOLUCION
+    WHERE id_contrato = ? AND revertido = 0 AND tipo_item = 'individual'
   `).get(idContrato);
   total_danos += danosIndividuales.total || 0;
 

@@ -373,6 +373,12 @@ function ContratoItem({ contrato, onClick }) {
           <span className="text-[10px] shrink-0" style={{ color: 'var(--muted)' }}>
             {contrato.total_items} item{contrato.total_items !== 1 ? 's' : ''}
           </span>
+          {(contrato.total_danos || 0) > 0 && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
+              style={{ backgroundColor: 'oklch(0.93 0.05 75)', color: 'var(--warning)' }}>
+              Daños: S/ {Number(contrato.total_danos).toFixed(2)}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-3 shrink-0">

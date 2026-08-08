@@ -5,6 +5,7 @@ import UnifiedPaymentModal from './UnifiedPaymentModal';
 import AnularPagoModal from './AnularPagoModal';
 import CalificarContratoModal from './CalificarContratoModal';
 import ImagenVisor from './ImagenVisor';
+import ConfirmModal from './ConfirmModal';
 import { gruparPagos } from '../lib/gruparPagos';
 import { localDate } from '../lib/date';
 
@@ -63,6 +64,18 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [calificarModal, setCalificarModal] = useState(false);
   // Visor de imagen de referencia
   const [visor, setVisor] = useState(null);
+  // Catálogo de daños predefinidos por ítem: [idx] = { lista, cargando }
+  const [dañosCat, setDañosCat] = useState({});
+  // Daños predefinidos agregados al listado por ítem: [idx] = [{ id, nombre, costo }]
+  const [dañosAgregados, setDañosAgregados] = useState({});
+  // Acordeón de sugerencias de daños por ítem: undefined = abierto, false = cerrado
+  const [dañosAcordeon, setDañosAcordeon] = useState({});
+  // Acordeón de lista de daños registrados por ítem: undefined = abierto, false = cerrado
+  const [listaAcordeon, setListaAcordeon] = useState({});
+  // Acordeón del detalle de daños en cierre: undefined = abierto, false = cerrado
+  const [detalleDañosAbierto, setDetalleDañosAbierto] = useState(undefined);
+  // Confirmación para deshacer devolución: null | { tipo, idx, idDevolucion?, nombre }
+  const [confirmDeshacer, setConfirmDeshacer] = useState(null);
 
   const verImagenItem = async (item) => {
     try {
@@ -97,18 +110,13 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
 
   const handleDeshacerGranel = async (idDevolucionGranel, idx) => {
     if (!window.api) return;
-    try {
-      await window.api.revertirDevolucionGranel(idDevolucionGranel);
-      // Limpiar caché y recargar historial
-      setDevolucionesGranel(p => { const n = { ...p }; delete n[idx]; return n; });
-      toast('Devolución revertida');
-      onRecargar();
-      // Recargar historial automáticamente
-      const item = items[idx];
-      if (item) cargarHistorialGranel(idx, item);
-    } catch (e) {
-      toast('Error al revertir: ' + (e.message || e), 'error');
-    }
+    const item = items[idx];
+    setConfirmDeshacer({
+      tipo: 'granel',
+      idx,
+      idDevolucion: idDevolucionGranel,
+      nombre: item?.item_nombre || item?.nombre || 'este material',
+    });
   };
 
   const c = contrato;
@@ -138,10 +146,19 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
     return sum + (morasEditadas[idx] != null ? morasEditadas[idx] : sugerida);
   }, 0);
 
-  const costosDanosBackend = items.reduce((s, i) => s + (i.granel_dev_costo_reparacion || 0), 0);
+  const costosDanosBackend = items.reduce((s, i) => {
+    if (i.id_item_granel) return s + (i.granel_dev_costo_reparacion || 0);
+    if (i.estado_devolucion === 'dañado' && i.danos_devueltos && i.danos_devueltos.length > 0) {
+      return s + i.danos_devueltos.reduce((x, d) => x + (d.costo || 0), 0);
+    }
+    return s;
+  }, 0);
   const costosPerdBackend = items.reduce((s, i) => s + (i.granel_dev_costo_perdida || 0), 0);
-  const costosDanosLocal = Object.entries(costosRep).reduce((a, [idx, v]) => {
-    if (estados[idx] === 'dañado' && v > 0) return a + parseFloat(v);
+  const costosDanosLocal = Object.entries(estados).reduce((a, [idx, v]) => {
+    if (v === 'dañado' && items[idx] && !items[idx].id_item_granel) {
+      const lista = dañosAgregados[idx] || [];
+      return a + lista.reduce((s, d) => s + (parseFloat(d.costo) || 0), 0);
+    }
     return a;
   }, 0);
   const costosPerdLocal = Object.values(costosPerdida).reduce((a, v) => a + (parseFloat(v) || 0), 0);
@@ -176,18 +193,41 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
 
   const handleDeshacer = async (idx) => {
     if (!window.api) return;
+    const item = items[idx];
+    setConfirmDeshacer({
+      tipo: 'individual',
+      idx,
+      nombre: item?.item_nombre || item?.nombre || 'este ítem',
+    });
+  };
+
+  const ejecutarDeshacer = async () => {
+    if (!confirmDeshacer || !window.api) return;
+    const { tipo, idx, idDevolucion } = confirmDeshacer;
+    setConfirmDeshacer(null);
     try {
-      await window.api.revertirDevolucion({ idDetalle: items[idx].id });
-      setGuardados(p => { const n = { ...p }; delete n[idx]; return n; });
-      setEstados(p => { const n = { ...p }; delete n[idx]; return n; });
-      // Limpiar estado granel asociado
-      setBuenas(p => { const n = { ...p }; delete n[idx]; return n; });
-      setDanadas(p => { const n = { ...p }; delete n[idx]; return n; });
-      setPerdidas(p => { const n = { ...p }; delete n[idx]; return n; });
-      setCostosPerdida(p => { const n = { ...p }; delete n[idx]; return n; });
-      setCostosRep(p => { const n = { ...p }; delete n[idx]; return n; });
+      if (tipo === 'individual') {
+        await window.api.revertirDevolucion({ idDetalle: items[idx].id });
+        setGuardados(p => { const n = { ...p }; delete n[idx]; return n; });
+        setEstados(p => { const n = { ...p }; delete n[idx]; return n; });
+        setBuenas(p => { const n = { ...p }; delete n[idx]; return n; });
+        setDanadas(p => { const n = { ...p }; delete n[idx]; return n; });
+        setPerdidas(p => { const n = { ...p }; delete n[idx]; return n; });
+        setCostosPerdida(p => { const n = { ...p }; delete n[idx]; return n; });
+        setCostosRep(p => { const n = { ...p }; delete n[idx]; return n; });
+        setDañosCat(p => { const n = { ...p }; delete n[idx]; return n; });
+        setDañosAgregados(p => { const n = { ...p }; delete n[idx]; return n; });
+setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
+      setListaAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
       delete guardadosRef.current[idx];
-      toast('Devolución revertida');
+        toast('Devolución revertida');
+      } else if (tipo === 'granel') {
+        await window.api.revertirDevolucionGranel(idDevolucion);
+        setDevolucionesGranel(p => { const n = { ...p }; delete n[idx]; return n; });
+        toast('Devolución revertida');
+        const item = items[idx];
+        if (item) cargarHistorialGranel(idx, item);
+      }
       onRecargar();
     } catch (e) {
       toast('Error al revertir: ' + (e.message || e), 'error');
@@ -196,11 +236,17 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
 
   const seleccionarEstado = (idx, e) => {
     if (guardadosRef.current[idx]) return;
-    setEstados(p => {
-      const actual = p[idx];
-      if (actual === e) return { ...p, [idx]: null };
-      return { ...p, [idx]: e };
-    });
+    const actual = estados[idx];
+    if (actual === e) {
+      // Toggle off: limpiar estado y selección de daños
+      setEstados(p => ({ ...p, [idx]: null }));
+      setDañosAgregados(p => { const n = { ...p }; delete n[idx]; return n; });
+      setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
+      setListaAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
+      return;
+    }
+    setEstados(p => ({ ...p, [idx]: e }));
+    if (e === 'dañado') cargarDañosItem(idx, items[idx]);
   };
 
   const guardarDevolucionBatch = async () => {
@@ -229,7 +275,8 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
           itemsDevueltos: [{
             id_detalle: item.id,
             estado_devolucion: estado,
-            costo_reparacion: estado === 'dañado' ? (parseFloat(costosRep[idx]) || 0) : undefined,
+            costo_reparacion: estado === 'dañado' ? ((dañosAgregados[idx] || []).reduce((s, d) => s + (parseFloat(d.costo) || 0), 0)) : undefined,
+            danos: estado === 'dañado' ? (dañosAgregados[idx] || []).map(d => ({ nombre: d.nombre, costo: parseFloat(d.costo) || 0 })) : undefined,
           }],
           observaciones: notas[idx] ? { [item.id]: notas[idx] } : {},
         });
@@ -298,7 +345,10 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
     const item = items[idx];
     const pend = item.granel_pendiente ?? item.cantidad;
     const max = Math.max(0, pend - (buenas[idx] || 0) - (perdidas[idx] || 0));
-    setDanadas(p => ({ ...p, [idx]: Math.max(0, Math.min(v, max)) }));
+    const capped = Math.max(0, Math.min(v, max));
+    setDanadas(p => ({ ...p, [idx]: capped }));
+    if (capped > 0) cargarDañosItem(idx, item);
+    if (capped === 0) setDañosAgregados(p => { const n = { ...p }; delete n[idx]; return n; });
   };
   const setPerd = (idx, v) => {
     const item = items[idx];
@@ -337,7 +387,8 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
       const hoy = localDate();
       const outcomes = [];
       if (b > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'bien', cantidad_devuelta: b });
-      if (d > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'dañado', cantidad_devuelta: d, costo_reparacion: parseFloat(costosRep[idx]) || 0 });
+      if (d > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'dañado', cantidad_devuelta: d, costo_reparacion: (dañosAgregados[idx] || []).reduce((s, dd) => s + (parseFloat(dd.costo) || 0), 0),
+        danos: (dañosAgregados[idx] || []).map(dd => ({ nombre: dd.nombre, costo: parseFloat(dd.costo) || 0 })) });
       if (p_ > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'perdido', cantidad_devuelta: p_, costo_perdida: parseFloat(costosPerdida[idx]) || null });
       window.api.log('[DEBUG registrarDevParcialGranel] outcomes: ' + JSON.stringify(outcomes) + ' contratoId: ' + c.id);
       const devResp = await window.api.registrarDevolucion({
@@ -353,6 +404,10 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
       setPerdidas(p => { const n = { ...p }; delete n[idx]; return n; });
       setCostosPerdida(p => { const n = { ...p }; delete n[idx]; return n; });
       setCostosRep(p => { const n = { ...p }; delete n[idx]; return n; });
+      setDañosCat(p => { const n = { ...p }; delete n[idx]; return n; });
+      setDañosAgregados(p => { const n = { ...p }; delete n[idx]; return n; });
+      setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
+      setListaAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
       // Invalidar caché del historial para recargar
       setDevolucionesGranel(p => { const n = { ...p }; delete n[idx]; return n; });
       toast((item.item_nombre || item.nombre) + ' — devuelto parcialmente');
@@ -409,6 +464,131 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
     onRecargar();
   };
 
+  /** Carga el catálogo de daños predefinidos de un ítem (una sola vez). */
+  const cargarDañosItem = async (idx, item) => {
+    if (!window.api || dañosCat[idx]?.lista) return;
+    const tipo = item.id_herramienta ? 'herramienta' : 'granel';
+    const id = item.id_herramienta || item.id_item_granel;
+    if (id == null) return;
+    setDañosCat(p => ({ ...p, [idx]: { lista: null, cargando: true } }));
+    try {
+      const lista = await window.api.getDañosItem(tipo, id);
+      if (!mountedRef.current) return;
+      setDañosCat(p => ({ ...p, [idx]: { lista, cargando: false } }));
+    } catch (e) {
+      if (!mountedRef.current) return;
+      setDañosCat(p => ({ ...p, [idx]: { lista: [], cargando: false } }));
+    }
+  };
+
+  /** Autocompleta campos de borrador con el daño sugerido */
+  const autocompletarDaño = (idx, d) => {
+    setCosto(idx, String(d.costo_sugerido));
+    setNota(idx, d.nombre);
+  };
+
+  /** Agrega el daño del borrador al listado */
+  const agregarDaño = (idx) => {
+    const nombre = (notas[idx] || '').trim();
+    const costo = parseFloat(costosRep[idx]) || 0;
+    if (!nombre && costo <= 0) return;
+    const entry = {
+      id: Date.now() + Math.random(),
+      nombre: nombre || 'Daño S/' + costo.toFixed(2),
+      costo,
+    };
+    setDañosAgregados(p => ({
+      ...p,
+      [idx]: [...(p[idx] || []), entry],
+    }));
+    // Limpiar borrador
+    setNota(idx, '');
+    setCosto(idx, '');
+  };
+
+  /** Quita un daño del listado por su id */
+  const quitarDaño = (idx, id) => {
+    setDañosAgregados(p => {
+      const lista = (p[idx] || []).filter(d => d.id !== id);
+      if (lista.length === 0) {
+        const n = { ...p };
+        delete n[idx];
+        return n;
+      }
+      return { ...p, [idx]: lista };
+    });
+  };
+
+  /** Lista de daños agregados para el ítem idx (acordeón vertical, abierto por defecto). */
+  const ListaDaños = ({ idx }) => {
+    const lista = dañosAgregados[idx] || [];
+    if (lista.length === 0) return null;
+    const abierto = listaAcordeon[idx] !== false;
+    return (
+      <div className="mt-1">
+        <button onClick={() => setListaAcordeon(p => ({ ...p, [idx]: abierto ? false : undefined }))}
+          className="flex items-center gap-1 text-[9px] uppercase tracking-wider font-semibold w-full text-left"
+          style={{ color: 'var(--muted)' }}>
+          <ChevronRight size={10}
+            style={{ transform: abierto ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }} />
+          Daños registrados ({lista.length})
+        </button>
+        {abierto && (
+          <div className="flex flex-col gap-0.5 mt-1">
+            {lista.map(d => (
+              <div key={d.id}
+                className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium"
+                style={{ backgroundColor: 'oklch(0.62 0.17 80 / 0.12)', color: 'oklch(0.52 0.17 80)' }}>
+                <span className="truncate flex-1">{d.nombre}</span>
+                <span className="font-mono shrink-0">S/ {d.costo.toFixed(2)}</span>
+                <button onClick={() => quitarDaño(idx, d.id)}
+                  className="w-3.5 h-3.5 rounded flex items-center justify-center hover:bg-black/10 font-bold leading-none shrink-0"
+                  style={{ color: 'oklch(0.52 0.17 80)', fontSize: '11px' }}>x</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /** Chips de daños sugeridos para el ítem idx (acordeón, solo autocompletan). */
+  const ChipsDaños = ({ idx }) => {
+    const info = dañosCat[idx];
+    if (!info) return null;
+    if (info.cargando) {
+      return <p className="text-[9px] mt-1" style={{ color: 'var(--faint)' }}>Cargando daños sugeridos...</p>;
+    }
+    if (!info.lista || info.lista.length === 0) return null;
+    const abierto = dañosAcordeon[idx] !== false;
+    return (
+      <div className="mt-1">
+        <button onClick={() => setDañosAcordeon(p => ({ ...p, [idx]: abierto ? false : undefined }))}
+          className="flex items-center gap-1 text-[9px] uppercase tracking-wider font-semibold w-full text-left"
+          style={{ color: 'var(--muted)' }}>
+          <ChevronRight size={10}
+            style={{ transform: abierto ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }} />
+          Sugerencias de daños ({info.lista.length})
+        </button>
+        {abierto && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {info.lista.map(d => (
+              <button key={d.id} onClick={() => autocompletarDaño(idx, d)}
+                className="px-1.5 h-5 rounded text-[9px] font-medium transition-all duration-150 active:scale-95"
+                style={{
+                  backgroundColor: 'var(--bg)',
+                  color: 'var(--muted)',
+                  border: '0.5px solid var(--border)',
+                }}>
+                {d.nombre} · S/ {d.costo_sugerido.toFixed(2)}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <><style>{`
       .dev-nospin::-webkit-inner-spin-button,
@@ -446,7 +626,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
       
       <div className="grid grid-cols-[3fr_2fr] gap-0 min-h-0">
         {/* COLUMNA IZQUIERDA: Items en devolución */}
-        <div className="px-4 py-2 space-y-3">
+        <div className="px-4 py-2 space-y-3 min-w-0">
           {items.length === 0 ? (
             <p className="text-xs" style={{ color: 'var(--faint)' }}>Sin ítems registrados</p>
           ) : (
@@ -523,8 +703,11 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                     )}
                     {yaGuardado && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                        style={{ backgroundColor: esKit && item.estado_devolucion === 'dañado' ? 'oklch(0.55 0.12 70)' : 'oklch(0.50 0.13 155)', color: '#fff' }}>
-                        {esKit && item.estado_devolucion === 'dañado' ? 'Dañado' : 'Devuelto'}
+                        style={{
+                          backgroundColor: item.estado_devolucion === 'dañado' ? 'oklch(0.55 0.12 70)' : item.estado_devolucion === 'perdido' ? 'oklch(0.55 0.19 30)' : 'oklch(0.50 0.13 155)',
+                          color: '#fff',
+                        }}>
+                        {item.estado_devolucion === 'dañado' ? 'Dañado' : item.estado_devolucion === 'perdido' ? 'Perdido' : 'Devuelto'}
                       </span>
                     )}
                     {esKit && pendKit > 0 && !kitAbierto[item.id] && (
@@ -555,6 +738,15 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                     <span style={{ color: 'var(--muted)' }}> &middot; Base: {diasItem} día{diasItem !== 1 ? 's' : ''}</span>
                   </div>
                   )}
+                  {/* Desglose de daños en individuales guardados */}
+                  {!esGranel && !esKit && yaGuardado && item.estado_devolucion === 'dañado' && item.danos_devueltos && item.danos_devueltos.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]" style={{ color: 'var(--faint)' }}>
+                      <span className="font-medium">Costos:</span>
+                      <span style={{ color: 'var(--warning)' }}>
+                        {item.danos_devueltos.map(d => d.nombre + ' S/' + d.costo.toFixed(2)).join(' · ')}
+                      </span>
+                    </div>
+                  )}
                   {/* Granel: resumen + historial */}
                   {esGranel && (() => {
                     window.api.log('[DEBUG DevolucionInline render] item: ' + item.id + ' id_item_granel: ' + item.id_item_granel + ' granel_pendiente: ' + item.granel_pendiente + ' granel_dev_bien: ' + item.granel_dev_bien + ' granel_dev_danada: ' + item.granel_dev_danada + ' granel_dev_perdida: ' + item.granel_dev_perdida + ' cantidad: ' + item.cantidad);
@@ -583,11 +775,15 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
 
                         {/* Costos registrados */}
                         {(item.granel_dev_costo_reparacion || item.granel_dev_costo_perdida) ? (
-                          <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--faint)' }}>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]" style={{ color: 'var(--faint)' }}>
                             <span className="font-medium">Costos:</span>
-                            {item.granel_dev_costo_reparacion > 0 && (
+                            {item.danos_devueltos && item.danos_devueltos.length > 0 ? (
+                              <span style={{ color: 'var(--warning)' }}>
+                                {item.danos_devueltos.map(d => d.nombre + ' S/' + d.costo.toFixed(2)).join(' · ')}
+                              </span>
+                            ) : item.granel_dev_costo_reparacion > 0 ? (
                               <span style={{ color: 'var(--warning)' }}>Daños S/ {item.granel_dev_costo_reparacion.toFixed(2)}</span>
-                            )}
+                            ) : null}
                             {item.granel_dev_costo_perdida > 0 && (
                               <span style={{ color: 'var(--danger)' }}>Pérdidas S/ {item.granel_dev_costo_perdida.toFixed(2)}</span>
                             )}
@@ -643,16 +839,25 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                               )}
                               <button onClick={() => setDan(idx, (danadas[idx] || 0) + 1)}
                                 className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/5" style={{ color: 'var(--muted)' }}><Plus size={10} /></button>
-                              {(danadas[idx] || 0) > 0 && (
-                                <span className="flex items-center gap-0.5 ml-1">
-                                  <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Costo S/</span>
-                                  <input type="number" step="0.01" min="0" value={costosRep[idx] ?? ''}
-                                    placeholder="0" onChange={e => setCosto(idx, e.target.value)}
-                                    className="w-14 h-5 px-0.5 rounded text-[9px] border text-center font-mono dev-nospin"
-                                    style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
-                                </span>
-                              )}
-                            </div>
+                              </div>
+                            {(danadas[idx] || 0) > 0 && (
+                              <div className="flex flex-wrap items-center gap-1 mt-1">
+                                <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Costo S/</span>
+                                <input type="number" step="0.01" min="0" value={costosRep[idx] ?? ''}
+                                  placeholder="0" onChange={e => setCosto(idx, e.target.value)}
+                                  className="w-14 h-5 px-0.5 rounded text-[9px] border text-center font-mono dev-nospin"
+                                  style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                                <input placeholder="Nota..." value={notas[idx] || ''}
+                                  onChange={e => setNota(idx, e.target.value)}
+                                  className="flex-1 min-w-[50px] h-5 px-1 rounded text-[9px] border"
+                                  style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                                <button onClick={() => agregarDaño(idx)}
+                                  className="w-4 h-4 rounded flex items-center justify-center shrink-0 transition-all duration-150 active:scale-90 text-[10px] font-bold"
+                                  style={{ backgroundColor: 'oklch(0.50 0.13 155)', color: '#fff', lineHeight: '1' }}>+</button>
+                              </div>
+                            )}
+                            {(danadas[idx] || 0) > 0 && <ListaDaños idx={idx} />}
+                            {(danadas[idx] || 0) > 0 && <ChipsDaños idx={idx} />}
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] font-medium" style={{ color: 'var(--danger)' }}>Perdidas:</span>
                               <button onClick={() => setPerd(idx, Math.max(0, (perdidas[idx] || 0) - 1))}
@@ -751,18 +956,26 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                     );
                   })()}
                   {/* Dañado: costo + nota — solo individual */}
-                  {!esGranel && !esKit && est === 'dañado' && (
-                    <div className="flex items-center gap-2 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
-                      <span className="text-[10px] shrink-0" style={{ color: 'var(--muted)' }}>Costo reparación: S/</span>
-                      <input type="number" step="0.01" min="0" value={costosRep[idx] ?? ''}
-                        placeholder="0" onChange={e => setCosto(idx, e.target.value)}
-                        className="w-16 h-6 px-1 rounded text-xs border text-center font-mono dev-nospin"
-                        style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
-                      <input placeholder="Nota del daño..." value={notas[idx] || ''}
-                        onChange={e => setNota(idx, e.target.value)}
-                        className="flex-1 h-6 px-1.5 rounded text-[10px] border"
-                        style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
-                    </div>
+                  {!esGranel && !esKit && est === 'dañado' && !yaGuardado && (
+                    <>
+                      <div className="flex items-center gap-2 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
+                        <span className="text-[10px] shrink-0" style={{ color: 'var(--muted)' }}>Costo reparación: S/</span>
+                        <input type="number" step="0.01" min="0" value={costosRep[idx] ?? ''}
+                          placeholder="0" onChange={e => setCosto(idx, e.target.value)}
+                          className="w-16 h-6 px-1 rounded text-xs border text-center font-mono dev-nospin"
+                          style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                        <input placeholder="Nota del daño..." value={notas[idx] || ''}
+                          onChange={e => setNota(idx, e.target.value)}
+                          className="flex-1 h-6 px-1.5 rounded text-[10px] border"
+                          style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                        <button onClick={() => agregarDaño(idx)}
+                          className="w-6 h-6 rounded flex items-center justify-center shrink-0 transition-all duration-150 active:scale-90 text-sm font-bold"
+                          style={{ backgroundColor: 'oklch(0.50 0.13 155)', color: '#fff' }}
+                          title="Añadir daño">+</button>
+                      </div>
+                      <ListaDaños idx={idx} />
+                      <ChipsDaños idx={idx} />
+                    </>
                   )}
                 </>
               );
@@ -857,10 +1070,51 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
             
             {/* Daños */}
             {totalDanos > 0 && (
+              <>
               <div className="flex justify-between">
                 <span style={{ color: 'var(--warning)' }}>Cobro por daños</span>
                 <span className="font-mono tabular-nums" style={{ color: 'var(--warning)' }}>+ S/ {totalDanos.toFixed(2)}</span>
               </div>
+              {(() => {
+                const partes = [];
+                for (const [, lista] of Object.entries(dañosAgregados)) {
+                  for (const d of lista || []) {
+                    partes.push({ nombre: d.nombre, costo: parseFloat(d.costo) || 0 });
+                  }
+                }
+                for (const item of items) {
+                  if (item.danos_devueltos) {
+                    for (const d of item.danos_devueltos) {
+                      partes.push({ nombre: d.nombre, costo: d.costo });
+                    }
+                  }
+                }
+                if (partes.length === 0) return null;
+                return (
+                  <div className="mt-0.5">
+                    <button onClick={() => setDetalleDañosAbierto(p => p === false ? undefined : false)}
+                      className="flex items-center gap-1 text-[9px] uppercase tracking-wider font-semibold w-full text-left"
+                      style={{ color: 'var(--muted)' }}>
+                      <ChevronRight size={10}
+                        style={{ transform: detalleDañosAbierto !== false ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }} />
+                      Detalle de daños ({partes.length})
+                    </button>
+                    {detalleDañosAbierto !== false && (
+                      <div className="flex flex-col gap-0.5 mt-0.5 pl-3">
+                        {partes.map((p, i) => (
+                          <div key={i}
+                            className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium"
+                            style={{ backgroundColor: 'oklch(0.62 0.17 80 / 0.12)', color: 'oklch(0.52 0.17 80)' }}>
+                            <span className="truncate flex-1">{p.nombre}</span>
+                            <span className="font-mono shrink-0">S/ {p.costo.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              </>
             )}
             {/* Pérdidas */}
             {totalPerdidas > 0 && (
@@ -1029,6 +1283,17 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
         idCliente={c.id_cliente}
         onClose={() => setCalificarModal(false)}
         onGuardado={() => { toast('Calificación guardada'); }}
+      />
+    )}
+    {confirmDeshacer && (
+      <ConfirmModal
+        open={true}
+        title={'Revertir devolución'}
+        message={'¿Revertir la devolución de ' + confirmDeshacer.nombre + '? Esta acción eliminará el registro de devolución y sus daños asociados.'}
+        confirmLabel={'Sí, revertir'}
+        danger={true}
+        onConfirm={ejecutarDeshacer}
+        onCancel={() => setConfirmDeshacer(null)}
       />
     )}
     {visor && (

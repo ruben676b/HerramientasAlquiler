@@ -377,6 +377,7 @@ export default function Inventario() {
                         title="Agregar unidades"
                       ><Plus size={13} /></button>
                       <button onClick={() => setModal({ tipo: 'editar-familia', familia: f })} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 active:scale-90" style={{ color: 'var(--muted)' }} title="Editar"><Pencil size={13} /></button>
+                      <button onClick={() => setModal({ tipo: 'danos-familia', familia: f })} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 active:scale-90" style={{ color: 'var(--muted)' }} title="Daños predefinidos"><AlertTriangle size={13} /></button>
                       <button onClick={() => setConfirm({ id: f.id_categoria, nombre: f.nombre, total: f.total })} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-950 active:scale-90" style={{ color: 'var(--muted)' }} title="Eliminar"><Trash2 size={13} /></button>
                     </div>
                   </button>
@@ -410,20 +411,48 @@ export default function Inventario() {
                             ><Trash2 size={13} /></button>
                             </div>
                             {/* Mini-historial */}
-                            {historial[h.id] && (historial[h.id].ultimoAlquiler || historial[h.id].mantenimientos?.length > 0) && (
+                            {historial[h.id]?.mantenimientos?.length > 0 && (
                               <div className="px-4 py-1.5 text-[11px] space-y-0.5" style={{ backgroundColor: 'var(--sidebar-hover)', borderBottom: '1px solid var(--border)' }}>
-                                {historial[h.id].ultimoAlquiler && (
-                                  <div style={{ color: 'var(--muted)' }}>
-                                    Último alquiler: {historial[h.id].ultimoAlquiler.fecha_salida}
-                                    {historial[h.id].ultimoAlquiler.fecha_devolucion_real ? ' → ' + historial[h.id].ultimoAlquiler.fecha_devolucion_real : ' (activo)'}
-                                    {' — ' + historial[h.id].ultimoAlquiler.cliente_nombre}
-                                  </div>
-                                )}
-                                {historial[h.id].mantenimientos?.map((m, i) => (
-                                  <div key={i} style={{ color: 'var(--muted)' }}>
-                                    Mantenimiento: {m.fecha_inicio}{m.fecha_fin ? ' → ' + m.fecha_fin : ' (abierto)'} — {m.descripcion}
-                                  </div>
-                                ))}
+                                {historial[h.id].mantenimientos.map((m, i) => {
+                                  const esDanioDevolucion = m.id_contrato && m.cliente_nombre;
+                                  const danios = m.id_contrato ? (historial[h.id].danosPorContrato?.[m.id_contrato] || []) : [];
+                                  const esActual = i === 0 && h.estado === 'mantenimiento';
+                                  return (
+                                    <div key={m.id || i} className={esActual ? 'rounded px-2 py-1 -mx-1' : ''}
+                                         style={esActual ? { backgroundColor: 'oklch(0.55 0.13 70 / 0.1)', borderLeft: '2px solid oklch(0.55 0.13 70)' } : {}}>
+                                      {esDanioDevolucion ? (
+                                        <>
+                                          <div className="flex items-center gap-1.5" style={{ color: esActual ? 'var(--warning)' : 'var(--muted)' }}>
+                                            <span className="font-semibold">Dañado</span>
+                                            <span style={{ color: 'var(--ink)' }}>por {m.cliente_nombre}</span>
+                                            <span style={{ color: 'var(--faint)' }}>— {m.fecha_inicio}</span>
+                                          </div>
+                                          {m.descripcion && !m.descripcion.startsWith('Devolucion:') && (
+                                            <div className="text-[10px] ml-3" style={{ color: 'var(--faint)' }}>{m.descripcion}</div>
+                                          )}
+                                          {danios.length > 0 && (
+                                            <div className="flex flex-col gap-0.5 ml-3 mt-0.5">
+                                              {danios.map((d, j) => (
+                                                <div key={j} className="text-[10px] flex items-center gap-1"
+                                                     style={{ color: esActual ? 'var(--warning)' : 'var(--faint)' }}>
+                                                  {'↳ ' + d.nombre + ' — S/ ' + d.costo.toFixed(2)}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <div style={{ color: 'var(--muted)' }}>
+                                          Marcado manualmente — {m.fecha_inicio}
+                                          {m.fecha_fin ? ' → ' + m.fecha_fin : ' (abierto)'}
+                                          {m.descripcion !== 'Cambio manual de estado a mantenimiento' && (
+                                            <span className="ml-1 text-[10px]" style={{ color: 'var(--faint)' }}>— {m.descripcion}</span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
@@ -466,6 +495,8 @@ export default function Inventario() {
                     <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => setModal({ tipo: 'editar-granel', data: g })}
                         className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 active:scale-90" style={{ color: 'var(--muted)' }} title="Editar"><Pencil size={13} /></button>
+                      <button onClick={() => setModal({ tipo: 'danos-granel', data: g })}
+                        className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 active:scale-90" style={{ color: 'var(--muted)' }} title="Daños predefinidos"><AlertTriangle size={13} /></button>
                       <button onClick={() => setConfirm({ id: g.nombre, nombre: g.nombre, total: g.total, tipo: 'material' })}
                         className="p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-950 active:scale-90" style={{ color: 'var(--muted)' }} title="Eliminar"><Trash2 size={13} /></button>
                     </div>
@@ -623,8 +654,10 @@ export default function Inventario() {
       {modal?.tipo === 'crear-familia' && <ModalCrearFamilia onSave={handleCrearFamilia} onClose={() => setModal(null)} />}
       {modal?.tipo === 'agregar-unidades' && <ModalAgregarUnidades familia={modal.familia} onSave={handleAgregarUnidades} onClose={() => setModal(null)} />}
       {modal?.tipo === 'editar-familia' && <ModalEditarFamilia familia={modal.familia} onSave={handleEditarFamilia} onClose={() => setModal(null)} />}
+      {modal?.tipo === 'danos-familia' && <ModalDañosFamilia familia={modal.familia} onClose={() => setModal(null)} />}
       {modal?.tipo === 'crear-granel' && <ModalCrearGranel onSave={handleCrearGranel} onClose={() => setModal(null)} />}
       {modal?.tipo === 'editar-granel' && <ModalEditarGranel data={modal.data} onSave={handleEditarGranel} onClose={() => setModal(null)} />}
+      {modal?.tipo === 'danos-granel' && <ModalDañosGranel data={modal.data} onClose={() => setModal(null)} />}
       {modal?.tipo === 'sumar-stock' && <StockModal data={modal.data} onApply={(d) => handleAjustarStock(modal.data.id, d)} onClose={() => setModal(null)} />}
       {modal?.tipo === 'baja-granel' && <BajaGranelModal data={modal.data} onSave={handleDarBaja} onClose={() => setModal(null)} />}
       {modal?.tipo === 'historial-granel' && <HistorialGranelModal data={modal.data} onUndo={handleRevertirAudit} onClose={() => setModal(null)} />}
@@ -1281,4 +1314,124 @@ function ModalEditarGranel({ data, onSave, onClose }) {
       <ImagenField rutaInicial={imagenActual} onCambio={setImagenEstado} />
     </ModalShell>
   );
+}
+
+/* ================================================================
+   DAÑOS PREDEFINIDOS — gestión (familia / material)
+   ================================================================ */
+
+function ModalDaños({ title, tipoItem, refKey, onClose }) {
+  const [daños, setDaños] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [nombre, setNombre] = useState('');
+  const [costo, setCosto] = useState('');
+  const nombreRef = useRef(null);
+  const toast = useToast();
+
+  const cargar = async () => {
+    try {
+      const lista = await window.api.getDañosPredefinidos(tipoItem, refKey);
+      setDaños(lista);
+    } catch (e) {
+      toast.show(e.message, 'error');
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  useEffect(() => { cargar(); }, [tipoItem, refKey]);
+
+  const agregar = async () => {
+    if (!nombre.trim()) return;
+    try {
+      await window.api.guardarDañoPredefinido({
+        tipo_item: tipoItem,
+        ...(tipoItem === 'individual' ? { id_categoria: refKey } : { nombre_granel: refKey }),
+        nombre: nombre.trim().replace(/\s+/g, ' '),
+        costo_sugerido: parseFloat(costo) || 0,
+      });
+      setNombre('');
+      setCosto('');
+      if (nombreRef.current) nombreRef.current.style.height = 'auto';
+      cargar();
+    } catch (e) {
+      toast.show(e.message, 'error');
+    }
+  };
+
+  const autoResize = (el) => {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 112) + 'px';
+  };
+
+  const quitar = async (id) => {
+    try {
+      await window.api.eliminarDañoPredefinido(id);
+      cargar();
+    } catch (e) {
+      toast.show(e.message, 'error');
+    }
+  };
+
+  return (
+    <>
+    <style>{`
+      .modal-danos-nospin::-webkit-inner-spin-button,
+      .modal-danos-nospin::-webkit-outer-spin-button {
+        -webkit-appearance: none !important;
+        margin: 0 !important;
+      }
+      .modal-danos-nospin { -moz-appearance: textfield !important; }
+    `}</style>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'oklch(0 0 0 / 0.4)' }} onClick={onClose}>
+      <div className="w-full max-w-xl rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>{title}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 active:scale-90" style={{ color: 'var(--muted)' }}><X size={16} /></button>
+        </div>
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>
+          Se mostrarán al marcar un ítem como dañado en una devolución, con su costo sugerido.
+        </p>
+        {cargando ? (
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Cargando…</p>
+        ) : daños.length === 0 ? (
+          <p className="text-xs py-1" style={{ color: 'var(--faint)' }}>Sin daños definidos todavía.</p>
+        ) : (
+          <div className="space-y-2">
+            {daños.map((d) => (
+              <div key={d.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+                <span className="flex-1 min-w-0 truncate" style={{ color: 'var(--ink)' }}>{d.nombre}</span>
+                <span className="font-mono text-sm shrink-0" style={{ color: 'var(--primary)' }}>S/ {d.costo_sugerido.toFixed(2)}</span>
+                <button onClick={() => quitar(d.id)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-950 active:scale-90 shrink-0" style={{ color: 'var(--muted)' }} title="Quitar"><Trash2 size={14} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2.5 pt-1 items-start">
+          <textarea ref={nombreRef} value={nombre}
+            onChange={(e) => { setNombre(e.target.value); autoResize(e.target); }}
+            placeholder="Daño (ej: Disco TCT roto)"
+            rows={1}
+            className="flex-1 min-h-10 max-h-28 px-3 py-2 rounded-lg text-sm border leading-5 outline-none transition-colors duration-150 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent resize-none overflow-y-auto"
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); agregar(); } }}
+            style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+          <input type="number" step="0.01" min="0" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="S/ 0.00"
+            className="w-36 shrink-0 h-10 px-3 rounded-lg text-sm border text-center font-mono outline-none transition-colors duration-150 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent modal-danos-nospin"
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); agregar(); } }}
+            style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+          <button onClick={agregar} className="h-10 px-4 shrink-0 rounded-lg flex items-center justify-center gap-1.5 text-sm font-semibold active:scale-90 transition-all duration-150"
+            style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-text)', border: 'none' }} title="Agregar"><Plus size={15} />Añadir</button>
+        </div>
+      </div>
+    </div>
+    </>
+  );
+}
+
+function ModalDañosFamilia({ familia, onClose }) {
+  return <ModalDaños title={'Daños: ' + (familia.nombre || familia.id_categoria)} tipoItem="individual" refKey={familia.id_categoria} onClose={onClose} />;
+}
+
+function ModalDañosGranel({ data, onClose }) {
+  return <ModalDaños title={'Daños: ' + data.nombre} tipoItem="granel" refKey={data.nombre} onClose={onClose} />;
 }

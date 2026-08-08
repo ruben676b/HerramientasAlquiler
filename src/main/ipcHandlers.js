@@ -53,6 +53,12 @@ const {
   getImagenItem,
   leerImagen,
 } = require('./services/imagenService');
+const {
+  getDañosPredefinidos,
+  guardarDañoPredefinido,
+  eliminarDañoPredefinido,
+  getDañosItem,
+} = require('./services/dañoService');
 const { guardarCalificacion } = require('./services/calificacionService');
 const {
   getClientesConCalificacion,
@@ -330,6 +336,23 @@ function registerIpcHandlers() {
 
   ipcMain.handle('leer-imagen', (_e, ruta) => {
     return leerImagen(ruta);
+  });
+
+  // --- Daños predefinidos ---
+  ipcMain.handle('get-danos-predefinidos', (_e, tipoItem, ref) => {
+    return getDañosPredefinidos(tipoItem, ref);
+  });
+
+  ipcMain.handle('guardar-dano-predefinido', (_e, datos) => {
+    return guardarDañoPredefinido(datos);
+  });
+
+  ipcMain.handle('eliminar-dano-predefinido', (_e, id) => {
+    return eliminarDañoPredefinido(id);
+  });
+
+  ipcMain.handle('get-danos-item', (_e, tipo, id) => {
+    return getDañosItem(tipo, id);
   });
 
   // --- Configuración ---

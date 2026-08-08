@@ -166,6 +166,7 @@ function initDatabase() {
     CREATE TABLE IF NOT EXISTS MANTENIMIENTO (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       id_herramienta TEXT NOT NULL,
+      id_contrato INTEGER REFERENCES CONTRATO(id),
       fecha_inicio TEXT NOT NULL,
       fecha_fin TEXT,
       descripcion TEXT NOT NULL,
@@ -226,6 +227,34 @@ function initDatabase() {
       revertido INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
       FOREIGN KEY (id_item_granel) REFERENCES ITEM_GRANEL(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS DAÑO_PREDEFINIDO (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tipo_item TEXT NOT NULL CHECK (tipo_item IN ('individual', 'granel')),
+      id_categoria TEXT,
+      nombre_granel TEXT,
+      nombre TEXT NOT NULL,
+      costo_sugerido REAL NOT NULL DEFAULT 0 CHECK (costo_sugerido >= 0),
+      activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
+      CHECK (
+        (tipo_item = 'individual' AND id_categoria NOT NULL AND nombre_granel IS NULL) OR
+        (tipo_item = 'granel' AND nombre_granel NOT NULL AND id_categoria IS NULL)
+      )
+    );
+
+    CREATE TABLE IF NOT EXISTS DAÑO_DEVOLUCION (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id_contrato INTEGER NOT NULL,
+      id_detalle INTEGER REFERENCES DETALLE_CONTRATO(id),
+      tipo_item TEXT NOT NULL CHECK (tipo_item IN ('individual', 'granel')),
+      id_herramienta TEXT,
+      id_item_granel INTEGER,
+      nombre TEXT NOT NULL,
+      costo REAL NOT NULL DEFAULT 0 CHECK (costo >= 0),
+      id_devolucion_granel INTEGER REFERENCES DEVOLUCION_GRANEL(id),
+      fecha TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      revertido INTEGER NOT NULL DEFAULT 0
     );
   `);
 
@@ -396,6 +425,23 @@ function initDatabase() {
     }
   } catch (err) {
     console.error('[DB] Error en migración tarifa_aplicada:', err);
+  }
+
+  // Migración: id_contrato en MANTENIMIENTO (para desglose de daños en inventario)
+  try {
+    const mantMigrado = db.prepare("SELECT valor FROM CONFIGURACION WHERE clave = 'mantenimiento_id_contrato_migrado'").get();
+    if (!mantMigrado) {
+      const cols = db.prepare("PRAGMA table_info(MANTENIMIENTO)").all();
+      const tieneIdContrato = cols.some(c => c.name === 'id_contrato');
+      if (!tieneIdContrato) {
+        db.exec(`ALTER TABLE MANTENIMIENTO ADD COLUMN id_contrato INTEGER REFERENCES CONTRATO(id)`);
+        console.log('[DB] Migración MANTENIMIENTO (id_contrato) completada.');
+      }
+      db.prepare(`INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion) VALUES (?, ?, ?)`)
+        .run('mantenimiento_id_contrato_migrado', 'true', 'Migración MANTENIMIENTO.id_contrato completada');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración MANTENIMIENTO id_contrato:', err);
   }
 
   // Siempre actualizar cláusulas (pueden cambiar entre versiones)

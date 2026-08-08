@@ -709,23 +709,32 @@ function cambiarEstado(id, nuevoEstado) {
 }
 
 function getHistorialUnidad(id) {
-  const ultimoAlquiler = db.prepare(`
-    SELECT c.id AS contrato_id, c.fecha_salida, c.fecha_devolucion_real, cl.nombre AS cliente_nombre
-    FROM DETALLE_CONTRATO d
-    JOIN CONTRATO c ON d.id_contrato = c.id
-    JOIN CLIENTE cl ON c.id_cliente = cl.id
-    WHERE d.id_herramienta = ?
-    ORDER BY c.fecha_creacion DESC LIMIT 1
-  `).get(id);
-
-  const ultimoMantenimiento = db.prepare(`
-    SELECT fecha_inicio, fecha_fin, descripcion, tipo, costo
-    FROM MANTENIMIENTO
-    WHERE id_herramienta = ?
-    ORDER BY id DESC LIMIT 3
+  // Últimos 5 mantenimientos con cliente asociado (si vienen de devolución)
+  const mantenimientos = db.prepare(`
+    SELECT m.id, m.fecha_inicio, m.fecha_fin, m.descripcion, m.tipo, m.costo, m.id_contrato,
+           cl.nombre AS cliente_nombre
+    FROM MANTENIMIENTO m
+    LEFT JOIN CONTRATO c ON m.id_contrato = c.id
+    LEFT JOIN CLIENTE cl ON c.id_cliente = cl.id
+    WHERE m.id_herramienta = ?
+    ORDER BY m.id DESC LIMIT 5
   `).all(id);
 
-  return { ultimoAlquiler: ultimoAlquiler || null, mantenimientos: ultimoMantenimiento };
+  // Desglose de daños predefinidos registrados en devoluciones de esta herramienta
+  const danos = db.prepare(`
+    SELECT d.id_contrato, d.nombre, d.costo, d.fecha
+    FROM DAÑO_DEVOLUCION d
+    JOIN MANTENIMIENTO m ON m.id_contrato = d.id_contrato
+    WHERE m.id_herramienta = ?
+    ORDER BY d.fecha DESC
+  `).all(id);
+  const danosPorContrato = {};
+  for (const dd of danos) {
+    if (!danosPorContrato[dd.id_contrato]) danosPorContrato[dd.id_contrato] = [];
+    danosPorContrato[dd.id_contrato].push({ nombre: dd.nombre, costo: dd.costo });
+  }
+
+  return { mantenimientos, danosPorContrato };
 }
 
 function getHerramientasPorCategoria() {

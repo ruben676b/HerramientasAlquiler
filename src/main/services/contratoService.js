@@ -376,8 +376,18 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
             totalDanos += item.costo_reparacion || 0;
             const hoy = localDate();
             const desc = observaciones?.[item.id_detalle] || 'Dañado en devolución';
-            db.prepare('INSERT INTO MANTENIMIENTO (id_herramienta, fecha_inicio, descripcion, tipo, costo) VALUES (?, ?, ?, ?, ?)')
-              .run(detalle.id_herramienta, hoy, 'Devolucion: ' + desc, 'correctivo', item.costo_reparacion || 0);
+            db.prepare('INSERT INTO MANTENIMIENTO (id_herramienta, fecha_inicio, descripcion, tipo, costo, id_contrato) VALUES (?, ?, ?, ?, ?, ?)')
+              .run(detalle.id_herramienta, hoy, 'Devolucion: ' + desc, 'correctivo', item.costo_reparacion || 0, idContrato);
+            // Guardar desglose de daños predefinidos para individual
+            if (item.danos && item.danos.length > 0) {
+              const insertDanoInd = db.prepare(`
+                INSERT INTO DAÑO_DEVOLUCION (id_contrato, id_detalle, tipo_item, id_herramienta, nombre, costo)
+                VALUES (?, ?, 'individual', ?, ?, ?)
+              `);
+              for (const d of item.danos) {
+                insertDanoInd.run(idContrato, item.id_detalle, detalle.id_herramienta, d.nombre, d.costo);
+              }
+            }
           }
 
           // Mora individual
@@ -399,6 +409,7 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
               perdida: 0,
               costo_reparacion: 0,
               costo_perdida: null,
+              danos: [],
             };
           }
           const acc = granelAccum[item.id_detalle];
@@ -408,6 +419,7 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
           } else if (item.estado_devolucion === 'dañado') {
             acc.danada += cant;
             acc.costo_reparacion += (item.costo_reparacion || 0);
+            if (item.danos) acc.danos.push(...item.danos);
           } else if (item.estado_devolucion === 'perdido') {
             acc.perdida += cant;
             acc.costo_perdida = item.costo_perdida != null ? item.costo_perdida : null;
@@ -436,6 +448,17 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
       `).run(idContrato, acc.id_item_granel, Number(idDetalle), fechaDevolucionReal, acc.bien, acc.danada, acc.perdida,
         acc.costo_reparacion || null, acc.costo_perdida);
       log('[DEBUG registrarDevolucion] INSERT DEVOLUCION_GRANEL: ' + JSON.stringify({ idContrato, idItemGranel: acc.id_item_granel, bien: acc.bien, danada: acc.danada, perdida: acc.perdida, lastInsertRowid: insertResult.lastInsertRowid }));
+
+      // Guardar desglose de daños predefinidos por cada fila de DEVOLUCION_GRANEL
+      if (acc.danos && acc.danos.length > 0) {
+        const insertDanoGr = db.prepare(`
+          INSERT INTO DAÑO_DEVOLUCION (id_contrato, id_detalle, tipo_item, id_item_granel, nombre, costo, id_devolucion_granel)
+          VALUES (?, ?, 'granel', ?, ?, ?, ?)
+        `);
+        for (const d of acc.danos) {
+          insertDanoGr.run(idContrato, Number(idDetalle), acc.id_item_granel, d.nombre, d.costo, insertResult.lastInsertRowid);
+        }
+      }
 
       // Stock
       if (acc.bien > 0) {
@@ -689,6 +712,17 @@ function getContratos(filtros = {}) {
     log('[DEBUG getContratos] contratoId: ' + c.id + ' devGranel: ' + JSON.stringify(devGranel) + ' items: ' + JSON.stringify(items.map(i => ({ id: i.id, id_item_granel: i.id_item_granel, cantidad: i.cantidad }))));
     const devGranelMap = Object.fromEntries(devGranel.map(d => [d.group_key, d]));
 
+    // Desglose de daños predefinidos registrados en la devolución
+    const danosDevueltos = db.prepare(`
+      SELECT id_detalle, nombre, costo FROM DAÑO_DEVOLUCION
+      WHERE id_contrato = ? AND revertido = 0
+    `).all(c.id);
+    const danosMap = {};
+    for (const d of danosDevueltos) {
+      if (!danosMap[d.id_detalle]) danosMap[d.id_detalle] = [];
+      danosMap[d.id_detalle].push({ nombre: d.nombre, costo: d.costo });
+    }
+
     const pagos = db.prepare(`
       SELECT id, monto, metodo, tipo, fecha_pago, anulado, fecha_anulacion, motivo_anulacion, id_detalle, grupo_pago
       FROM PAGO WHERE id_contrato = ?
@@ -709,6 +743,8 @@ function getContratos(filtros = {}) {
         item.granel_dev_costo_reparacion = dev.total_costo_reparacion || 0;
         item.granel_dev_costo_perdida = dev.total_costo_perdida || 0;
       }
+      // Desglose de daños predefinidos registrados
+      item.danos_devueltos = danosMap[item.id] || [];
       // Fecha pactada por ítem: si tiene fecha propia, usar esa; si no, la del contrato
       const fechaDevItem = item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada;
       const diasItem = Math.max(1, Math.ceil(
@@ -741,10 +777,9 @@ function getContratos(filtros = {}) {
 
     const total_danos = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_reparacion || 0), 0)
       + (db.prepare(`
-        SELECT COALESCE(SUM(m.costo), 0) AS total
-        FROM MANTENIMIENTO m
-        JOIN DETALLE_CONTRATO d ON d.id_herramienta = m.id_herramienta
-        WHERE d.id_contrato = ? AND d.tipo_item = 'individual' AND d.estado_devolucion = 'dañado'
+        SELECT COALESCE(SUM(costo), 0) AS total
+        FROM DAÑO_DEVOLUCION
+        WHERE id_contrato = ? AND revertido = 0 AND tipo_item = 'individual'
       `).get(c.id)?.total || 0);
     const total_perdidas = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_perdida || 0) + (i.tipo_item === 'kit' ? (i.costo_perdida || 0) : 0), 0);
 
@@ -800,6 +835,8 @@ function revertirDevolucionItem(idDetalle) {
       if (detalle.estado_devolucion === 'dañado') {
         db.prepare("DELETE FROM MANTENIMIENTO WHERE id_herramienta = ? AND fecha_inicio = ? AND tipo = 'correctivo' AND descripcion LIKE 'Devolucion:%'")
           .run(detalle.id_herramienta, detalle.fecha_devolucion_real);
+        db.prepare('UPDATE DAÑO_DEVOLUCION SET revertido = 1 WHERE id_detalle = ? AND id_contrato = ? AND tipo_item = ? AND revertido = 0')
+          .run(idDetalle, detalle.id_contrato, 'individual');
       }
     } else if (detalle.tipo_item === 'granel') {
       const rowsDevueltas = db.prepare(`
@@ -874,6 +911,9 @@ function revertirDevolucionItem(idDetalle) {
       }
 
       // Nota: granel no registra en MANTENIMIENTO, el daño se gestiona via cantidad_danada en ITEM_GRANEL
+      // Marcar desglose de daños granel como revertido
+      db.prepare('UPDATE DAÑO_DEVOLUCION SET revertido = 1 WHERE id_detalle = ? AND id_contrato = ? AND tipo_item = ? AND revertido = 0')
+        .run(idDetalle, detalle.id_contrato, 'granel');
     }
 
     // Sincronizar líneas padre de kits con el estado de sus componentes
@@ -960,6 +1000,10 @@ function revertirDevolucionGranel(idDevolucionGranel) {
 
     // Marcar como revertida
     db.prepare('UPDATE DEVOLUCION_GRANEL SET revertido = 1 WHERE id = ?')
+      .run(idDevolucionGranel);
+
+    // Marcar desglose de daños como revertido
+    db.prepare('UPDATE DAÑO_DEVOLUCION SET revertido = 1 WHERE id_devolucion_granel = ?')
       .run(idDevolucionGranel);
 
     // Sincronizar líneas padre de kits con el estado de sus componentes

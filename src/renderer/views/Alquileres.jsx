@@ -397,13 +397,18 @@ const handleDevolverGarantia = async () => {
                                           &#9888; +{item.dias_atraso_item} d&iacute;a{item.dias_atraso_item !== 1 ? 's' : ''}
                                         </span>
                                       )}
-                                      {item.tipo_item === 'kit' && item.estado_devolucion && item.estado_devolucion !== 'pendiente' && (
+                                      {item.estado_devolucion && item.estado_devolucion !== 'pendiente' && (
                                         <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
                                           style={{
-                                            backgroundColor: item.estado_devolucion === 'bien' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.05 75)',
-                                            color: item.estado_devolucion === 'bien' ? 'var(--success)' : 'var(--warning)',
+                                            backgroundColor: item.estado_devolucion === 'bien' ? 'oklch(0.93 0.05 160)' : item.estado_devolucion === 'no devuelto' ? 'oklch(0.95 0.03 25)' : 'oklch(0.93 0.05 75)',
+                                            color: item.estado_devolucion === 'bien' ? 'var(--success)' : item.estado_devolucion === 'no devuelto' ? 'var(--danger)' : 'var(--warning)',
                                           }}>
-                                          {item.estado_devolucion === 'bien' ? '\u2713 Devuelto' : 'Da\u00f1ado'}
+                                          {item.estado_devolucion === 'bien' ? '\u2713 Devuelto' : item.estado_devolucion === 'no devuelto' ? 'Perdido' : 'Da\u00f1ado'}
+                                          {item.danos_devueltos && item.danos_devueltos.length > 0 && (
+                                            <span className="ml-1" style={{ color: 'var(--faint)' }}>
+                                              {item.danos_devueltos.map(d => d.nombre).join(', ')}
+                                            </span>
+                                          )}
                                         </span>
                                       )}
                                     </div>
@@ -419,13 +424,19 @@ const handleDevolverGarantia = async () => {
                                     {esGranel && (item.granel_dev_bien || item.granel_dev_danada || item.granel_dev_perdida || 0) > 0 && (
                                       <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
                                         <span />
-                                        <span className="text-[11px] flex items-center gap-2">
+                                        <span className="text-[11px] flex flex-wrap items-center gap-x-2 gap-y-0.5">
                                           <span style={{ color: 'var(--muted)' }}>Dev:</span>
                                           {(item.granel_dev_bien || 0) > 0 && <span style={{ color: 'var(--success)' }}>{item.granel_dev_bien} bien</span>}
                                           {(item.granel_dev_danada || 0) > 0 && <span style={{ color: 'oklch(0.55 0.13 70)' }}>{item.granel_dev_danada} dañ</span>}
                                           {(item.granel_dev_perdida || 0) > 0 && <span style={{ color: 'var(--danger)' }}>{item.granel_dev_perdida} perd</span>}
                                           {(item.granel_pendiente || 0) > 0 && <span style={{ color: 'var(--faint)' }}>pend: {item.granel_pendiente}</span>}
                                           {(item.granel_pendiente === 0) && <span className="font-medium" style={{ color: 'var(--success)' }}>Completo</span>}
+                                          {item.danos_devueltos && item.danos_devueltos.length > 0 && (
+                                            <span className="text-[10px] truncate max-w-[200px]" style={{ color: 'var(--faint)' }}
+                                                  title={item.danos_devueltos.map(d => d.nombre + ' S/' + d.costo.toFixed(2)).join(' · ')}>
+                                              ({item.danos_devueltos.map(d => d.nombre).join(', ')})
+                                            </span>
+                                          )}
                                         </span>
                                         <span />
                                       </div>
@@ -480,6 +491,11 @@ const handleDevolverGarantia = async () => {
                                                     <span className="font-medium"
                                                       style={{ color: x.estado_devolucion === 'bien' ? 'var(--success)' : 'var(--warning)' }}>
                                                       &mdash; {x.estado_devolucion === 'bien' ? 'Devuelto' : x.estado_devolucion}
+                                                      {x.danos_devueltos && x.danos_devueltos.length > 0 && (
+                                                        <span style={{ color: 'var(--faint)' }}>
+                                                          {' (' + x.danos_devueltos.map(d => d.nombre).join(', ') + ')'}
+                                                        </span>
+                                                      )}
                                                     </span>
                                                   )
                                                 )}
