@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, X, Plus, Package, Wrench, Star, Info } from 'lucide-react';
+import { Search, X, Plus, Package, Wrench, Star, Info, Boxes } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { localDate } from '../lib/date';
 import Button from '../components/ui/button';
@@ -31,12 +31,14 @@ export default function Mostrador() {
   // --- Catálogo ---
   const [herramientas, setHerramientas] = useState([]);
   const [granelCat, setGranelCat] = useState([]);
+  const [kitsCat, setKitsCat] = useState([]);
   const [cargandoCatalogo, setCargandoCatalogo] = useState(true);
 
   // --- Agregar ítem ---
   const [modoItem, setModoItem] = useState('individual');
   const [herrId, setHerrId] = useState('');
   const [granelId, setGranelId] = useState('');
+  const [kitId, setKitId] = useState('');
   const [cantidad, setCantidad] = useState(1);
   const [items, setItems] = useState([]);
 
@@ -53,12 +55,14 @@ export default function Mostrador() {
     if (!window.api) return;
     (async () => {
       try {
-        const [h, g] = await Promise.all([
+        const [h, g, k] = await Promise.all([
           window.api.getHerramientasDisponibles(),
           window.api.getGranel(),
+          window.api.getKits?.(),
         ]);
         setHerramientas(h);
         setGranelCat(g);
+        setKitsCat(k || []);
       } catch (e) {
         setError('Error al cargar catálogo: ' + e.message);
       } finally {
@@ -117,7 +121,7 @@ export default function Mostrador() {
         { tipo: 'individual', id_herramienta: h.id, nombre: h.nombre, precio_dia: h.precio_dia, cantidad: 1 },
       ]);
       setHerrId('');
-    } else {
+    } else if (modoItem === 'granel') {
       const c = parseInt(cantidad, 10);
       if (!granelId || c < 1) return;
       const g = granelCat.find((t) => t.id === parseInt(granelId, 10));
@@ -131,6 +135,21 @@ export default function Mostrador() {
         { tipo: 'granel', id_item_granel: g.id, nombre: g.nombre, condicion: g.condicion, precio_dia: g.precio_dia, cantidad: c },
       ]);
       setGranelId('');
+      setCantidad(1);
+    } else if (modoItem === 'kit') {
+      const c = parseInt(cantidad, 10);
+      if (!kitId || c < 1) return;
+      const k = kitsCat.find((t) => t.id === parseInt(kitId, 10));
+      if (!k) return;
+      if (c > k.disponibilidad) {
+        setError('Stock insuficiente. Kits armables: ' + k.disponibilidad);
+        return;
+      }
+      setItems((p) => [
+        ...p,
+        { tipo: 'kit', id_kit: k.id, nombre: k.nombre, precio_dia: k.precio_dia, cantidad: c },
+      ]);
+      setKitId('');
       setCantidad(1);
     }
   };
@@ -161,6 +180,7 @@ export default function Mostrador() {
           tipo_item: i.tipo,
           id_herramienta: i.id_herramienta || undefined,
           id_item_granel: i.id_item_granel || undefined,
+          id_kit: i.id_kit || undefined,
           cantidad: i.cantidad || 1,
         })),
       });
@@ -503,6 +523,18 @@ export default function Mostrador() {
               >
                 <Package size={14} /> Material
               </button>
+              <button
+                onClick={() => setModoItem('kit')}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-1.5 h-9 rounded-md text-sm font-medium transition-colors duration-150',
+                )}
+                style={{
+                  backgroundColor: modoItem === 'kit' ? 'var(--primary)' : 'transparent',
+                  color: modoItem === 'kit' ? 'var(--primary-text)' : 'var(--muted)',
+                }}
+              >
+                <Boxes size={14} /> Kit
+              </button>
             </div>
 
             {/* Selector */}
@@ -540,7 +572,7 @@ export default function Mostrador() {
                   <Plus size={15} className="mr-1" /> Agregar
                 </Button>
               </div>
-            ) : (
+            ) : modoItem === 'granel' ? (
               <div className="flex gap-2 items-end flex-wrap">
                 <div className="flex-1 min-w-[160px]">
                   <label className={labelCls} style={{ color: 'var(--muted)' }}>
@@ -581,6 +613,57 @@ export default function Mostrador() {
                   variant="secondary"
                   onClick={agregar}
                   disabled={!granelId || cantidad < 1}
+                  className="h-10 px-4 text-sm shrink-0"
+                >
+                  <Plus size={15} className="mr-1" /> Agregar
+                </Button>
+              </div>
+            ) : (
+              <div className="flex gap-2 items-end flex-wrap">
+                <div className="flex-1 min-w-[160px]">
+                  <label className={labelCls} style={{ color: 'var(--muted)' }}>
+                    Kit
+                  </label>
+                  <select
+                    value={kitId}
+                    onChange={(e) => setKitId(e.target.value)}
+                    className={inputCls}
+                    style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
+                  >
+                    <option value="">Seleccionar kit...</option>
+                    {kitsCat.map((k) => (
+                      <option key={k.id} value={k.id}
+                        disabled={k.disponibilidad === 0}
+                        style={k.disponibilidad === 0 ? { color: 'var(--danger)', backgroundColor: 'oklch(0.96 0.04 20)' } : {}}>
+                        {k.disponibilidad > 0
+                          ? `${k.nombre} — S/ ${k.precio_dia.toFixed(2)}/día — ${k.disponibilidad} armables`
+                          : `${k.nombre} — sin stock`}
+                      </option>
+                    ))}
+                  </select>
+                  {!cargandoCatalogo && kitsCat.length === 0 && (
+                    <p className="text-xs mt-1" style={{ color: 'var(--warning)' }}>
+                      No hay kits configurados.
+                    </p>
+                  )}
+                </div>
+                <div className="w-20">
+                  <label className={labelCls} style={{ color: 'var(--muted)' }}>
+                    Cant.
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={cantidad}
+                    onChange={(e) => setCantidad(e.target.value)}
+                    className={inputCls}
+                    style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
+                  />
+                </div>
+                <Button
+                  variant="secondary"
+                  onClick={agregar}
+                  disabled={!kitId || cantidad < 1}
                   className="h-10 px-4 text-sm shrink-0"
                 >
                   <Plus size={15} className="mr-1" /> Agregar
@@ -639,15 +722,28 @@ export default function Mostrador() {
                             <div className="flex items-center gap-2">
                               {item.tipo === 'individual' ? (
                                 <Wrench size={13} style={{ color: 'var(--muted)' }} />
+                              ) : item.tipo === 'kit' ? (
+                                <Boxes size={13} style={{ color: 'var(--muted)' }} />
                               ) : (
                                 <Package size={13} style={{ color: 'var(--muted)' }} />
                               )}
                               <span>
                                 {item.tipo === 'individual'
                                   ? item.id_herramienta + ' — ' + item.nombre
+                                  : item.tipo === 'kit'
+                                  ? item.nombre
                                   : item.nombre + ' (' + item.condicion + ')'}
                               </span>
                             </div>
+                            {item.tipo === 'kit' && (() => {
+                              const comps = kitsCat.find(k => k.id === item.id_kit)?.componentes || [];
+                              if (comps.length === 0) return null;
+                              return (
+                                <p className="text-[10px] mt-0.5" style={{ color: 'var(--faint)' }}>
+                                  {comps.map(c => (c.cantidad * (item.cantidad || 1)) + '× ' + c.nombre).join(' · ')}
+                                </p>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-3 text-center" style={{ color: 'var(--muted)' }}>
                             {item.cantidad}

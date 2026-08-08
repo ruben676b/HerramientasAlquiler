@@ -53,6 +53,14 @@ const {
   getDetalleContrato,
 } = require('./services/clienteService');
 const { getResumenCaja } = require('./services/cajaService');
+const {
+  getKits,
+  getKitById,
+  getKitDisponibilidad,
+  crearKit,
+  editarKit,
+  desactivarKit,
+} = require('./services/kitService');
 
 function registerIpcHandlers() {
   // --- Catálogo ---
@@ -169,6 +177,20 @@ function registerIpcHandlers() {
     const { idPago, motivo } = data;
     return anularPago(idPago, motivo);
   });
+
+  // --- Kits ---
+
+  ipcMain.handle('get-kits', () => getKits());
+
+  ipcMain.handle('get-kit', (_e, idKit) => getKitById(idKit));
+
+  ipcMain.handle('crear-kit', (_e, data) => crearKit(data));
+
+  ipcMain.handle('editar-kit', (_e, idKit, data) => editarKit(idKit, data));
+
+  ipcMain.handle('desactivar-kit', (_e, idKit) => desactivarKit(idKit));
+
+  ipcMain.handle('get-kit-disponibilidad', (_e, idKit) => getKitDisponibilidad(idKit));
 
   // --- Sistema ---
 

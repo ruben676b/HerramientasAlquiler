@@ -75,6 +75,14 @@ contextBridge.exposeInMainWorld('api', {
   getContratosCliente: (id) => ipcRenderer.invoke('get-contratos-cliente', id),
   getDetalleContrato: (id) => ipcRenderer.invoke('get-detalle-contrato', id),
 
+// Kits
+  getKits: () => ipcRenderer.invoke('get-kits'),
+  getKit: (id) => ipcRenderer.invoke('get-kit', id),
+  crearKit: (data) => ipcRenderer.invoke('crear-kit', data),
+  editarKit: (id, data) => ipcRenderer.invoke('editar-kit', id, data),
+  desactivarKit: (id) => ipcRenderer.invoke('desactivar-kit', id),
+  getKitDisponibilidad: (id) => ipcRenderer.invoke('get-kit-disponibilidad', id),
+
 // Debug
   log: (msg) => ipcRenderer.invoke('log', msg),
 

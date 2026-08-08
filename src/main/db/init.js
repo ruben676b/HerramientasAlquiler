@@ -19,6 +19,7 @@ function initDatabase() {
       nombre TEXT NOT NULL,
       descripcion TEXT,
       precio_dia REAL NOT NULL CHECK (precio_dia >= 0),
+      mora_dia REAL NOT NULL DEFAULT 0 CHECK (mora_dia >= 0),
       precio_minimo REAL CHECK (precio_minimo >= 0),
       precio_mes REAL CHECK (precio_mes >= 0),
       precio_venta REAL CHECK (precio_venta >= 0),
@@ -34,6 +35,7 @@ function initDatabase() {
       nombre TEXT NOT NULL,
       condicion TEXT NOT NULL CHECK (condicion IN ('nuevo', 'usado')),
       precio_dia REAL NOT NULL CHECK (precio_dia >= 0),
+      mora_dia REAL NOT NULL DEFAULT 0 CHECK (mora_dia >= 0),
       precio_minimo REAL CHECK (precio_minimo >= 0),
       precio_mes REAL CHECK (precio_mes >= 0),
       precio_venta REAL CHECK (precio_venta >= 0),
@@ -45,6 +47,30 @@ function initDatabase() {
       cantidad_vendida INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_vendida >= 0),
       cantidad_baja INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_baja >= 0),
       activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1))
+    );
+
+    CREATE TABLE IF NOT EXISTS KIT (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      descripcion TEXT,
+      precio_dia REAL NOT NULL CHECK (precio_dia >= 0),
+      precio_minimo REAL CHECK (precio_minimo >= 0),
+      precio_mes REAL CHECK (precio_mes >= 0),
+      precio_venta REAL CHECK (precio_venta >= 0),
+      activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1))
+    );
+
+    CREATE TABLE IF NOT EXISTS KIT_COMPONENTE (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id_kit INTEGER NOT NULL REFERENCES KIT(id),
+      tipo_item TEXT NOT NULL CHECK (tipo_item IN ('individual', 'granel')),
+      id_item_granel INTEGER REFERENCES ITEM_GRANEL(id),
+      id_herramienta TEXT REFERENCES HERRAMIENTA(id),
+      cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+      CHECK (
+        (tipo_item = 'granel' AND id_item_granel NOT NULL AND id_herramienta IS NULL) OR
+        (tipo_item = 'individual' AND id_herramienta NOT NULL AND id_item_granel IS NULL AND cantidad = 1)
+      )
     );
 
     CREATE TABLE IF NOT EXISTS CLIENTE (
@@ -95,22 +121,26 @@ function initDatabase() {
     CREATE TABLE IF NOT EXISTS DETALLE_CONTRATO (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       id_contrato INTEGER NOT NULL,
-      tipo_item TEXT NOT NULL CHECK (tipo_item IN ('individual', 'granel')),
+      tipo_item TEXT NOT NULL CHECK (tipo_item IN ('individual', 'granel', 'kit')),
       id_herramienta TEXT,
       id_item_granel INTEGER,
+      id_kit INTEGER,
       cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
       precio_dia_aplicado REAL NOT NULL CHECK (precio_dia_aplicado >= 0),
       estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto', 'perdido')),
       fecha_devolucion_real TEXT,
       fecha_devolucion_pactada_item TEXT,
       total_item_snapshot REAL,
+      tarifa_aplicada TEXT NOT NULL DEFAULT 'dia' CHECK (tarifa_aplicada IN ('dia', 'minimo', 'mes')),
       costo_perdida REAL CHECK (costo_perdida >= 0),
       FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
       FOREIGN KEY (id_herramienta) REFERENCES HERRAMIENTA(id),
       FOREIGN KEY (id_item_granel) REFERENCES ITEM_GRANEL(id),
+      FOREIGN KEY (id_kit) REFERENCES KIT(id),
       CHECK (
         (tipo_item = 'individual' AND id_herramienta NOT NULL AND id_item_granel IS NULL AND cantidad = 1) OR
-        (tipo_item = 'granel' AND id_item_granel NOT NULL AND id_herramienta IS NULL)
+        (tipo_item = 'granel' AND id_item_granel NOT NULL AND id_herramienta IS NULL) OR
+        (tipo_item = 'kit' AND id_kit NOT NULL AND id_herramienta IS NULL AND id_item_granel IS NULL)
       )
     );
 
@@ -227,6 +257,21 @@ function initDatabase() {
     console.error('[DB] Error creando trigger trg_granel_disponible_insert:', err);
   }
 
+  // Migración: columna mora_dia en HERRAMIENTA e ITEM_GRANEL (bases de datos existentes)
+  try {
+    const hasCol = (tabla) => db.prepare(`PRAGMA table_info(${tabla})`).all().some(c => c.name === 'mora_dia');
+    if (!hasCol('HERRAMIENTA')) {
+      db.exec('ALTER TABLE HERRAMIENTA ADD COLUMN mora_dia REAL NOT NULL DEFAULT 0 CHECK (mora_dia >= 0)');
+      console.log('[DB] Migración: mora_dia agregada a HERRAMIENTA.');
+    }
+    if (!hasCol('ITEM_GRANEL')) {
+      db.exec('ALTER TABLE ITEM_GRANEL ADD COLUMN mora_dia REAL NOT NULL DEFAULT 0 CHECK (mora_dia >= 0)');
+      console.log('[DB] Migración: mora_dia agregada a ITEM_GRANEL.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración de mora_dia:', err);
+  }
+
   // Migración: crear AUDIT_GRANEL si no existe (para bases de datos existentes)
   try {
     const hasAudit = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='AUDIT_GRANEL'").get();
@@ -257,6 +302,83 @@ function initDatabase() {
     }
   } catch (err) {
     console.error('[DB] Error creando AUDIT_GRANEL:', err);
+  }
+
+  // Migración: DETALLE_CONTRATO con soporte de kits (id_kit + tipo_item 'kit')
+  try {
+    const kitMigrado = db.prepare("SELECT valor FROM CONFIGURACION WHERE clave = 'detalle_kit_migrado'").get();
+    if (!kitMigrado) {
+      const cols = db.prepare("PRAGMA table_info(DETALLE_CONTRATO)").all();
+      const tieneIdKit = cols.some(c => c.name === 'id_kit');
+      if (!tieneIdKit) {
+        db.pragma('foreign_keys = OFF');
+        db.transaction(() => {
+          db.exec(`
+            CREATE TABLE DETALLE_CONTRATO_NUEVA (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              id_contrato INTEGER NOT NULL,
+              tipo_item TEXT NOT NULL CHECK (tipo_item IN ('individual', 'granel', 'kit')),
+              id_herramienta TEXT,
+              id_item_granel INTEGER,
+              id_kit INTEGER,
+              cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+              precio_dia_aplicado REAL NOT NULL CHECK (precio_dia_aplicado >= 0),
+              estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto', 'perdido')),
+              fecha_devolucion_real TEXT,
+              fecha_devolucion_pactada_item TEXT,
+              total_item_snapshot REAL,
+              costo_perdida REAL CHECK (costo_perdida >= 0),
+              FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
+              FOREIGN KEY (id_herramienta) REFERENCES HERRAMIENTA(id),
+              FOREIGN KEY (id_item_granel) REFERENCES ITEM_GRANEL(id),
+              FOREIGN KEY (id_kit) REFERENCES KIT(id),
+              CHECK (
+                (tipo_item = 'individual' AND id_herramienta NOT NULL AND id_item_granel IS NULL AND cantidad = 1) OR
+                (tipo_item = 'granel' AND id_item_granel NOT NULL AND id_herramienta IS NULL) OR
+                (tipo_item = 'kit' AND id_kit NOT NULL AND id_herramienta IS NULL AND id_item_granel IS NULL)
+              )
+            );
+            INSERT INTO DETALLE_CONTRATO_NUEVA (
+              id, id_contrato, tipo_item, id_herramienta, id_item_granel, id_kit,
+              cantidad, precio_dia_aplicado, estado_devolucion, fecha_devolucion_real,
+              fecha_devolucion_pactada_item, total_item_snapshot, costo_perdida
+            )
+            SELECT id, id_contrato, tipo_item, id_herramienta, id_item_granel, NULL,
+                   cantidad, precio_dia_aplicado, estado_devolucion, fecha_devolucion_real,
+                   fecha_devolucion_pactada_item, total_item_snapshot, costo_perdida
+            FROM DETALLE_CONTRATO;
+            DROP TABLE DETALLE_CONTRATO;
+            ALTER TABLE DETALLE_CONTRATO_NUEVA RENAME TO DETALLE_CONTRATO;
+          `);
+          // Asegurar secuencia AUTOINCREMENT (PAGO y DEVOLUCION_GRANEL referencian ids)
+          db.exec(`UPDATE sqlite_sequence SET seq = (SELECT MAX(id) FROM DETALLE_CONTRATO) WHERE name = 'DETALLE_CONTRATO'`);
+        })();
+        db.pragma('foreign_keys = ON');
+        console.log('[DB] Migración DETALLE_CONTRATO (kits) completada.');
+      }
+      db.prepare(`INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion) VALUES (?, ?, ?)`)
+        .run('detalle_kit_migrado', 'true', 'Migración DETALLE_CONTRATO para kits completada');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración DETALLE_CONTRATO kits:', err);
+    try { db.pragma('foreign_keys = ON'); } catch (e) {}
+  }
+
+  // Migración: tarifa_aplicada en DETALLE_CONTRATO (selector día / mínimo / mensual)
+  try {
+    const tarifaMigrado = db.prepare("SELECT valor FROM CONFIGURACION WHERE clave = 'detalle_tarifa_migrado'").get();
+    if (!tarifaMigrado) {
+      const cols = db.prepare("PRAGMA table_info(DETALLE_CONTRATO)").all();
+      const tieneTarifa = cols.some(c => c.name === 'tarifa_aplicada');
+      if (!tieneTarifa) {
+        db.exec(`ALTER TABLE DETALLE_CONTRATO ADD COLUMN tarifa_aplicada TEXT NOT NULL DEFAULT 'dia' CHECK (tarifa_aplicada IN ('dia', 'minimo', 'mes'))`);
+        console.log('[DB] Migración DETALLE_CONTRATO (tarifa_aplicada) completada.');
+      }
+      db.prepare(`INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion) VALUES (?, ?, ?)`)
+        .run('detalle_tarifa_migrado', 'true', 'Migración tarifa_aplicada completada');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración tarifa_aplicada:', err);
   }
 
   // Siempre actualizar cláusulas (pueden cambiar entre versiones)

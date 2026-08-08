@@ -4,9 +4,9 @@ const path = require('path');
 
 const isDev = !app.isPackaged;
 
-const dbPath = isDev
+const dbPath = process.env.DB_PATH || (isDev
   ? path.resolve(__dirname, '..', '..', '..', 'alquiler_herramientas.db')
-  : path.join(app.getPath('userData'), 'alquiler_herramientas.db');
+  : path.join(app.getPath('userData'), 'alquiler_herramientas.db'));
 
 const db = new Database(dbPath);
 

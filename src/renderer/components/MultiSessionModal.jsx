@@ -189,7 +189,7 @@ function SessionForm({ session }) {
     setFechaSalida(data.fechaSalida || fmtLocalDate(new Date()));
     setFechaDevolucionRaw(data.fechaDevolucion || fmtLocalDate(new Date()));
     setClienteSeleccionado(data.clienteSeleccionado || null);
-    setItems(data.items || []);
+    setItems((data.items || []).map(it => ({ ...it, tarifa: it.tarifa || (it.usar_precio_mes ? 'mes' : 'dia') })));
     setStep(data.step || 0);
     setError('');
     setBusquedaEquipo('');
@@ -253,6 +253,7 @@ function SessionForm({ session }) {
   const [garantiaMetodo, setGarantiaMetodo] = useState('efectivo');
   const [todasHerramientas, setTodasHerramientas] = useState([]);
   const [granelCat, setGranelCat] = useState([]);
+  const [kitsCat, setKitsCat] = useState([]);
   const [items, setItems] = useState(saved.items || []);
   const [totalEditando, setTotalEditando] = useState({});
   const [cantEditando, setCantEditando] = useState({});
@@ -270,9 +271,11 @@ function SessionForm({ session }) {
     Promise.all([
       window.api.getHerramientas({}),
       window.api.getGranel(),
-    ]).then(([h, g]) => {
+      window.api.getKits ? window.api.getKits() : Promise.resolve([]),
+    ]).then(([h, g, k]) => {
       setTodasHerramientas(h);
       setGranelCat(g);
+      setKitsCat(k);
     }).catch(() => {});
   }, [step]);
 
@@ -286,6 +289,22 @@ function SessionForm({ session }) {
         (data?.items || []).forEach(item => {
           if (item.id_item_granel) {
             mapa[item.id_item_granel] = (mapa[item.id_item_granel] || 0) + item.cantidad;
+          }
+        });
+      });
+    return mapa;
+  }, [sessions, session.id, items]);
+
+  // Kits reservados en otras sesiones activas
+  const kitsEnOtrasSesiones = useMemo(() => {
+    const mapa = {};
+    sessions
+      .filter(s => !s.saved && s.id !== session.id)
+      .forEach(s => {
+        const data = loadFormData(s.id);
+        (data?.items || []).forEach(item => {
+          if (item.id_kit) {
+            mapa[item.id_kit] = (mapa[item.id_kit] || 0) + (item.cantidad || 1);
           }
         });
       });
@@ -344,8 +363,21 @@ function SessionForm({ session }) {
           _dispEfectivo: g.cantidad_disponible - (enLista?.cantidad || 0) - enOtras,
         };
       });
-    return [...herr, ...gran];
-  }, [busquedaEquipo, todasHerramientas, granelCat, items]);
+    const kits = kitsCat
+      .filter(k => (k.nombre || '').toLowerCase().includes(q))
+      .slice(0, 8)
+      .map(k => {
+        const enLista = items.find(i => i.id_kit === k.id);
+        const enOtras = kitsEnOtrasSesiones[k.id] || 0;
+        return {
+          ...k,
+          _tipo: 'kit',
+          _enLista: !!enLista,
+          _dispEfectivo: (k.disponibilidad || 0) - (enLista?.cantidad || 0) - enOtras,
+        };
+      });
+    return [...herr, ...gran, ...kits];
+  }, [busquedaEquipo, todasHerramientas, granelCat, kitsCat, items, kitsEnOtrasSesiones]);
 
   const agregarHerramienta = (h) => {
     if (h.estado !== 'disponible') return;
@@ -353,7 +385,7 @@ function SessionForm({ session }) {
       toast(h.id + ' ya está agregada en este alquiler', 'warning');
       return;
     }
-    setItems([...items, { tipo: 'individual', id_herramienta: h.id, nombre: h.nombre, precio_dia: h.precio_dia, precio_minimo: h.precio_minimo, precio_mes: h.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion }]);
+    setItems([...items, { tipo: 'individual', id_herramienta: h.id, nombre: h.nombre, precio_dia: h.precio_dia, precio_minimo: h.precio_minimo, precio_mes: h.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: 'dia' }]);
     setBusquedaEquipo('');
   };
 
@@ -363,7 +395,20 @@ function SessionForm({ session }) {
     if (existente) {
       setItems(items.map((i) => i.id_item_granel === g.id ? { ...i, cantidad: i.cantidad + 1 } : i));
     } else {
-      setItems([...items, { tipo: 'granel', id_item_granel: g.id, nombre: g.nombre, condicion: g.condicion, precio_dia: g.precio_dia, precio_minimo: g.precio_minimo, precio_mes: g.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion }]);
+      setItems([...items, { tipo: 'granel', id_item_granel: g.id, nombre: g.nombre, condicion: g.condicion, precio_dia: g.precio_dia, precio_minimo: g.precio_minimo, precio_mes: g.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: 'dia' }]);
+    }
+    setBusquedaEquipo('');
+  };
+
+  const agregarKit = (k) => {
+    const enLista = items.find((i) => i.id_kit === k.id);
+    const enOtras = kitsEnOtrasSesiones[k.id] || 0;
+    const disp = (k.disponibilidad || 0) - (enLista?.cantidad || 0) - enOtras;
+    if (disp < 1) return setError('Stock insuficiente para el kit ' + k.nombre + '.');
+    if (enLista) {
+      setItems(items.map((i) => i.id_kit === k.id ? { ...i, cantidad: i.cantidad + 1 } : i));
+    } else {
+      setItems([...items, { tipo: 'kit', id_kit: k.id, nombre: k.nombre, precio_dia: k.precio_dia, precio_minimo: k.precio_minimo, precio_mes: k.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: 'dia', _componentes: k.componentes || [], _disponibilidad: k.disponibilidad || 0 }]);
     }
     setBusquedaEquipo('');
   };
@@ -402,13 +447,19 @@ function SessionForm({ session }) {
   // Calcular máximo disponible por ítem granel (considerando otras sesiones)
   const itemsConMaximo = useMemo(() => {
     return items.map(item => {
+      if (item.tipo === 'kit') {
+        const original = kitsCat.find(k => k.id === item.id_kit);
+        const enOtras = kitsEnOtrasSesiones[item.id_kit] || 0;
+        const max = original ? Math.max(1, (original.disponibilidad || 0) - enOtras) : 999;
+        return { ...item, _maxDisponible: max, _stockOriginal: original?.disponibilidad || 0 };
+      }
       if (item.tipo !== 'granel') return item;
       const original = granelCat.find(g => g.id === item.id_item_granel);
       const enOtras = granelEnOtrasSesiones[item.id_item_granel] || 0;
       const max = original ? Math.max(1, original.cantidad_disponible - enOtras) : 999;
       return { ...item, _maxDisponible: max, _stockOriginal: original?.cantidad_disponible || 0 };
     });
-  }, [items, granelCat, granelEnOtrasSesiones]);
+  }, [items, granelCat, kitsCat, granelEnOtrasSesiones, kitsEnOtrasSesiones]);
 
 
 
@@ -462,6 +513,16 @@ function SessionForm({ session }) {
     if (step === 1) {
       if (items.length === 0) return setError('Agregue al menos un ítem al alquiler.');
       for (const item of items) {
+        if (item.id_kit) {
+          const original = kitsCat.find(k => k.id === item.id_kit);
+          if (!original) continue;
+          const enOtras = kitsEnOtrasSesiones[item.id_kit] || 0;
+          const disponible = (original.disponibilidad || 0) - enOtras;
+          if (item.cantidad > disponible) {
+            return setError('Stock insuficiente para el kit "' + item.nombre + '". Pedido: ' + item.cantidad + ', disponible: ' + disponible + '.');
+          }
+          continue;
+        }
         if (!item.id_item_granel) continue;
         const original = granelCat.find(g => g.id === item.id_item_granel);
         if (!original) continue;
@@ -505,13 +566,28 @@ function SessionForm({ session }) {
       const diasItem = Math.max(1, Math.ceil(
         (new Date(devDate + 'T00:00:00') - new Date(fechaSalida + 'T00:00:00')) / 86400000
       ) + 1);
-      const usarMes = item.id_item_granel && item.usar_precio_mes && item.precio_mes != null;
-      const subCalc = usarMes
-        ? item.precio_mes * item.cantidad
-        : (item.precio_dia || 0) * diasItem * item.cantidad;
-      return { ...item, dias_item: diasItem, sub_calc: subCalc };
+      const tarifa = item.tarifa || 'dia';
+      let subCalc;
+      if (tarifa === 'mes' && item.precio_mes != null) {
+        subCalc = item.precio_mes * item.cantidad;
+      } else if (tarifa === 'minimo' && item.precio_minimo != null) {
+        subCalc = item.precio_minimo * diasItem * item.cantidad;
+      } else {
+        subCalc = (item.precio_dia || 0) * diasItem * item.cantidad;
+      }
+      return { ...item, dias_item: diasItem, sub_calc: subCalc, tarifa };
     });
   }, [itemsConMaximo, fechaSalida, fechaDevolucion]);
+
+  const infoTarifa = (item) => {
+    if (item.tarifa === 'mes' && item.precio_mes != null) return { precio: item.precio_mes, label: '/mes' };
+    if (item.tarifa === 'minimo' && item.precio_minimo != null) return { precio: item.precio_minimo, label: '/día' };
+    return { precio: item.precio_dia || 0, label: '/día' };
+  };
+
+  const setTarifaItem = (idx, tarifa) => {
+    setItems(items.map((it, i) => i === idx ? { ...it, tarifa, total_editado: undefined } : it));
+  };
 
   const totalEquipos = itemsConDias.reduce((a, item) => a + item.sub_calc, 0);
   const pendiente = Math.max(0, totalEquipos - totalPagado);
@@ -537,8 +613,11 @@ function SessionForm({ session }) {
           tipo_item: item.tipo,
           id_herramienta: item.id_herramienta || undefined,
           id_item_granel: item.id_item_granel || undefined,
+          id_kit: item.id_kit || undefined,
           cantidad: item.cantidad || 1,
           fecha_devolucion_pactada: item.fecha_devolucion_item || undefined,
+          tarifa_aplicada: item.tarifa || 'dia',
+          precio_aplicado: infoTarifa(item).precio,
           total_item_snapshot: item.total_editado != null ? item.total_editado : item.sub_calc,
         })),
         pagos: [
@@ -812,6 +891,7 @@ function SessionForm({ session }) {
                   if (e.key === 'Enter' && equipoIndex >= 0 && resultadosUnificados[equipoIndex]) {
                     const r = resultadosUnificados[equipoIndex];
                     if (r._tipo === 'herramienta') agregarHerramienta(r);
+                    else if (r._tipo === 'kit') agregarKit(r);
                     else agregarGranel(r);
                     setEquipoIndex(-1);
                   }
@@ -848,14 +928,14 @@ function SessionForm({ session }) {
                     }
                     const destacado = idx === equipoIndex;
                     return (
-                      <button key={esHerr ? r.id : ('g' + r.id)} disabled={!disponible}
+                      <button key={esHerr ? r.id : (r._tipo === 'kit' ? 'k' + r.id : 'g' + r.id)} disabled={!disponible}
                         title={tooltip}
                         onClick={() => {
                           if (!disponible) {
                             toast(tooltip, 'warning');
                             return;
                           }
-                          esHerr ? agregarHerramienta(r) : agregarGranel(r);
+                          esHerr ? agregarHerramienta(r) : (r._tipo === 'kit' ? agregarKit(r) : agregarGranel(r));
                         }}
                         className="w-full text-left px-3 py-2 text-xs transition-colors duration-150 flex items-center gap-3 disabled:opacity-40"
                         style={{
@@ -870,8 +950,8 @@ function SessionForm({ session }) {
                         )}
                         <span className="flex-1" style={{ color: 'var(--ink)' }}>{r.nombre}</span>
                         <span className="text-[9px] px-1 py-0.5 rounded font-medium shrink-0"
-                          style={{ backgroundColor: esHerr ? 'oklch(0.55 0.08 240 / 0.10)' : 'oklch(0.62 0.13 75 / 0.10)', color: esHerr ? 'var(--info)' : 'var(--warning)' }}>
-                          {esHerr ? 'Herr.' : 'Mat.'}
+                          style={{ backgroundColor: esHerr ? 'oklch(0.55 0.08 240 / 0.10)' : (r._tipo === 'kit' ? 'oklch(0.50 0.11 155 / 0.10)' : 'oklch(0.62 0.13 75 / 0.10)'), color: esHerr ? 'var(--info)' : (r._tipo === 'kit' ? 'var(--success)' : 'var(--warning)') }}>
+                          {esHerr ? 'Herr.' : (r._tipo === 'kit' ? 'Kit' : 'Mat.')}
                         </span>
                         <span className="text-xs font-mono shrink-0" style={{ color: 'var(--muted)' }}>S/ {r.precio_dia.toFixed(2)}</span>
                         {enOtraSesion && (
@@ -905,12 +985,12 @@ function SessionForm({ session }) {
                 <>
                   {itemsConDias.map((item, idx) => {
                     const esGranel = !!item.id_item_granel;
-                    const usarMes = esGranel && item.usar_precio_mes && item.precio_mes != null;
-                    const refPrice = usarMes ? item.precio_mes : (item.precio_dia || 0);
-                    const refLabel = usarMes ? 'mes c/u' : (esGranel ? 'día c/u' : (item.dias_item >= 30 && item.precio_mes ? 'mes' : 'día'));
+                    const esKit = !!item.id_kit;
+                    const tarifa = item.tarifa || 'dia';
+                    const refInfo = infoTarifa(item);
                     const subCalc = item.sub_calc;
                     const sub = item.total_editado != null ? item.total_editado : subCalc;
-                    const bajoMinimo = item.precio_minimo != null && sub < item.precio_minimo * (usarMes ? 1 : item.dias_item) * item.cantidad;
+                    const bajoMinimo = tarifa === 'dia' && item.precio_minimo != null && sub < item.precio_minimo * item.dias_item * item.cantidad;
                     return (
                       <div key={idx}
                         className="px-4 py-3 rounded-xl transition-colors duration-150 group"
@@ -921,6 +1001,11 @@ function SessionForm({ session }) {
                             <span className="inline-flex px-2 py-0.5 rounded-lg font-mono text-xs font-bold shrink-0"
                               style={{ backgroundColor: 'oklch(0.53 0.135 55 / 0.10)', color: 'var(--primary)' }}>
                               {item.id_herramienta}
+                            </span>
+                          ) : esKit ? (
+                            <span className="inline-flex px-2 py-0.5 rounded-lg text-xs font-medium shrink-0"
+                              style={{ backgroundColor: 'oklch(0.50 0.11 155 / 0.12)', color: 'var(--success)' }}>
+                              Kit
                             </span>
                           ) : (
                             <span className="inline-flex px-2 py-0.5 rounded-lg text-xs font-medium shrink-0"
@@ -937,8 +1022,8 @@ function SessionForm({ session }) {
                             style={{ color: 'var(--muted)' }}><X size={14} /></button>
                         </div>
 
-                        {/* Línea 1b: Cantidad (solo granel) */}
-                        {esGranel && (
+                        {/* Línea 1b: Cantidad (solo granel y kits) */}
+                        {(esGranel || esKit) && (
                           <div className="flex items-center gap-2 mt-2 text-xs">
                             <span style={{ color: 'var(--muted)' }}>Cantidad:</span>
                             <button onClick={() => cambiarCantidad(idx, -1)}
@@ -969,6 +1054,17 @@ function SessionForm({ session }) {
                             }}>
                               Stock: {item._stockOriginal} disp.
                             </span>
+                          </div>
+                        )}
+
+                        {/* Componentes del kit */}
+                        {esKit && (
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            {(item._componentes || []).map((c, i) => (
+                              <span key={i} className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: 'var(--surface)', color: 'var(--faint)' }}>
+                                {(c.cantidad * (item.cantidad || 1)) + '× ' + c.nombre}
+                              </span>
+                            ))}
                           </div>
                         )}
 
@@ -1007,31 +1103,38 @@ function SessionForm({ session }) {
                           </span>
                         </div>
 
-                        {/* Línea 3: Precio ref + toggle tarifa + Total editable */}
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                            Ref: S/ {refPrice.toFixed(2)}/{refLabel}
+                        {/* Línea 3: Tarifa + Total editable */}
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <span className="flex gap-px rounded overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
+                            <button onClick={() => setTarifaItem(idx, 'dia')}
+                              title="Precio normal por día"
+                              className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
+                              style={{
+                                backgroundColor: tarifa === 'dia' ? 'oklch(0.53 0.135 55)' : 'var(--bg)',
+                                color: tarifa === 'dia' ? '#fff' : 'var(--muted)',
+                              }}>S/ {(item.precio_dia || 0).toFixed(0)}/día</button>
                             {item.precio_minimo != null && (
-                              <> (Min: <span style={{ color: bajoMinimo ? 'var(--danger)' : 'var(--muted)' }}>S/ {(usarMes ? (item.precio_minimo || 0) * item.cantidad : (item.precio_minimo || 0) * item.dias_item * item.cantidad).toFixed(0)}</span>)</>
+                              <button onClick={() => setTarifaItem(idx, 'minimo')}
+                                title="Precio mínimo por día"
+                                className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
+                                style={{
+                                  backgroundColor: tarifa === 'minimo' ? 'oklch(0.55 0.12 240)' : 'var(--bg)',
+                                  color: tarifa === 'minimo' ? '#fff' : 'var(--muted)',
+                                }}>Min S/ {item.precio_minimo.toFixed(0)}</button>
+                            )}
+                            {item.precio_mes != null && (
+                              <button onClick={() => setTarifaItem(idx, 'mes')}
+                                title="Precio mensual (tarifa plana)"
+                                className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
+                                style={{
+                                  backgroundColor: tarifa === 'mes' ? 'oklch(0.50 0.11 155)' : 'var(--bg)',
+                                  color: tarifa === 'mes' ? '#fff' : 'var(--muted)',
+                                }}>S/ {item.precio_mes.toFixed(0)}/mes</button>
                             )}
                           </span>
-                          {/* Toggle día/mes solo para granel con precio_mes */}
-                          {esGranel && item.precio_mes != null && (
-                            <span className="flex gap-px rounded overflow-hidden border ml-1" style={{ borderColor: 'var(--border)' }}>
-                              <button onClick={() => { setItems(items.map((it, i) => i === idx ? { ...it, usar_precio_mes: false, total_editado: undefined } : it)); }}
-                                className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
-                                style={{
-                                  backgroundColor: !usarMes ? 'oklch(0.53 0.135 55)' : 'var(--bg)',
-                                  color: !usarMes ? '#fff' : 'var(--muted)',
-                                }}>día</button>
-                              <button onClick={() => { setItems(items.map((it, i) => i === idx ? { ...it, usar_precio_mes: true, total_editado: undefined } : it)); }}
-                                className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
-                                style={{
-                                  backgroundColor: usarMes ? 'oklch(0.53 0.135 55)' : 'var(--bg)',
-                                  color: usarMes ? '#fff' : 'var(--muted)',
-                                }}>mes</button>
-                            </span>
-                          )}
+                          <span className="text-[10px]" style={{ color: 'var(--faint)' }}>
+                            {refInfo.label === '/mes' ? 'plana por mes' : 'por día'}
+                          </span>
                           <span style={{ color: 'var(--border)' }}>|</span>
                           <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Total:</span>
                           {totalEditando[idx] ? (
@@ -1059,9 +1162,7 @@ function SessionForm({ session }) {
                             </span>
                           )}
                           {item.total_editado != null && (() => {
-                            const baseCalc = (item.id_item_granel && item.usar_precio_mes && item.precio_mes != null)
-                              ? item.precio_mes * item.cantidad
-                              : item.precio_dia * item.dias_item * item.cantidad;
+                            const baseCalc = item.sub_calc;
                             const diff = item.total_editado - baseCalc;
                             return diff !== 0 ? (
                               <span className="text-[9px]" style={{ color: 'var(--danger)' }}>
@@ -1081,10 +1182,7 @@ function SessionForm({ session }) {
                       {itemsConMaximo.length} ítem{itemsConMaximo.length !== 1 ? 's' : ''} (cada uno con su fecha)
                     </span>
                     <span className="text-sm font-mono font-bold" style={{ color: 'var(--ink)' }}>
-                      S/ {itemsConDias.reduce((a, item) => {
-                        const usarMes = item.id_item_granel && item.usar_precio_mes && item.precio_mes != null;
-                        return a + (usarMes ? item.precio_mes * item.cantidad : item.precio_dia * item.dias_item * item.cantidad);
-                      }, 0).toFixed(2)}
+                      S/ {itemsConDias.reduce((a, item) => a + item.sub_calc, 0).toFixed(2)}
                     </span>
                   </div>
                 </>
@@ -1109,10 +1207,7 @@ function SessionForm({ session }) {
                       .replaceAll('[CLIENTE_NOMBRE]', nombre || '—')
                       .replaceAll('[CLIENTE_DNI]', dni || '—')
                       .replaceAll('[CLIENTE_DIRECCION]', '—')
-                      .replaceAll('[TOTAL]', 'S/ ' + itemsConDias.reduce((a, item) => {
-                        const usarMes = item.id_item_granel && item.usar_precio_mes && item.precio_mes != null;
-                        return a + (usarMes ? item.precio_mes * item.cantidad : item.precio_dia * item.dias_item * item.cantidad);
-                      }, 0).toFixed(2))
+                      .replaceAll('[TOTAL]', 'S/ ' + itemsConDias.reduce((a, item) => a + item.sub_calc, 0).toFixed(2))
                       .replaceAll('[FECHA_INICIO]', fechaSalida)
                       .replaceAll('[FECHA_DEVOLUCION]', fechaDevolucion)
                       .replaceAll('[DEPOSITO_TEXTO]', '')
@@ -1139,14 +1234,11 @@ function SessionForm({ session }) {
                   onClick={async () => {
                     if (!window.api) return;
                     try {
-                      const total = itemsConDias.reduce((a, item) => {
-                        const usarMes = item.id_item_granel && item.usar_precio_mes && item.precio_mes != null;
-                        return a + (usarMes ? item.precio_mes * item.cantidad : item.precio_dia * item.dias_item * item.cantidad);
-                      }, 0);
+                      const total = itemsConDias.reduce((a, item) => a + item.sub_calc, 0);
                       const pdfPath = await window.api.generarPdfPreview({
                         arrendadora: { nombre: 'SOLEDAD SUPANTA QUISPE', dni: '72094861', ruc: '10720948619', direccion: 'Av. Los Pinos N° 348', telefono: '985618849' },
                         cliente: { nombre: nombre || '—', dni: dni || '—', telefono: telefono || '—', direccion: '' },
-                        items: itemsConDias.map(item => ({ codigo: item.id_herramienta || (item.nombre + ' (' + item.condicion + ')'), nombre: item.nombre, cantidad: item.cantidad, precio_dia: item.precio_dia, fecha_devolucion_pactada: item.fecha_devolucion_item || fechaDevolucion })),
+                        items: itemsConDias.map(item => ({ codigo: item.id_herramienta || (item.nombre + ' (' + item.condicion + ')'), nombre: item.nombre, cantidad: item.cantidad, precio_dia: infoTarifa(item).precio, tarifa: item.tarifa || 'dia', desglose: item._componentes ? item._componentes.map(c => ({ cantidad: c.cantidad * (item.cantidad || 1), nombre: c.nombre })) : undefined, fecha_devolucion_pactada: item.fecha_devolucion_item || fechaDevolucion })),
                         fechas: { salida: fechaSalida, devolucion: fechaDevolucion },
                         total, firmaBase64: firmaBase64 || null,
                       });
@@ -1193,9 +1285,7 @@ function SessionForm({ session }) {
                   ) : (
                     <div className="space-y-1">
                       {itemsConDias.map((item, idx) => {
-                        const subItem = item.total_editado || ((item.id_item_granel && item.usar_precio_mes && item.precio_mes != null)
-                          ? item.precio_mes * item.cantidad
-                          : item.precio_dia * item.dias_item * item.cantidad);
+                        const subItem = item.total_editado != null ? item.total_editado : item.sub_calc;
                         return (
                           <div key={idx} className="flex items-center gap-2">
                             <span className="font-mono text-[9px] shrink-0" style={{ color: 'var(--info)' }}>
@@ -1218,10 +1308,7 @@ function SessionForm({ session }) {
                   <hr style={{ borderColor: 'var(--border)', marginTop: 8, marginBottom: 6 }} />
                   <div className="flex justify-between items-baseline">
                     <span className="font-bold text-sm" style={{ color: 'var(--ink)' }}>TOTAL</span>
-                    <span className="font-mono font-bold text-sm" style={{ color: 'var(--success)' }}>S/ {itemsConDias.reduce((a, item) => {
-                      const usarMes = item.id_item_granel && item.usar_precio_mes && item.precio_mes != null;
-                      return a + (usarMes ? item.precio_mes * item.cantidad : item.precio_dia * item.dias_item * item.cantidad);
-                    }, 0).toFixed(2)}</span>
+                    <span className="font-mono font-bold text-sm" style={{ color: 'var(--success)' }}>S/ {itemsConDias.reduce((a, item) => a + item.sub_calc, 0).toFixed(2)}</span>
                   </div>
                 </div>
 

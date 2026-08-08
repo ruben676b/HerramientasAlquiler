@@ -73,10 +73,10 @@ function crearContrato(
 
     const insertDetalle = db.prepare(`
       INSERT INTO DETALLE_CONTRATO (
-        id_contrato, tipo_item, id_herramienta, id_item_granel,
+        id_contrato, tipo_item, id_herramienta, id_item_granel, id_kit,
         cantidad, precio_dia_aplicado,
-        fecha_devolucion_pactada_item, total_item_snapshot
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        fecha_devolucion_pactada_item, total_item_snapshot, tarifa_aplicada
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const resultado = insertContrato.run(
@@ -121,10 +121,12 @@ function crearContrato(
           'individual',
           item.id_herramienta,
           null,
+          null,
           1,
-          herramienta.precio_dia,
+          item.precio_aplicado != null ? item.precio_aplicado : herramienta.precio_dia,
           fechaDevItem,
-          item.total_item_snapshot != null ? item.total_item_snapshot : null
+          item.total_item_snapshot != null ? item.total_item_snapshot : null,
+          item.tarifa_aplicada || 'dia'
         );
 
         db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(
@@ -162,15 +164,124 @@ function crearContrato(
           'granel',
           null,
           item.id_item_granel,
+          null,
           item.cantidad,
-          granel.precio_dia,
+          item.precio_aplicado != null ? item.precio_aplicado : granel.precio_dia,
           fechaDevItemG,
-          item.total_item_snapshot != null ? item.total_item_snapshot : null
+          item.total_item_snapshot != null ? item.total_item_snapshot : null,
+          item.tarifa_aplicada || 'dia'
         );
 
         db.prepare(
           'UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?'
         ).run(item.cantidad, item.id_item_granel);
+      } else if (item.tipo_item === 'kit') {
+        if (!item.cantidad || item.cantidad < 1) {
+          throw new Error('La cantidad para kits debe ser al menos 1.');
+        }
+
+        const kit = db
+          .prepare(
+            'SELECT precio_dia, nombre FROM KIT WHERE id = ? AND activo = 1'
+          )
+          .get(item.id_kit);
+
+        if (!kit) {
+          throw new Error('Kit no encontrado o inactivo: ' + item.id_kit);
+        }
+
+        const componentes = db
+          .prepare('SELECT * FROM KIT_COMPONENTE WHERE id_kit = ?')
+          .all(item.id_kit);
+
+        if (componentes.length === 0) {
+          throw new Error(
+            'El kit ' + kit.nombre + ' no tiene componentes configurados.'
+          );
+        }
+
+        // Línea padre del kit (precio real, se factura)
+        insertDetalle.run(
+          idContrato,
+          'kit',
+          null,
+          null,
+          item.id_kit,
+          item.cantidad,
+          item.precio_aplicado != null ? item.precio_aplicado : kit.precio_dia,
+          item.fecha_devolucion_pactada || null,
+          item.total_item_snapshot != null ? item.total_item_snapshot : null,
+          item.tarifa_aplicada || 'dia'
+        );
+
+        // Líneas hijas: componentes del kit (precio 0, controlan stock/devolución)
+        for (const comp of componentes) {
+          if (comp.tipo_item === 'granel') {
+            const granelC = db
+              .prepare(
+                'SELECT cantidad_disponible, nombre FROM ITEM_GRANEL WHERE id = ? AND activo = 1'
+              )
+              .get(comp.id_item_granel);
+            if (!granelC) {
+              throw new Error(
+                'Componente granel del kit no encontrado o inactivo: ' + comp.id_item_granel
+              );
+            }
+            const necesario = comp.cantidad * item.cantidad;
+            if (granelC.cantidad_disponible < necesario) {
+              throw new Error(
+                'Stock insuficiente de ' + granelC.nombre + ' para el kit ' + kit.nombre +
+                  '. Disponible: ' + granelC.cantidad_disponible + ', necesario: ' + necesario
+              );
+            }
+            insertDetalle.run(
+              idContrato,
+              'granel',
+              null,
+              comp.id_item_granel,
+              item.id_kit,
+              necesario,
+              0,
+              null,
+              null,
+              'dia'
+            );
+            db.prepare(
+              'UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?'
+            ).run(necesario, comp.id_item_granel);
+          } else if (comp.tipo_item === 'individual') {
+            const herrC = db
+              .prepare('SELECT estado, nombre FROM HERRAMIENTA WHERE id = ? AND activo = 1')
+              .get(comp.id_herramienta);
+            if (!herrC) {
+              throw new Error(
+                'Componente del kit no encontrado o inactivo: ' + comp.id_herramienta
+              );
+            }
+            if (herrC.estado !== 'disponible') {
+              throw new Error(
+                'La herramienta ' + herrC.nombre + ' del kit ' + kit.nombre +
+                  ' no está disponible (estado: ' + herrC.estado + ').'
+              );
+            }
+            insertDetalle.run(
+              idContrato,
+              'individual',
+              comp.id_herramienta,
+              null,
+              item.id_kit,
+              1,
+              0,
+              null,
+              null,
+              'dia'
+            );
+            db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(
+              'alquilado',
+              comp.id_herramienta
+            );
+          }
+        }
       }
     }
 
@@ -301,6 +412,9 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
             acc.perdida += cant;
             acc.costo_perdida = item.costo_perdida != null ? item.costo_perdida : null;
           }
+        } else if (detalle.tipo_item === 'kit') {
+          // Kit marcado explícitamente (perdido completo o devuelto completo en un solo gesto)
+          totalDanos += procesarKitLinea(idContrato, detalle, item, fechaDevolucionReal);
         }
       }
     }
@@ -345,6 +459,9 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
       }
     }
 
+    // Sincronizar líneas padre de kits con el estado de sus componentes
+    recalcularKits(idContrato, fechaDevolucionReal);
+
     // Determinar estado del contrato: individuales por estado_devolucion, granel por DEVOLUCION_GRANEL
     const individualesPendientes = db.prepare(
       "SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO WHERE id_contrato = ? AND tipo_item = 'individual' AND estado_devolucion = 'pendiente'"
@@ -377,6 +494,117 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
   });
 
   return ejecutar();
+}
+
+/**
+ * Procesa una línea padre de kit marcada explícitamente en la devolución
+ * (kit completo devuelto 'bien' o kit completo perdido 'perdido').
+ * Expande el estado a todos sus componentes y ajusta stock.
+ * @returns {number} costo_perdida aplicado (para sumar a totalDanos)
+ */
+function procesarKitLinea(idContrato, detalle, item, fechaDevolucionReal) {
+  const estadoKit = item.estado_devolucion; // 'bien' | 'perdido'
+  db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ?, costo_perdida = COALESCE(?, costo_perdida) WHERE id = ?')
+    .run(estadoKit, fechaDevolucionReal, item.costo_perdida ?? null, detalle.id);
+
+  let costoPerdidaAplicado = 0;
+
+  if (estadoKit === 'bien' || estadoKit === 'perdido') {
+    // Componentes individuales del kit
+    const compsInd = db.prepare(
+      "SELECT id, id_herramienta, estado_devolucion FROM DETALLE_CONTRATO WHERE id_contrato = ? AND id_kit = ? AND tipo_item = 'individual'"
+    ).all(idContrato, detalle.id_kit);
+    for (const ci of compsInd) {
+      if (ci.estado_devolucion === 'pendiente') {
+        db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ? WHERE id = ?')
+          .run(estadoKit, fechaDevolucionReal, ci.id);
+        db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?')
+          .run('disponible', ci.id_herramienta);
+      }
+    }
+
+    // Componentes granel del kit
+    const compsGr = db.prepare(
+      "SELECT id, id_item_granel, cantidad FROM DETALLE_CONTRATO WHERE id_contrato = ? AND id_kit = ? AND tipo_item = 'granel'"
+    ).all(idContrato, detalle.id_kit);
+    for (const cg of compsGr) {
+      const yaDevuelto = db.prepare(
+        'SELECT COALESCE(SUM(cantidad_bien + cantidad_danada + cantidad_perdida), 0) AS t FROM DEVOLUCION_GRANEL WHERE id_contrato = ? AND id_detalle = ? AND revertido = 0'
+      ).get(idContrato, cg.id).t;
+      const pendiente = Math.max(0, cg.cantidad - yaDevuelto);
+      if (pendiente <= 0) continue;
+      const bien = estadoKit === 'bien' ? pendiente : 0;
+      const perdida = estadoKit === 'perdido' ? pendiente : 0;
+      db.prepare(`
+        INSERT INTO DEVOLUCION_GRANEL (id_contrato, id_item_granel, id_detalle, fecha, cantidad_bien, cantidad_danada, cantidad_perdida, costo_reparacion, costo_perdida)
+        VALUES (?, ?, ?, ?, ?, 0, ?, NULL, NULL)
+      `).run(idContrato, cg.id_item_granel, cg.id, fechaDevolucionReal, bien, perdida);
+      db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = MAX(0, cantidad_alquilada - ?), cantidad_perdida = cantidad_perdida + ? WHERE id = ?')
+        .run(pendiente, perdida, cg.id_item_granel);
+    }
+
+    if (estadoKit === 'perdido' && item.costo_perdida) {
+      costoPerdidaAplicado = item.costo_perdida;
+    }
+  }
+
+  return costoPerdidaAplicado;
+}
+
+/**
+ * Sincroniza el estado de las líneas padre de kit según el estado de sus componentes.
+ * - Si hay componentes pendientes -> kit 'pendiente' (fecha NULL)
+ * - Si todos completos y alguno dañado/perdido -> kit 'dañado'
+ * - Si todos completos y bien -> kit 'bien' (fecha = fecha de devolución)
+ * Los kits marcados 'perdido' explícitamente no se sobrescriben.
+ */
+function recalcularKits(idContrato, fechaDevolucionReal) {
+  const kitLines = db.prepare(
+    "SELECT id, id_kit, estado_devolucion FROM DETALLE_CONTRATO WHERE id_contrato = ? AND tipo_item = 'kit'"
+  ).all(idContrato);
+
+  for (const kl of kitLines) {
+    if (kl.estado_devolucion === 'perdido') continue; // ya resuelto explícitamente
+
+    const indPend = db.prepare(
+      "SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO WHERE id_contrato = ? AND id_kit = ? AND tipo_item = 'individual' AND estado_devolucion = 'pendiente'"
+    ).get(idContrato, kl.id_kit).cnt;
+
+    const grPend = db.prepare(`
+      SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO d
+      WHERE d.id_contrato = ? AND d.id_kit = ? AND d.tipo_item = 'granel'
+      AND d.cantidad > (
+        SELECT COALESCE(SUM(dg.cantidad_bien + dg.cantidad_danada + dg.cantidad_perdida), 0)
+        FROM DEVOLUCION_GRANEL dg
+        WHERE dg.id_contrato = d.id_contrato AND dg.id_detalle = d.id AND dg.revertido = 0
+      )
+    `).get(idContrato, kl.id_kit).cnt;
+
+    const pendientes = indPend + grPend;
+    if (pendientes > 0) {
+      db.prepare("UPDATE DETALLE_CONTRATO SET estado_devolucion = 'pendiente', fecha_devolucion_real = NULL WHERE id = ?")
+        .run(kl.id);
+      continue;
+    }
+
+    const danadoCnt = db.prepare(
+      "SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO WHERE id_contrato = ? AND id_kit = ? AND tipo_item = 'individual' AND estado_devolucion IN ('dañado','perdido')"
+    ).get(idContrato, kl.id_kit).cnt;
+
+    const granelDanadoCnt = db.prepare(`
+      SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO d
+      WHERE d.id_contrato = ? AND d.id_kit = ? AND d.tipo_item = 'granel'
+      AND (
+        SELECT COALESCE(SUM(dg.cantidad_danada + dg.cantidad_perdida), 0)
+        FROM DEVOLUCION_GRANEL dg
+        WHERE dg.id_contrato = d.id_contrato AND dg.id_detalle = d.id AND dg.revertido = 0
+      ) > 0
+    `).get(idContrato, kl.id_kit).cnt;
+
+    const estado = (danadoCnt + granelDanadoCnt) > 0 ? 'dañado' : 'bien';
+    db.prepare("UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ? WHERE id = ?")
+      .run(estado, fechaDevolucionReal, kl.id);
+  }
 }
 
 function getContratos(filtros = {}) {
@@ -420,13 +648,17 @@ function getContratos(filtros = {}) {
   // Enriquecer con items y días de atraso
   return contratos.map(c => {
     const items = db.prepare(`
-      SELECT d.*, COALESCE(h.nombre, i.nombre) AS item_nombre,
-             COALESCE(h.id, 'MAT') AS item_codigo,
+      SELECT d.*,
+             CASE WHEN d.tipo_item = 'kit' THEN 'KIT-' || d.id_kit
+                  ELSE COALESCE(h.id, 'MAT') END AS item_codigo,
+             COALESCE(h.nombre, i.nombre, k.nombre) AS item_nombre,
+             k.nombre AS kit_nombre,
              i.condicion AS item_condicion,
              i.precio_venta AS item_precio_venta
       FROM DETALLE_CONTRATO d
       LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id
       LEFT JOIN ITEM_GRANEL i ON d.id_item_granel = i.id
+      LEFT JOIN KIT k ON d.id_kit = k.id
       WHERE d.id_contrato = ?
     `).all(c.id);
 
@@ -514,7 +746,7 @@ function getContratos(filtros = {}) {
         JOIN DETALLE_CONTRATO d ON d.id_herramienta = m.id_herramienta
         WHERE d.id_contrato = ? AND d.tipo_item = 'individual' AND d.estado_devolucion = 'dañado'
       `).get(c.id)?.total || 0);
-    const total_perdidas = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_perdida || 0), 0);
+    const total_perdidas = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_perdida || 0) + (i.tipo_item === 'kit' ? (i.costo_perdida || 0) : 0), 0);
 
     return { ...c, items: itemsConAtraso, pagos, dias_atraso: max_dias_atraso, total_atraso, total_contrato: totalContrato, total_danos, total_perdidas };
   });
@@ -644,6 +876,9 @@ function revertirDevolucionItem(idDetalle) {
       // Nota: granel no registra en MANTENIMIENTO, el daño se gestiona via cantidad_danada en ITEM_GRANEL
     }
 
+    // Sincronizar líneas padre de kits con el estado de sus componentes
+    recalcularKits(detalle.id_contrato, localDate());
+
     // Recalcular estado del contrato (individual por estado_devolucion, granel por DEVOLUCION_GRANEL)
     const individualesPendientes = db.prepare(
       "SELECT COUNT(*) AS cnt FROM DETALLE_CONTRATO WHERE id_contrato = ? AND tipo_item = 'individual' AND estado_devolucion = 'pendiente'"
@@ -726,6 +961,9 @@ function revertirDevolucionGranel(idDevolucionGranel) {
     // Marcar como revertida
     db.prepare('UPDATE DEVOLUCION_GRANEL SET revertido = 1 WHERE id = ?')
       .run(idDevolucionGranel);
+
+    // Sincronizar líneas padre de kits con el estado de sus componentes
+    recalcularKits(entry.id_contrato, localDate());
 
     // Recalcular estado del contrato
     const individualesPendientes = db.prepare(

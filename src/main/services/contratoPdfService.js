@@ -33,10 +33,12 @@ function generarPdfDesdeDatos(datos) {
     (new Date(fechas.devolucion + 'T00:00:00') - new Date(fechas.salida + 'T00:00:00')) / 86400000
   ) + 1);
   const totalItems = items.reduce((a, i) => {
+    if (i.snapshot != null) return a + i.snapshot;
     const fechaDevItem = i.fecha_devolucion_pactada || fechas.devolucion;
     const diasItem = Math.max(1, Math.ceil(
       (new Date(fechaDevItem + 'T00:00:00') - new Date(fechas.salida + 'T00:00:00')) / 86400000
     ) + 1);
+    if (i.tarifa === 'mes') return a + i.precio_dia * i.cantidad;
     return a + i.precio_dia * diasItem * i.cantidad;
   }, 0);
 
@@ -135,19 +137,34 @@ function generarPdfDesdeDatos(datos) {
   let y = doc.y;
   items.forEach((item) => {
     if (y > 720) { doc.addPage(); y = 45; }
+    const tarifa = item.tarifa || 'dia';
     const fechaDevItem = item.fecha_devolucion_pactada || fechas.devolucion;
     const diasItem = Math.max(1, Math.ceil(
       (new Date(fechaDevItem + 'T00:00:00') - new Date(fechas.salida + 'T00:00:00')) / 86400000
     ) + 1);
-    const sub = item.precio_dia * diasItem * item.cantidad;
+    const sub = item.snapshot != null
+      ? item.snapshot
+      : (tarifa === 'mes' ? item.precio_dia * item.cantidad : item.precio_dia * diasItem * item.cantidad);
     const esGranel = item.codigo && item.codigo.includes('(') && !/^[A-Z]+-\d/.test(item.codigo);
     const codigo = esGranel ? 'Material' : (item.codigo || '—');
     doc.text(codigo, colX[0], y, { width: colWidths[0] });
     doc.text(item.nombre || '—', colX[1], y, { width: colWidths[1] });
-    doc.text(`S/ ${item.precio_dia.toFixed(2)}`, colX[2], y, { width: colWidths[2], align: 'right' });
+    doc.text(`S/ ${item.precio_dia.toFixed(2)}/${tarifa === 'mes' ? 'mes' : 'día'}`, colX[2], y, { width: colWidths[2], align: 'right' });
     doc.text(String(item.cantidad), colX[3], y, { width: colWidths[3], align: 'center' });
     doc.text(`S/ ${sub.toFixed(2)}`, colX[4], y, { width: colWidths[4], align: 'right' });
     y += 11;
+    if (item.desglose) {
+      const lineas = Array.isArray(item.desglose)
+        ? item.desglose
+        : [{ cantidad: '', nombre: 'Incluye: ' + item.desglose }];
+      doc.font('Helvetica-Oblique').fontSize(7);
+      for (const c of lineas) {
+        if (y > 720) { doc.addPage(); y = 45; }
+        doc.text('• ' + (c.cantidad ? c.cantidad + ' × ' : '') + (c.nombre || '—'), colX[1], y, { width: colX[2] - colX[1] - 5 });
+        y += 8;
+      }
+      doc.font('Helvetica').fontSize(6.5);
+    }
   });
 
   // Total
@@ -263,11 +280,12 @@ function generarPdf(idContrato) {
   if (!contrato) throw new Error('Contrato no encontrado.');
 
   const detalles = db.prepare(`
-    SELECT d.*, COALESCE(h.nombre, i.nombre) AS item_nombre,
-           COALESCE(h.id, i.nombre || ' (' || i.condicion || ')') AS item_codigo
+    SELECT d.*, COALESCE(h.nombre, i.nombre, k.nombre) AS item_nombre,
+           COALESCE(h.id, i.nombre || ' (' || i.condicion || ')', k.nombre) AS item_codigo
     FROM DETALLE_CONTRATO d
     LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id
     LEFT JOIN ITEM_GRANEL i ON d.id_item_granel = i.id
+    LEFT JOIN KIT k ON d.tipo_item = 'kit' AND d.id_kit = k.id
     WHERE d.id_contrato = ?
   `).all(idContrato);
 
@@ -283,10 +301,12 @@ function generarPdf(idContrato) {
     (new Date(contrato.fecha_devolucion_pactada + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
   ) + 1);
   const totalItems = detalles.reduce((a, d) => {
+    if (d.total_item_snapshot != null) return a + d.total_item_snapshot;
     const fechaDevItem = d.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;
     const diasItem = Math.max(1, Math.ceil(
       (new Date(fechaDevItem + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
     ) + 1);
+    if ((d.tarifa_aplicada || 'dia') === 'mes') return a + d.precio_dia_aplicado * d.cantidad;
     return a + d.precio_dia_aplicado * diasItem * d.cantidad;
   }, 0);
   const total = totalItems + (contrato.deposito_monto || 0);
@@ -299,16 +319,37 @@ function generarPdf(idContrato) {
       telefono: contrato.cliente_telefono,
       direccion: contrato.cliente_direccion,
     },
-    items: detalles.map(d => {
-      const fechaDevItem = d.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;
-      return {
-        codigo: d.item_codigo,
-        nombre: d.item_nombre,
-        cantidad: d.cantidad,
-        precio_dia: d.precio_dia_aplicado,
-        fecha_devolucion_pactada: fechaDevItem,
-      };
-    }),
+    items: (() => {
+      const filas = [];
+      for (const d of detalles) {
+        const fechaDevItem = d.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;
+        if (d.tipo_item === 'kit') {
+          const hijos = detalles.filter(x => x.id_kit === d.id_kit && x.tipo_item !== 'kit');
+          const desglose = hijos.map(x => ({ cantidad: x.cantidad, nombre: x.item_nombre }));
+          filas.push({
+            codigo: d.item_codigo,
+            nombre: d.item_nombre,
+            cantidad: d.cantidad,
+            precio_dia: d.precio_dia_aplicado,
+            fecha_devolucion_pactada: fechaDevItem,
+            tarifa: d.tarifa_aplicada || 'dia',
+            snapshot: d.total_item_snapshot,
+            desglose,
+          });
+        } else if (!d.id_kit) {
+          filas.push({
+            codigo: d.item_codigo,
+            nombre: d.item_nombre,
+            cantidad: d.cantidad,
+            precio_dia: d.precio_dia_aplicado,
+            fecha_devolucion_pactada: fechaDevItem,
+            tarifa: d.tarifa_aplicada || 'dia',
+            snapshot: d.total_item_snapshot,
+          });
+        }
+      }
+      return filas;
+    })(),
     fechas: { salida: contrato.fecha_salida, devolucion: contrato.fecha_devolucion_pactada },
     total,
     deposito: {

@@ -57,6 +57,8 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [historialGranelAbierto, setHistorialGranelAbierto] = useState({});
   const [devolucionesGranel, setDevolucionesGranel] = useState({});
   const [cargandoHistorial, setCargandoHistorial] = useState({});
+  // Estado para el acordeón de componentes del kit
+  const [kitAbierto, setKitAbierto] = useState({});
   const [calificarModal, setCalificarModal] = useState(false);
 
   const cargarHistorialGranel = async (idx, item) => {
@@ -428,7 +430,18 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
           {items.length === 0 ? (
             <p className="text-xs" style={{ color: 'var(--faint)' }}>Sin ítems registrados</p>
           ) : (
-            items.map((item, idx) => {
+            (() => {
+              // Agrupar componentes bajo la tarjeta de su kit
+              const hijosPorKit = {};
+              const ordenPadres = [];
+              items.forEach((it, i) => {
+                if (it.id_kit && it.tipo_item !== 'kit') {
+                  (hijosPorKit[it.id_kit] = hijosPorKit[it.id_kit] || []).push(i);
+                } else {
+                  ordenPadres.push(i);
+                }
+              });
+              const renderItemBody = (item, idx, esKit, esHijo) => {
               const est = estados[idx] || null;
               const esGranel = !!item.id_item_granel;
               const devueltoEnDB = item.estado_devolucion && item.estado_devolucion !== 'pendiente';
@@ -436,26 +449,22 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
               const fechaPactadaItem = item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada;
               const diasItem = item.dias_item || 0;
               const moraActual = morasEditadas[idx] != null ? morasEditadas[idx] : ((item.dias_atraso_item || 0) * (item.precio_dia_aplicado || 0) * (item.cantidad || 1));
+              const hijosKit = esKit ? (hijosPorKit[item.id_kit] || []) : [];
+              const pendKit = hijosKit.reduce((acc, hIdx) => {
+                const h = items[hIdx];
+                return acc + (h.id_item_granel ? (h.granel_pendiente || 0) : (h.estado_devolucion === 'pendiente' ? 1 : 0));
+              }, 0);
               return (
-                <div key={idx}
-                  className="rounded-lg border px-3 py-2 text-xs transition-all duration-150"
-                  style={{
-                    borderColor: yaGuardado
-                      ? 'oklch(0.50 0.13 155)'
-                      : (est ? ESTADOS_OPC.find(o => o.id === est)?.bg + '60' : 'var(--border)'),
-                    backgroundColor: yaGuardado
-                      ? 'oklch(0.95 0.05 155)'
-                      : (est ? 'oklch(0.97 0.04 70)' : 'var(--surface)'),
-                  }}>
+                <>
                   {/* Fila 1: Badge + nombre + botones estado + precio */}
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className={esKit ? 'flex flex-wrap items-center gap-2 mb-1' : 'flex items-center gap-2 mb-1'}>
                     <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
-                      style={{ backgroundColor: 'oklch(0.40 0.12 240)', color: '#fff' }}>
-                      {esGranel ? 'x' + (item.cantidad || 1) : item.item_codigo || item.id}
+                      style={{ backgroundColor: esKit ? 'oklch(0.45 0.13 160)' : 'oklch(0.40 0.12 240)', color: '#fff' }}>
+                      {esKit ? 'Kit ×' + (item.cantidad || 1) : (esGranel ? 'x' + (item.cantidad || 1) : item.item_codigo || item.id)}
                     </span>
-                    <span className="font-medium text-[13px] truncate flex-1" style={{ color: 'var(--ink)' }}>{item.item_nombre || item.nombre}</span>
+                    <span className={esKit ? 'font-semibold text-[13px]' : 'font-medium text-[13px] truncate flex-1'} style={{ color: 'var(--ink)' }}>{item.item_nombre || item.nombre}</span>
                     {/* Botones Bien/Dañado solo para items individuales no guardados */}
-                    {!esGranel && !yaGuardado && (
+                    {!esGranel && !esKit && !yaGuardado && (
                       <div className="flex gap-0.5 shrink-0">
                         {ESTADOS_OPC.map(op => {
                           const sel = est === op.id;
@@ -484,11 +493,24 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                     )}
                     {yaGuardado && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                        style={{ backgroundColor: 'oklch(0.50 0.13 155)', color: '#fff' }}>
-                        Devuelto
+                        style={{ backgroundColor: esKit && item.estado_devolucion === 'dañado' ? 'oklch(0.55 0.12 70)' : 'oklch(0.50 0.13 155)', color: '#fff' }}>
+                        {esKit && item.estado_devolucion === 'dañado' ? 'Dañado' : 'Devuelto'}
                       </span>
                     )}
-                    {!esGranel && yaGuardado && (
+                    {esKit && pendKit > 0 && !kitAbierto[item.id] && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold shrink-0"
+                        style={{ backgroundColor: 'oklch(0.92 0.04 240)', color: 'oklch(0.43 0.13 240)' }}>
+                        {pendKit} pendiente{pendKit !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {esKit && hijosKit.length > 0 && (
+                      <span className="flex items-center gap-0.5 shrink-0" style={{ color: 'var(--muted)' }}>
+                        <ChevronRight size={12}
+                          style={{ transform: kitAbierto[item.id] ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }} />
+                        <span className="text-[9px] font-semibold uppercase tracking-wider">Componentes ({hijosKit.length})</span>
+                      </span>
+                    )}
+                    {!esGranel && !esKit && yaGuardado && (
                       <button onClick={() => handleDeshacer(idx)}
                         className="text-[9px] px-1.5 h-5 rounded font-medium transition-all duration-150 hover:opacity-80 shrink-0"
                         style={{ backgroundColor: 'oklch(0.92 0.03 25)', color: 'var(--danger)' }}>
@@ -496,11 +518,13 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                       </button>
                     )}
                   </div>
-                  {/* Fila 2: Fechas del ítem */}
+                  {/* Fila 2: Fechas del ítem (heredadas del kit en componentes) */}
+                  {!esHijo && (
                   <div className="text-[10px] mb-1" style={{ color: 'var(--muted)' }}>
                     Salida: {fmtFecha(c.fecha_salida)} &middot; Pactada: {fmtFecha(fechaPactadaItem)}
                     <span style={{ color: 'var(--muted)' }}> &middot; Base: {diasItem} día{diasItem !== 1 ? 's' : ''}</span>
                   </div>
+                  )}
                   {/* Granel: resumen + historial */}
                   {esGranel && (() => {
                     window.api.log('[DEBUG DevolucionInline render] item: ' + item.id + ' id_item_granel: ' + item.id_item_granel + ' granel_pendiente: ' + item.granel_pendiente + ' granel_dev_bien: ' + item.granel_dev_bien + ' granel_dev_danada: ' + item.granel_dev_danada + ' granel_dev_perdida: ' + item.granel_dev_perdida + ' cantidad: ' + item.cantidad);
@@ -697,7 +721,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                     );
                   })()}
                   {/* Dañado: costo + nota — solo individual */}
-                  {!esGranel && est === 'dañado' && (
+                  {!esGranel && !esKit && est === 'dañado' && (
                     <div className="flex items-center gap-2 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
                       <span className="text-[10px] shrink-0" style={{ color: 'var(--muted)' }}>Costo reparación: S/</span>
                       <input type="number" step="0.01" min="0" value={costosRep[idx] ?? ''}
@@ -710,9 +734,62 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                         style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
                     </div>
                   )}
-                </div>
+                </>
               );
-            })
+              };
+              const renderItemCard = (item, idx) => {
+                const esKit = item.tipo_item === 'kit';
+                const estK = estados[idx] || null;
+                const devDB = item.estado_devolucion && item.estado_devolucion !== 'pendiente';
+                const yaG = guardados[idx] || devDB;
+                const styleCard = {
+                  borderColor: yaG
+                    ? 'oklch(0.50 0.13 155)'
+                    : (estK ? ESTADOS_OPC.find(o => o.id === estK)?.bg + '60' : 'var(--border)'),
+                  backgroundColor: yaG
+                    ? 'oklch(0.95 0.05 155)'
+                    : (estK ? 'oklch(0.97 0.04 70)' : 'var(--surface)'),
+                };
+                const cardBody = (
+                  <div className="rounded-lg border px-3 py-2 text-xs transition-all duration-150"
+                    style={esKit ? { ...styleCard, cursor: 'pointer' } : styleCard}
+                    onClick={esKit ? () => setKitAbierto(p => ({ ...p, [item.id]: !p[item.id] })) : undefined}
+                    title={esKit ? 'Clic para ver componentes' : undefined}>
+                    {renderItemBody(item, idx, esKit, false)}
+                  </div>
+                );
+                if (!esKit) return <div key={idx}>{cardBody}</div>;
+                const hijos = hijosPorKit[item.id_kit] || [];
+                return (
+                  <div key={idx}>
+                    {cardBody}
+                    {kitAbierto[item.id] && hijos.length > 0 && (
+                      <div className="ml-3 mt-1.5 space-y-1.5">
+                        {hijos.map(hIdx => {
+                          const hi = items[hIdx];
+                          const estH = estados[hIdx] || null;
+                          const yaH = guardados[hIdx] || (hi.estado_devolucion && hi.estado_devolucion !== 'pendiente');
+                          return (
+                            <div key={hIdx} className="rounded-lg border px-3 py-2 text-xs transition-all duration-150"
+                              style={{
+                                borderColor: yaH
+                                  ? 'oklch(0.50 0.13 155)'
+                                  : (estH ? ESTADOS_OPC.find(o => o.id === estH)?.bg + '60' : 'var(--border)'),
+                                backgroundColor: yaH
+                                  ? 'oklch(0.95 0.05 155)'
+                                  : (estH ? 'oklch(0.97 0.04 70)' : 'var(--surface)'),
+                              }}>
+                              {renderItemBody(hi, hIdx, false, true)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              };
+              return ordenPadres.map(i => renderItemCard(items[i], i));
+            })()
           )}
           {individualesPendientes > 0 && (
             <div className="px-4 pb-2">

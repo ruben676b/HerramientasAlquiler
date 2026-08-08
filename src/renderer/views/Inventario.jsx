@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Search, Plus, Pencil, Trash2, Wrench, Package, X, History,
-  ChevronDown, ChevronRight, CheckCircle, AlertTriangle, MinusCircle,
+  ChevronDown, ChevronRight, CheckCircle, AlertTriangle, MinusCircle, Layers,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { SEMANTIC, ESTADOS_HERRAMIENTA } from '../lib/constants';
 import Button from '../components/ui/button';
 import ConfirmModal from '../components/ConfirmModal';
+import KitEditorModal from '../components/KitEditorModal';
 import { useToast } from '../components/Toast';
 
 /* ================================================================
@@ -20,12 +21,14 @@ export default function Inventario() {
   const [familias, setFamilias] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [granel, setGranel] = useState([]);
+  const [kits, setKits] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [error, setError] = useState(null);
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [confirmUnidad, setConfirmUnidad] = useState(null);
+  const [confirmKit, setConfirmKit] = useState(null);
   const [historial, setHistorial] = useState({});
   const [expanded, setExpanded] = useState({});
   const searchRef = useRef(null);
@@ -35,14 +38,16 @@ export default function Inventario() {
     if (!window.api) return;
     setCargando(true);
     try {
-      const [f, c, g] = await Promise.all([
+      const [f, c, g, k] = await Promise.all([
         window.api.getHerramientasPorCategoria(),
         window.api.getCategorias(),
         window.api.getGranelFull(),
+        window.api.getKits ? window.api.getKits() : Promise.resolve([]),
       ]);
       setFamilias(f);
       setCategorias(c);
       setGranel(g);
+      setKits(k);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -73,6 +78,10 @@ export default function Inventario() {
     ? granel.filter((g) => g.nombre.toLowerCase().includes(busqueda.toLowerCase()))
     : granel;
 
+  const kitsFiltrado = busqueda
+    ? kits.filter((k) => k.nombre.toLowerCase().includes(busqueda.toLowerCase()))
+    : kits;
+
   const [granelExpandido, setGranelExpandido] = useState({});
 
   // Auto-expand familias cuando se busca
@@ -95,6 +104,10 @@ export default function Inventario() {
 
   // Acciones
   const toggleExpand = (id) => {
+    if (String(id).startsWith('kit-')) {
+      setExpanded((e) => ({ ...e, [id]: !e[id] }));
+      return;
+    }
     setExpanded((e) => {
       const nuevo = !e[id];
       if (nuevo && !historial[id] && window.api?.getHistorialUnidad) {
@@ -206,6 +219,31 @@ export default function Inventario() {
     catch (e) { setError(e.message); }
   };
 
+  // Kits CRUD
+  const handleGuardarKit = async (data) => {
+    try {
+      if (modal?.kit) {
+        await window.api.editarKit(modal.kit.id, data);
+        toast('Kit actualizado');
+      } else {
+        await window.api.crearKit(data);
+        toast('Kit creado');
+      }
+      setModal(null);
+      await cargar();
+    } catch (e) { setError(e.message); }
+  };
+
+  const handleDesactivarKit = async () => {
+    if (!confirmKit) return;
+    try {
+      await window.api.desactivarKit(confirmKit.id);
+      toast(confirmKit.nombre + ' desactivado');
+      setConfirmKit(null);
+      await cargar();
+    } catch (e) { setError(e.message); setConfirmKit(null); }
+  };
+
   // ================================================================
   // RENDER
   // ================================================================
@@ -226,7 +264,7 @@ export default function Inventario() {
             </span>
           )}
         </div>
-        <Button variant="primary" size="sm" onClick={() => setModal(tab === 'herramientas' ? { tipo: 'crear-familia' } : { tipo: 'crear-granel' })}>
+        <Button variant="primary" size="sm" onClick={() => setModal(tab === 'herramientas' ? { tipo: 'crear-familia' } : tab === 'granel' ? { tipo: 'crear-granel' } : { tipo: 'crear-kit' })}>
           <Plus size={14} /> {tab === 'herramientas' ? 'Nueva' : 'Nuevo'}
         </Button>
       </div>
@@ -244,6 +282,7 @@ export default function Inventario() {
         {[
           { id: 'herramientas', label: 'Herramientas', icon: Wrench },
           { id: 'granel', label: 'Material a granel', icon: Package },
+          { id: 'kits', label: 'Kits', icon: Layers },
         ].map((t) => (
           <button key={t.id} onClick={() => { setTab(t.id); setBusqueda(''); }}
             className={cn('flex items-center gap-1.5 px-4 h-9 rounded-md text-sm font-medium transition-colors duration-150')}
@@ -374,7 +413,7 @@ export default function Inventario() {
             })}
           </div>
         )
-      ) : (
+      ) : tab === 'granel' ? (
         /* GRANEL — vista agrupada */
         granelFiltrado.length === 0 ? (
           <div className="py-16 text-center">
@@ -470,6 +509,91 @@ export default function Inventario() {
             })}
           </div>
         )
+      ) : (
+        /* KITS */
+        kitsFiltrado.length === 0 ? (
+          <div className="py-16 text-center">
+            <Layers size={36} className="mx-auto mb-3" style={{ color: 'var(--faint)' }} />
+            <p className="text-sm" style={{ color: 'var(--muted)' }}>No hay kits</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--faint)' }}>Use Nuevo para crear un kit con herramientas y materiales</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {kitsFiltrado.map((k) => {
+              const isOpen = expanded['kit-' + k.id];
+              const disp = k.disponibilidad || 0;
+              return (
+                <div key={k.id} className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+                  <button
+                    onClick={() => toggleExpand('kit-' + k.id)}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-[var(--surface)]"
+                  >
+                    <span className="shrink-0">{isOpen ? <ChevronDown size={16} style={{ color: 'var(--muted)' }} /> : <ChevronRight size={16} style={{ color: 'var(--muted)' }} />}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{k.nombre}</span>
+                        {k.descripcion && <span className="text-xs truncate" style={{ color: 'var(--faint)' }}>{k.descripcion}</span>}
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>
+                        <span>{k.componentes?.length || 0} componente{(k.componentes?.length || 0) !== 1 ? 's' : ''}</span>
+                        <span>S/ {k.precio_dia?.toFixed(2)}/día</span>
+                        {k.precio_venta ? <span className="text-[10px]">venta S/ {k.precio_venta.toFixed(2)}</span> : null}
+                      </div>
+                    </div>
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0"
+                      style={{
+                        backgroundColor: disp > 0 ? SEMANTIC.disponible.soft : SEMANTIC.pendiente.soft,
+                        color: disp > 0 ? SEMANTIC.disponible.variable : SEMANTIC.pendiente.variable,
+                      }}
+                      title={disp > 0 ? 'Kits armables con el stock actual' : 'Sin stock completo para armar'}
+                    >
+                      {disp > 0 ? disp + ' disponible' + (disp !== 1 ? 's' : '') : 'sin stock'}
+                    </span>
+                    <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => setModal({ tipo: 'editar-kit', kit: k })}
+                        className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 active:scale-90" style={{ color: 'var(--muted)' }} title="Editar kit"><Pencil size={13} /></button>
+                      <button onClick={() => setConfirmKit({ id: k.id, nombre: k.nombre })}
+                        className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-950 active:scale-90" style={{ color: 'var(--muted)' }} title="Desactivar kit"><Trash2 size={13} /></button>
+                    </div>
+                  </button>
+
+                  {/* Componentes expandidos */}
+                  {isOpen && k.componentes?.length > 0 && (
+                    <div style={{ borderTop: '1px solid var(--border)' }}>
+                      <div className="flex items-center px-4 py-1 text-[9px] uppercase tracking-wider font-semibold" style={{ color: 'var(--faint)' }}>
+                        <span className="flex-1">Componente</span>
+                        <span className="w-16 text-right shrink-0">Tipo</span>
+                        <span className="w-16 text-right shrink-0">Cant.</span>
+                        <span className="w-20 text-right shrink-0">Stock actual</span>
+                      </div>
+                      {k.componentes.map((c, i) => {
+                        const esGranel = c.tipo_item === 'granel';
+                        const stock = esGranel ? (c.cantidad_disponible ?? 0) : (c.estado_herramienta === 'disponible' ? 1 : 0);
+                        const ok = esGranel ? stock >= c.cantidad : stock >= 1;
+                        const cb = esGranel ? SEMANTIC[c.condicion] : null;
+                        return (
+                          <div key={i} className="flex items-center px-4 py-1.5 text-xs transition-colors duration-150 hover:bg-[var(--surface)]" style={{ borderTop: '1px solid var(--border)' }}>
+                            <span className="flex-1 flex items-center gap-2 min-w-0" style={{ color: 'var(--ink)' }}>
+                              {esGranel ? <Package size={11} style={{ color: 'var(--muted)' }} /> : <Wrench size={11} style={{ color: 'var(--muted)' }} />}
+                              <span className="truncate">{c.nombre}</span>
+                              {cb && <span className="inline-flex px-1.5 py-0.5 rounded-full text-[9px] font-medium shrink-0" style={{ backgroundColor: cb.soft, color: cb.variable }}>{c.condicion}</span>}
+                            </span>
+                            <span className="w-16 text-right shrink-0 font-mono" style={{ color: 'var(--muted)' }}>{esGranel ? 'material' : 'herramienta'}</span>
+                            <span className="w-16 text-right shrink-0 font-mono" style={{ color: 'var(--ink)' }}>{esGranel ? c.cantidad : 1}</span>
+                            <span className="w-20 text-right shrink-0 font-mono" style={{ color: ok ? 'var(--success)' : 'var(--danger)' }}>
+                              {esGranel ? (stock >= c.cantidad ? stock + ' (ok)' : stock + ' / req ' + c.cantidad) : (stock ? 'disponible' : 'no disp.')}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
 
       {/* Modales */}
@@ -481,6 +605,8 @@ export default function Inventario() {
       {modal?.tipo === 'sumar-stock' && <StockModal data={modal.data} onApply={(d) => handleAjustarStock(modal.data.id, d)} onClose={() => setModal(null)} />}
       {modal?.tipo === 'baja-granel' && <BajaGranelModal data={modal.data} onSave={handleDarBaja} onClose={() => setModal(null)} />}
       {modal?.tipo === 'historial-granel' && <HistorialGranelModal data={modal.data} onUndo={handleRevertirAudit} onClose={() => setModal(null)} />}
+      {modal?.tipo === 'crear-kit' && <KitEditorModal onSave={handleGuardarKit} onClose={() => setModal(null)} />}
+      {modal?.tipo === 'editar-kit' && <KitEditorModal kitId={modal.kit.id} onSave={handleGuardarKit} onClose={() => setModal(null)} />}
 
       <ConfirmModal
         open={!!confirm}
@@ -507,6 +633,16 @@ export default function Inventario() {
           setConfirmUnidad(null);
         }}
         onCancel={() => setConfirmUnidad(null)}
+      />
+
+      <ConfirmModal
+        open={!!confirmKit}
+        title="Desactivar kit"
+        message={`¿Desactivar el kit "${confirmKit?.nombre}"? Los contratos existentes no se ven afectados.`}
+        confirmLabel="Desactivar"
+        danger
+        onConfirm={handleDesactivarKit}
+        onCancel={() => setConfirmKit(null)}
       />
     </div>
   );

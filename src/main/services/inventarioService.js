@@ -39,8 +39,8 @@ function crearHerramienta({ id, id_categoria, nombre, descripcion, precio_dia, v
   if (existente) throw new Error('Ya existe una herramienta con el código ' + id);
 
   db.prepare(`
-    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, valor_reposicion, fecha_adquisicion)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, mora_dia, valor_reposicion, fecha_adquisicion, estado)
+    VALUES (?, ?, ?, ?, ?, 0, ?, ?, 'disponible')
   `).run(id, id_categoria, nombre, descripcion || null, precio_dia || 0, valor_reposicion || null, fecha_adquisicion || null);
 
   return { id };
@@ -91,8 +91,8 @@ function crearGranel({ nombre, condicion, precio_dia, cantidad_total }) {
   if (!nombre || !condicion) throw new Error('Nombre y condición son obligatorios.');
 
   const r = db.prepare(`
-    INSERT INTO ITEM_GRANEL (nombre, condicion, precio_dia, cantidad_total, cantidad_disponible)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO ITEM_GRANEL (nombre, condicion, precio_dia, mora_dia, cantidad_total, cantidad_disponible)
+    VALUES (?, ?, ?, 0, ?, ?)
   `).run(nombre, condicion, precio_dia || 0, cantidad_total || 0, cantidad_total || 0);
 
   return { id: r.lastInsertRowid };
@@ -169,8 +169,8 @@ function crearMaterial({ nombre, precio_nuevo, precio_minimo_nuevo, precio_mes_n
   if (!nombre) throw new Error('El nombre del material es obligatorio.');
 
   const insert = db.prepare(`
-    INSERT INTO ITEM_GRANEL (nombre, condicion, precio_dia, precio_minimo, precio_mes, precio_venta, cantidad_total, cantidad_disponible)
-    VALUES (?, ?, ?, ?, ?, ?, 0, 0)
+    INSERT INTO ITEM_GRANEL (nombre, condicion, precio_dia, mora_dia, precio_minimo, precio_mes, precio_venta, cantidad_total, cantidad_disponible)
+    VALUES (?, ?, ?, 0, ?, ?, ?, 0, 0)
   `);
 
   const tx = db.transaction(() => {
@@ -509,8 +509,8 @@ function crearLote({ id_categoria, nombre, precio_dia, precio_minimo, precio_mes
   }
 
   const insert = db.prepare(`
-    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, precio_minimo, precio_mes, precio_venta, estado)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'disponible')
+    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, mora_dia, precio_minimo, precio_mes, precio_venta, estado)
+    VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 'disponible')
   `);
 
   const creadas = [];
@@ -548,8 +548,8 @@ function agregarUnidades(id_categoria, cantidad) {
   }
 
   const insert = db.prepare(`
-    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, estado)
-    VALUES (?, ?, ?, ?, ?, 'disponible')
+    INSERT INTO HERRAMIENTA (id, id_categoria, nombre, descripcion, precio_dia, mora_dia, estado)
+    VALUES (?, ?, ?, ?, ?, 0, 'disponible')
   `);
 
   const creadas = [];

@@ -356,14 +356,26 @@ const handleDevolverGarantia = async () => {
                               <p className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>
                                 Tarifa diaria total: S/ {(c.subtotal_diario || 0).toFixed(2)}
                               </p>
-                              {c.items?.map((item, idx) => {
+                              {(() => {
+                                const padres = c.items.filter(i => !i.id_kit || i.tipo_item === 'kit');
+                                const kitComps = c.items.filter(i => i.id_kit && i.tipo_item !== 'kit');
+                                return padres.map((item, idx) => {
                                 const esGranel = item.item_condicion;
-                                const sub = (item.total_item || ((item.precio_dia_aplicado || 0) * (item.dias_item || dias) * (item.cantidad || 1))) + (item.monto_atraso_item || 0);
+                                const esMes = item.tarifa_aplicada === 'mes';
+                                const baseItem = item.total_item || (esMes
+                                  ? (item.precio_dia_aplicado || 0) * (item.cantidad || 1)
+                                  : (item.precio_dia_aplicado || 0) * (item.dias_item || dias) * (item.cantidad || 1));
+                                const sub = baseItem + (item.monto_atraso_item || 0);
                                 return (
                                   <div key={idx} className="space-y-0.5">
                                     {/* Fila 1: Badge + Nombre + Tarifa + Atraso badge */}
                                     <div className="flex items-center gap-1 flex-wrap">
-                                      {!esGranel ? (
+                                      {item.tipo_item === 'kit' ? (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
+                                          style={{ backgroundColor: 'oklch(0.45 0.13 160)', color: '#fff' }}>
+                                          Kit &times;{item.cantidad}
+                                        </span>
+                                      ) : !esGranel ? (
                                         <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
                                           style={{ backgroundColor: 'oklch(0.40 0.12 240)', color: '#fff' }}>
                                           {item.item_codigo}
@@ -377,12 +389,21 @@ const handleDevolverGarantia = async () => {
                                       )}
                                       <span className="text-[13px] leading-tight font-semibold" style={{ color: 'var(--ink)' }}>{item.item_nombre}</span>
                                       <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
-                                        S/ {(item.precio_dia_aplicado || 0).toFixed(2)}/d&iacute;a{esGranel ? ' c/u' : ''}
+                                        S/ {(item.precio_dia_aplicado || 0).toFixed(2)}/{esMes ? 'mes' : 'd&iacute;a'}{esGranel ? ' c/u' : ''}
                                       </span>
                                       {(item.dias_atraso_item || 0) > 0 && (
                                         <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
                                           style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>
                                           &#9888; +{item.dias_atraso_item} d&iacute;a{item.dias_atraso_item !== 1 ? 's' : ''}
+                                        </span>
+                                      )}
+                                      {item.tipo_item === 'kit' && item.estado_devolucion && item.estado_devolucion !== 'pendiente' && (
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                                          style={{
+                                            backgroundColor: item.estado_devolucion === 'bien' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.05 75)',
+                                            color: item.estado_devolucion === 'bien' ? 'var(--success)' : 'var(--warning)',
+                                          }}>
+                                          {item.estado_devolucion === 'bien' ? '\u2713 Devuelto' : 'Da\u00f1ado'}
                                         </span>
                                       )}
                                     </div>
@@ -413,7 +434,7 @@ const handleDevolverGarantia = async () => {
                                     <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
                                       <span />
                                       <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                                        Base S/ {(item.total_item || (item.precio_dia_aplicado || 0) * (item.dias_item || 1) * (item.cantidad || 1)).toFixed(0)}
+                                        Base S/ {baseItem.toFixed(0)}
                                         {(item.dias_atraso_item || 0) > 0 && (
                                            <span style={{ color: 'var(--danger)' }}> + Mora S/ {(item.monto_atraso_item || 0).toFixed(0)}</span>
                                         )}
@@ -422,9 +443,57 @@ const handleDevolverGarantia = async () => {
                                         S/ {sub.toFixed(2)}
                                       </span>
                                     </div>
+                                    {/* Componentes del kit */}
+                                    {item.tipo_item === 'kit' && (() => {
+                                      const comps = kitComps.filter(x => x.id_kit === item.id_kit);
+                                      if (!comps.length) return null;
+                                      return (
+                                        <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
+                                          <span />
+                                          <div className="rounded-md px-2 py-1.5 space-y-1"
+                                            style={{ backgroundColor: 'oklch(0.985 0.004 240)', border: '0.5px solid var(--border)' }}>
+                                            {comps.map((x, xi) => (
+                                              <div key={xi} className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                                                <span className="font-semibold" style={{ color: 'var(--ink)' }}>
+                                                  {x.cantidad} &times; {x.item_nombre}
+                                                </span>
+                                                {x.id_item_granel ? (
+                                                  <>
+                                                    {(x.granel_dev_bien || 0) > 0 && <span className="font-medium" style={{ color: 'var(--success)' }}>{x.granel_dev_bien} bien</span>}
+                                                    {(x.granel_dev_danada || 0) > 0 && <span className="font-medium" style={{ color: 'oklch(0.55 0.13 70)' }}>{x.granel_dev_danada} da&ntilde;</span>}
+                                                    {(x.granel_dev_perdida || 0) > 0 && <span className="font-medium" style={{ color: 'var(--danger)' }}>{x.granel_dev_perdida} perd</span>}
+                                                    {(x.granel_pendiente || 0) > 0 && (
+                                                      <span className="px-1.5 py-0.5 rounded font-semibold"
+                                                        style={{ backgroundColor: 'oklch(0.92 0.04 240)', color: 'oklch(0.43 0.13 240)' }}>
+                                                        {x.granel_pendiente} pend
+                                                      </span>
+                                                    )}
+                                                    {(x.granel_pendiente === 0) && (
+                                                      <span className="px-1.5 py-0.5 rounded font-semibold"
+                                                        style={{ backgroundColor: 'oklch(0.93 0.05 160)', color: 'var(--success)' }}>
+                                                        Completo
+                                                      </span>
+                                                    )}
+                                                  </>
+                                                ) : (
+                                                  x.estado_devolucion && x.estado_devolucion !== 'pendiente' && (
+                                                    <span className="font-medium"
+                                                      style={{ color: x.estado_devolucion === 'bien' ? 'var(--success)' : 'var(--warning)' }}>
+                                                      &mdash; {x.estado_devolucion === 'bien' ? 'Devuelto' : x.estado_devolucion}
+                                                    </span>
+                                                  )
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                          <span />
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                 );
-                              })}
+                                });
+                              })()}
                             </div>
                           )}
                         </div>
