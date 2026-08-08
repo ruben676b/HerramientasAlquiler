@@ -369,7 +369,7 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
           const despues = db.prepare('SELECT estado_devolucion, fecha_devolucion_real FROM DETALLE_CONTRATO WHERE id = ?').get(item.id_detalle);
           log('[DIAG registrarDevolucion] DESPUES UPDATE id_detalle=' + item.id_detalle + ' estado_devolucion=' + (despues?.estado_devolucion) + ' fecha=' + (despues?.fecha_devolucion_real));
 
-          const nuevoEstado = item.estado_devolucion === 'dañado' ? 'mantenimiento' : 'disponible';
+          const nuevoEstado = item.estado_devolucion === 'dañado' ? 'malogrado' : 'disponible';
           db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(nuevoEstado, detalle.id_herramienta);
 
           if (item.estado_devolucion === 'dañado') {

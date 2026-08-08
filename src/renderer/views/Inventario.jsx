@@ -109,15 +109,7 @@ export default function Inventario() {
       setExpanded((e) => ({ ...e, [id]: !e[id] }));
       return;
     }
-    setExpanded((e) => {
-      const nuevo = !e[id];
-      if (nuevo && !historial[id] && window.api?.getHistorialUnidad) {
-        window.api.getHistorialUnidad(id)
-          .then((h) => setHistorial((p) => ({ ...p, [id]: h })))
-          .catch(() => {});
-      }
-      return { ...e, [id]: nuevo };
-    });
+    setExpanded((e) => ({ ...e, [id]: !e[id] }));
   };
 
   const handleCrearFamilia = async (data) => {
@@ -343,7 +335,19 @@ export default function Inventario() {
                 <div key={f.id_categoria} className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
                   {/* Family header */}
                   <button
-                    onClick={() => toggleExpand(f.id_categoria)}
+                    onClick={() => {
+                      const nuevo = !expanded[f.id_categoria];
+                      setExpanded(e => ({ ...e, [f.id_categoria]: nuevo }));
+                      if (nuevo) {
+                        f.herramientas.forEach(h => {
+                          if (!historial[h.id] && window.api?.getHistorialUnidad) {
+                            window.api.getHistorialUnidad(h.id)
+                              .then(data => setHistorial(p => ({ ...p, [h.id]: data })))
+                              .catch(() => {});
+                          }
+                        });
+                      }
+                    }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-[var(--surface)]"
                   >
                     <span className="shrink-0">{isOpen ? <ChevronDown size={16} style={{ color: 'var(--muted)' }} /> : <ChevronRight size={16} style={{ color: 'var(--muted)' }} />}</span>
@@ -401,6 +405,18 @@ export default function Inventario() {
                             ) : (
                               <EstadoDropdown h={h} s={s} Icon={Icon} onChange={(e) => handleCambiarEstado(h.id, e)} />
                             )}
+                            {/* Icono de historial de daños */}
+                            {historial[h.id]?.mantenimientos?.length > 0 && (
+                              <button onClick={(e) => {
+                                e.stopPropagation();
+                                setModal({ tipo: 'historial-herramienta', herramienta: h, historial: historial[h.id] });
+                              }}
+                                className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 shrink-0"
+                                style={{ color: (h.estado === 'malogrado' || h.estado === 'mantenimiento') ? 'var(--warning)' : 'var(--faint)' }}
+                                title="Ver historial">
+                                <AlertTriangle size={13} />
+                              </button>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -410,51 +426,6 @@ export default function Inventario() {
                               style={{ color: 'var(--muted)' }} title="Eliminar unidad"
                             ><Trash2 size={13} /></button>
                             </div>
-                            {/* Mini-historial */}
-                            {historial[h.id]?.mantenimientos?.length > 0 && (
-                              <div className="px-4 py-1.5 text-[11px] space-y-0.5" style={{ backgroundColor: 'var(--sidebar-hover)', borderBottom: '1px solid var(--border)' }}>
-                                {historial[h.id].mantenimientos.map((m, i) => {
-                                  const esDanioDevolucion = m.id_contrato && m.cliente_nombre;
-                                  const danios = m.id_contrato ? (historial[h.id].danosPorContrato?.[m.id_contrato] || []) : [];
-                                  const esActual = i === 0 && h.estado === 'mantenimiento';
-                                  return (
-                                    <div key={m.id || i} className={esActual ? 'rounded px-2 py-1 -mx-1' : ''}
-                                         style={esActual ? { backgroundColor: 'oklch(0.55 0.13 70 / 0.1)', borderLeft: '2px solid oklch(0.55 0.13 70)' } : {}}>
-                                      {esDanioDevolucion ? (
-                                        <>
-                                          <div className="flex items-center gap-1.5" style={{ color: esActual ? 'var(--warning)' : 'var(--muted)' }}>
-                                            <span className="font-semibold">Dañado</span>
-                                            <span style={{ color: 'var(--ink)' }}>por {m.cliente_nombre}</span>
-                                            <span style={{ color: 'var(--faint)' }}>— {m.fecha_inicio}</span>
-                                          </div>
-                                          {m.descripcion && !m.descripcion.startsWith('Devolucion:') && (
-                                            <div className="text-[10px] ml-3" style={{ color: 'var(--faint)' }}>{m.descripcion}</div>
-                                          )}
-                                          {danios.length > 0 && (
-                                            <div className="flex flex-col gap-0.5 ml-3 mt-0.5">
-                                              {danios.map((d, j) => (
-                                                <div key={j} className="text-[10px] flex items-center gap-1"
-                                                     style={{ color: esActual ? 'var(--warning)' : 'var(--faint)' }}>
-                                                  {'↳ ' + d.nombre + ' — S/ ' + d.costo.toFixed(2)}
-                                                </div>
-                                              ))}
-                                            </div>
-                                          )}
-                                        </>
-                                      ) : (
-                                        <div style={{ color: 'var(--muted)' }}>
-                                          Marcado manualmente — {m.fecha_inicio}
-                                          {m.fecha_fin ? ' → ' + m.fecha_fin : ' (abierto)'}
-                                          {m.descripcion !== 'Cambio manual de estado a mantenimiento' && (
-                                            <span className="ml-1 text-[10px]" style={{ color: 'var(--faint)' }}>— {m.descripcion}</span>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
                           </div>
                         );
                       })}
@@ -660,6 +631,7 @@ export default function Inventario() {
       {modal?.tipo === 'danos-granel' && <ModalDañosGranel data={modal.data} onClose={() => setModal(null)} />}
       {modal?.tipo === 'sumar-stock' && <StockModal data={modal.data} onApply={(d) => handleAjustarStock(modal.data.id, d)} onClose={() => setModal(null)} />}
       {modal?.tipo === 'baja-granel' && <BajaGranelModal data={modal.data} onSave={handleDarBaja} onClose={() => setModal(null)} />}
+      {modal?.tipo === 'historial-herramienta' && <HistorialHerramientaModal herramienta={modal.herramienta} historial={modal.historial} onClose={() => setModal(null)} />}
       {modal?.tipo === 'historial-granel' && <HistorialGranelModal data={modal.data} onUndo={handleRevertirAudit} onClose={() => setModal(null)} />}
       {modal?.tipo === 'crear-kit' && <KitEditorModal onSave={handleGuardarKit} onClose={() => setModal(null)} />}
       {modal?.tipo === 'editar-kit' && <KitEditorModal kitId={modal.kit.id} onSave={handleGuardarKit} onClose={() => setModal(null)} />}
@@ -931,6 +903,68 @@ function BajaGranelModal({ data, onSave, onClose }) {
           style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} autoFocus
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicar(); } }} />
       </Field>
+    </ModalShell>
+  );
+}
+
+function HistorialHerramientaModal({ herramienta, historial, onClose }) {
+  return (
+    <ModalShell title={'Historial: ' + herramienta.id + ' — ' + herramienta.nombre} onClose={onClose}>
+      <div className="space-y-2 text-[12px]">
+        {historial.mantenimientos?.length > 0 ? (
+          historial.mantenimientos.map((m, i) => {
+            const esDanio = (m.id_contrato && m.cliente_nombre) || m.descripcion?.startsWith('Devolucion:');
+            const cliente = m.cliente_nombre || (m.descripcion?.startsWith('Devolucion:') ? '(cliente anterior)' : null);
+            const nota = m.descripcion?.replace(/^Devolucion:\s*/, '') || '';
+            const danios = m.id_contrato ? (historial.danosPorContrato?.[m.id_contrato] || []) : [];
+            const esActual = i === 0;
+            return (
+              <div key={m.id || i} className={esActual ? 'rounded-lg p-3 -mx-1' : ''}
+                   style={esActual ? { backgroundColor: 'oklch(0.55 0.13 70 / 0.08)', border: '1px solid oklch(0.55 0.13 70 / 0.2)' } : {}}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  {esDanio ? (
+                    <span className="font-semibold text-[11px] uppercase tracking-wider"
+                          style={{ color: 'var(--warning)' }}>Dañado</span>
+                  ) : (
+                    <span className="font-semibold text-[11px] uppercase tracking-wider"
+                          style={{ color: 'var(--muted)' }}>Mantenimiento</span>
+                  )}
+                  <span style={{ color: 'var(--muted)' }}>—</span>
+                  <span style={{ color: 'var(--ink)' }}>{m.fecha_inicio}</span>
+                  {m.fecha_fin && <span style={{ color: 'var(--faint)' }}>→ {m.fecha_fin}</span>}
+                </div>
+                {esDanio && cliente && (
+                  <div className="text-[11px] ml-2" style={{ color: 'var(--muted)' }}>
+                    Cliente: <span style={{ color: 'var(--ink)' }}>{cliente}</span>
+                  </div>
+                )}
+                {(nota && nota !== 'Dañado en devolución') && (
+                  <div className="text-[10px] ml-2 mt-0.5" style={{ color: 'var(--faint)' }}>{nota}</div>
+                )}
+                {danios.length > 0 && (
+                  <div className="flex flex-col gap-0.5 ml-2 mt-1.5">
+                    <span className="text-[10px] font-medium" style={{ color: 'var(--muted)' }}>Daños registrados:</span>
+                    {danios.map((d, j) => (
+                      <div key={j} className="flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded"
+                           style={{ backgroundColor: 'oklch(0.62 0.17 80 / 0.1)', color: 'oklch(0.52 0.17 80)' }}>
+                        <span className="truncate flex-1">{d.nombre}</span>
+                        <span className="font-mono shrink-0">S/ {d.costo.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!esDanio && (
+                  <div className="text-[10px] ml-2" style={{ color: 'var(--faint)' }}>
+                    {m.descripcion || 'Sin descripción'}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <div className="text-center py-4" style={{ color: 'var(--faint)' }}>Sin historial de daños</div>
+        )}
+      </div>
     </ModalShell>
   );
 }

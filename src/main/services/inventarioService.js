@@ -722,11 +722,10 @@ function getHistorialUnidad(id) {
 
   // Desglose de daños predefinidos registrados en devoluciones de esta herramienta
   const danos = db.prepare(`
-    SELECT d.id_contrato, d.nombre, d.costo, d.fecha
-    FROM DAÑO_DEVOLUCION d
-    JOIN MANTENIMIENTO m ON m.id_contrato = d.id_contrato
-    WHERE m.id_herramienta = ?
-    ORDER BY d.fecha DESC
+    SELECT id_contrato, nombre, costo, fecha
+    FROM DAÑO_DEVOLUCION
+    WHERE id_herramienta = ? AND revertido = 0
+    ORDER BY fecha DESC
   `).all(id);
   const danosPorContrato = {};
   for (const dd of danos) {
