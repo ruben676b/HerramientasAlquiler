@@ -5,6 +5,9 @@ const { ipcMain, app, shell, dialog } = require('electron');
 const db = require('./db/database');
 const {
   crearContrato,
+  crearReserva,
+  convertirReserva,
+  cancelarReserva,
   registrarDevolucion,
   getContratos,
   registrarPagoAdicional,
@@ -168,6 +171,46 @@ function registerIpcHandlers() {
   ipcMain.handle('anular-pago', (_e, data) => {
     const { idPago, motivo } = data;
     return anularPago(idPago, motivo);
+  });
+
+  // --- Reservas ---
+
+  ipcMain.handle('crear-reserva', (_event, data) => {
+    const {
+      idCliente,
+      idUsuario,
+      fechaReserva,
+      fechaDevolucionPactada,
+      depositoMonto,
+      depositoDni,
+      items,
+      pagos,
+      dniCliente,
+      nombreCliente,
+      telefonoCliente,
+    } = data;
+
+    return crearReserva(
+      idCliente,
+      idUsuario,
+      fechaReserva,
+      fechaDevolucionPactada,
+      depositoMonto,
+      depositoDni,
+      items,
+      pagos,
+      dniCliente,
+      nombreCliente,
+      telefonoCliente
+    );
+  });
+
+  ipcMain.handle('convertir-reserva', (_event, idContrato) => {
+    return convertirReserva(idContrato);
+  });
+
+  ipcMain.handle('cancelar-reserva', (_event, idContrato, devolverAdelanto) => {
+    return cancelarReserva(idContrato, devolverAdelanto);
   });
 
   // --- Sistema ---

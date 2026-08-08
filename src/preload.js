@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('api', {
 
   // Contratos
   crearContrato: (data) => ipcRenderer.invoke('crear-contrato', data),
+  crearReserva: (data) => ipcRenderer.invoke('crear-reserva', data),
+  convertirReserva: (id) => ipcRenderer.invoke('convertir-reserva', id),
+  cancelarReserva: (id, devolverAdelanto) => ipcRenderer.invoke('cancelar-reserva', id, devolverAdelanto),
   registrarDevolucion: (data) =>
     ipcRenderer.invoke('registrar-devolucion', data),
   revertirDevolucion: (data) =>

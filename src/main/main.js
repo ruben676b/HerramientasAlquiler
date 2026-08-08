@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 const { initDatabase } = require('./db/init');
 const { registerIpcHandlers } = require('./ipcHandlers');
+const { autoCancelarReservas } = require('./services/contratoService');
 
 const isDev = !app.isPackaged;
 
@@ -32,6 +33,7 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   initDatabase();
   registerIpcHandlers();
+  try { autoCancelarReservas(); } catch (e) { console.error('[autoCancelarReservas] Error:', e.message); }
   createWindow();
 
   app.on('activate', () => {

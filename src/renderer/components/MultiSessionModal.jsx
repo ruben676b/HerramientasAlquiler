@@ -186,8 +186,13 @@ function SessionForm({ session }) {
     setDni(nuevoDni);
     setNombre(nuevoNombre);
     setTelefono(data.telefono || '');
-    setFechaSalida(data.fechaSalida || fmtLocalDate(new Date()));
-    setFechaDevolucionRaw(data.fechaDevolucion || fmtLocalDate(new Date()));
+    const defaultFechaLoad = session.tipo === 'reserva'
+      ? (data.fechaReserva || fmtLocalDate(new Date(Date.now() + 86400000)))
+      : fmtLocalDate(new Date());
+
+    setFechaSalida(data.fechaSalida || defaultFechaLoad);
+    setFechaDevolucionRaw(data.fechaDevolucion || defaultFechaLoad);
+    setFechaReserva(data.fechaReserva || (session.tipo === 'reserva' ? fmtLocalDate(new Date(Date.now() + 86400000)) : ''));
     setClienteSeleccionado(data.clienteSeleccionado || null);
     setItems(data.items || []);
     setStep(data.step || 0);
@@ -209,14 +214,23 @@ function SessionForm({ session }) {
   const [dni, setDni] = useState(saved.dni || '');
   const [nombre, setNombre] = useState(saved.nombre || '');
   const [telefono, setTelefono] = useState(saved.telefono || '');
-  const [fechaSalida, setFechaSalida] = useState(saved.fechaSalida || fmtLocalDate(new Date()));
+  const defaultFecha = session.tipo === 'reserva'
+    ? (saved.fechaReserva || fmtLocalDate(new Date(Date.now() + 86400000)))
+    : fmtLocalDate(new Date());
+
+  const [fechaSalida, setFechaSalida] = useState(
+    saved.fechaSalida || defaultFecha
+  );
   const [fechaDevolucion, setFechaDevolucionRaw] = useState(
-    saved.fechaDevolucion || fmtLocalDate(new Date())
+    saved.fechaDevolucion || defaultFecha
   );
   const setFechaDevolucion = (f) => {
     setFechaDevolucionRaw(f);
     setItems(prev => prev.map(item => ({ ...item, total_editado: undefined })));
   };
+  const [fechaReserva, setFechaReserva] = useState(
+    saved.fechaReserva || (session.tipo === 'reserva' ? fmtLocalDate(new Date(Date.now() + 86400000)) : '')
+  );
   const [sugerenciasDni, setSugerenciasDni] = useState([]);
   const [sugerenciasNombre, setSugerenciasNombre] = useState([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState(saved.clienteSeleccionado || null);
@@ -301,8 +315,20 @@ function SessionForm({ session }) {
 
   // Auto-guardar items
   useEffect(() => {
-    saveFormData(session.id, { dni, nombre, telefono, fechaSalida, fechaDevolucion, clienteSeleccionado, items, step, firmaBase64, pagos, depositoMonto, depositoDni });
+    saveFormData(session.id, { dni, nombre, telefono, fechaSalida, fechaDevolucion, fechaReserva, clienteSeleccionado, items, step, firmaBase64, pagos, depositoMonto, depositoDni });
   }, [items, dni, nombre, telefono, fechaSalida, fechaDevolucion, clienteSeleccionado, session.id, step, pagos]);
+
+  // Sincronizar fechaSalida y fechaDevolucion con fechaReserva en reservas
+  useEffect(() => {
+    if (session.tipo !== 'reserva' || !fechaReserva) return;
+    setFechaSalida(fechaReserva);
+    setFechaDevolucionRaw(fechaReserva);
+  }, [fechaReserva]);
+
+  // Sincronizar fecha_devolucion_item de todos los ítems con fechaDevolucion
+  useEffect(() => {
+    setItems(prev => prev.map(item => ({ ...item, fecha_devolucion_item: fechaDevolucion })));
+  }, [fechaDevolucion]);
 
   // Herramientas ya en otras sesiones activas
   const herramientasEnOtrasSesiones = useMemo(() => {
@@ -458,6 +484,7 @@ function SessionForm({ session }) {
       if (dni && dni.length !== 8) return setError('El DNI debe tener 8 dígitos.');
       if (!telefono || telefono.length < 9) return setError('El teléfono es obligatorio (9 dígitos).');
       if (fechaDevolucion < fechaSalida) return setError('La devolución debe ser posterior a la salida.');
+      if (session.tipo === 'reserva' && !fechaReserva) return setError('La fecha de reserva es obligatoria.');
     }
     if (step === 1) {
       if (items.length === 0) return setError('Agregue al menos un ítem al alquiler.');
@@ -519,48 +546,66 @@ function SessionForm({ session }) {
     if (!window.api) return;
     setError('');
     try {
-      // 1. Crear o actualizar cliente
-      // (Por ahora simplificado: el backend se encarga al crear el contrato)
+      const esReserva = session.tipo === 'reserva';
 
-      // 2. Crear contrato
-      const resultado = await window.api.crearContrato({
-        idCliente: clienteSeleccionado?.id || 0,
-        dniCliente: dni || '',
-        nombreCliente: nombre || '',
-        telefonoCliente: telefono || '',
-        idUsuario: 1,
-        fechaSalida,
-        fechaDevolucionPactada: fechaDevolucion,
-        depositoMonto: 0, // Sin depósito monetario por ahora
-        depositoDni: depositoDni ? 1 : 0,
-        items: itemsConDias.map(item => ({
-          tipo_item: item.tipo,
-          id_herramienta: item.id_herramienta || undefined,
-          id_item_granel: item.id_item_granel || undefined,
-          cantidad: item.cantidad || 1,
-          fecha_devolucion_pactada: item.fecha_devolucion_item || undefined,
-          total_item_snapshot: item.total_editado != null ? item.total_editado : item.sub_calc,
+      const itemsData = itemsConDias.map(item => ({
+        tipo_item: item.tipo,
+        id_herramienta: item.id_herramienta || undefined,
+        id_item_granel: item.id_item_granel || undefined,
+        cantidad: item.cantidad || 1,
+        fecha_devolucion_pactada: item.fecha_devolucion_item || undefined,
+        total_item_snapshot: item.total_editado != null ? item.total_editado : item.sub_calc,
+      }));
+
+      const pagosData = [
+        ...pagos.map(p => ({
+          ...p,
+          tipo: totalPagado >= totalEquipos ? 'saldo' : 'adelanto'
         })),
-        pagos: [
-          ...pagos.map(p => ({
-            ...p,
-            tipo: totalPagado >= totalEquipos ? 'saldo' : 'adelanto'
-          })),
-          ...garantias.map(g => ({
-            ...g,
-            tipo: 'deposito'
-          })),
-        ],
-      });
+        ...garantias.map(g => ({
+          ...g,
+          tipo: 'deposito'
+        })),
+      ];
 
-      const idContrato = resultado.idContrato;
+      let idContrato;
 
-      // 3. Guardar firma si existe
+      if (esReserva) {
+        const resultado = await window.api.crearReserva({
+          idCliente: clienteSeleccionado?.id || 0,
+          dniCliente: dni || '',
+          nombreCliente: nombre || '',
+          telefonoCliente: telefono || '',
+          idUsuario: 1,
+          fechaReserva,
+          fechaDevolucionPactada: fechaDevolucion,
+          depositoMonto: 0,
+          depositoDni: depositoDni ? 1 : 0,
+          items: itemsData,
+          pagos: pagosData,
+        });
+        idContrato = resultado.idContrato;
+      } else {
+        const resultado = await window.api.crearContrato({
+          idCliente: clienteSeleccionado?.id || 0,
+          dniCliente: dni || '',
+          nombreCliente: nombre || '',
+          telefonoCliente: telefono || '',
+          idUsuario: 1,
+          fechaSalida,
+          fechaDevolucionPactada: fechaDevolucion,
+          depositoMonto: 0,
+          depositoDni: depositoDni ? 1 : 0,
+          items: itemsData,
+          pagos: pagosData,
+        });
+        idContrato = resultado.idContrato;
+      }
+
       if (firmaBase64) {
         await window.api.guardarFirma(idContrato, firmaBase64);
       }
 
-      // 4. Generar PDF
       try {
         const pdfPath = await window.api.generarContratoPdf(idContrato);
         toast('Contrato #' + idContrato + ' creado. PDF generado.');
@@ -569,7 +614,7 @@ function SessionForm({ session }) {
       }
 
       removeSession(session.id);
-      toast('Alquiler #' + idContrato + ' guardado correctamente');
+      toast((esReserva ? 'Reserva' : 'Alquiler') + ' #' + idContrato + ' guardado correctamente');
       window.dispatchEvent(new CustomEvent('contrato-creado'));
       
       const remainingSessions = sessions.filter(s => !s.saved && s.id !== session.id);
@@ -747,6 +792,21 @@ function SessionForm({ session }) {
                 className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }}
                 placeholder="9 dígitos" maxLength={9} />
             </div>
+
+            {/* Fecha de reserva (solo para tipo reserva) */}
+            {session.tipo === 'reserva' && (
+              <div>
+                <label className="text-[13px] font-medium mb-1.5 block" style={{ color: 'var(--ink)' }}>
+                  Fecha de reserva <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                <input type="date" value={fechaReserva} onChange={(e) => setFechaReserva(e.target.value)}
+                  min={fmtLocalDate(new Date())}
+                  className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                <p className="text-[10px] mt-1" style={{ color: 'var(--faint)' }}>
+                  Fecha en que el cliente vendrá a recoger los equipos
+                </p>
+              </div>
+            )}
           </div>
         )}
 

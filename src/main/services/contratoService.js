@@ -23,6 +23,58 @@ function log(msg) {
  * @param {Array}  items                 - [{ tipo_item, id_herramienta?, id_item_granel?, cantidad? }]
  * @returns {{ idContrato: number }}
  */
+function _validarHerramientasSinReservaActiva(items) {
+  const hoy = localDate();
+  for (const item of items) {
+    if (item.tipo_item === 'individual' && item.id_herramienta) {
+      const reservaActiva = db.prepare(`
+        SELECT c.id FROM CONTRATO c
+        JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id
+        WHERE d.id_herramienta = ? AND c.estado = 'reservado' AND c.fecha_reserva >= ?
+      `).get(item.id_herramienta, hoy);
+      if (reservaActiva) {
+        throw new Error(
+          'La herramienta ' + item.id_herramienta +
+          ' tiene una reserva activa (contrato #' + reservaActiva.id + ').'
+        );
+      }
+    }
+  }
+}
+
+function _autoCrearCliente(idCliente, dniCliente, nombreCliente, telefonoCliente) {
+  let idClienteReal = idCliente;
+  if (!idClienteReal || idClienteReal < 1) {
+    if (dniCliente && dniCliente.length === 8) {
+      const existente = db.prepare('SELECT id FROM CLIENTE WHERE dni = ?').get(dniCliente);
+      if (existente) {
+        idClienteReal = existente.id;
+      }
+    }
+    if (!idClienteReal && nombreCliente) {
+      const r = db.prepare('INSERT INTO CLIENTE (tipo, nombre, dni, telefono, fecha_registro) VALUES (?, ?, ?, ?, date(\'now\', \'localtime\'))')
+        .run('persona', nombreCliente, dniCliente || null, telefonoCliente || null);
+      idClienteReal = r.lastInsertRowid;
+    }
+  }
+  if (!idClienteReal || idClienteReal < 1) {
+    throw new Error('No se pudo identificar al cliente. Ingrese DNI o nombre.');
+  }
+  return idClienteReal;
+}
+
+function _insertarPagos(idContrato, pagos) {
+  if (pagos && pagos.length > 0) {
+    const insertPago = db.prepare(`
+      INSERT INTO PAGO (id_contrato, monto, metodo, tipo, fecha_pago)
+      VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
+    `);
+    for (const p of pagos) {
+      insertPago.run(idContrato, p.monto, p.metodo, p.tipo || 'saldo');
+    }
+  }
+}
+
 function crearContrato(
   idCliente,
   idUsuario,
@@ -44,24 +96,9 @@ function crearContrato(
     throw new Error('La fecha de devolución debe ser posterior a la fecha de salida.');
   }
 
-  // Auto-crear cliente si no existe
-  let idClienteReal = idCliente;
-  if (!idClienteReal || idClienteReal < 1) {
-    if (dniCliente && dniCliente.length === 8) {
-      const existente = db.prepare('SELECT id FROM CLIENTE WHERE dni = ?').get(dniCliente);
-      if (existente) {
-        idClienteReal = existente.id;
-      }
-    }
-    if (!idClienteReal && nombreCliente) {
-      const r = db.prepare('INSERT INTO CLIENTE (tipo, nombre, dni, telefono, fecha_registro) VALUES (?, ?, ?, ?, date(\'now\', \'localtime\'))')
-        .run('persona', nombreCliente, dniCliente || null, telefonoCliente || null);
-      idClienteReal = r.lastInsertRowid;
-    }
-  }
-  if (!idClienteReal || idClienteReal < 1) {
-    throw new Error('No se pudo identificar al cliente. Ingrese DNI o nombre.');
-  }
+  const idClienteReal = _autoCrearCliente(idCliente, dniCliente, nombreCliente, telefonoCliente);
+
+  _validarHerramientasSinReservaActiva(items);
 
   const ejecutar = db.transaction(() => {
     const insertContrato = db.prepare(`
@@ -174,21 +211,287 @@ function crearContrato(
       }
     }
 
-    // Insertar pagos
-    if (pagos && pagos.length > 0) {
-      const insertPago = db.prepare(`
-        INSERT INTO PAGO (id_contrato, monto, metodo, tipo, fecha_pago)
-        VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
-      `);
-      for (const p of pagos) {
-        insertPago.run(idContrato, p.monto, p.metodo, p.tipo || 'saldo');
-      }
-    }
+    _insertarPagos(idContrato, pagos);
 
     return { idContrato };
   });
 
   return ejecutar();
+}
+
+/**
+ * Crea una reserva con estado 'reservado'.
+ * Las herramientas individuales NO cambian de estado (permanecen 'disponible').
+ * Los ítems a granel incrementan cantidad_alquilada para reservar el stock.
+ *
+ * @param {number} idCliente
+ * @param {number} idUsuario
+ * @param {string} fechaReserva         - fecha en que el cliente vendrá a recoger (YYYY-MM-DD)
+ * @param {string} fechaDevolucionPactada
+ * @param {number} depositoMonto
+ * @param {number} depositoDni
+ * @param {Array}  items
+ * @param {Array}  pagos
+ * @param {string} dniCliente
+ * @param {string} nombreCliente
+ * @param {string} telefonoCliente
+ * @returns {{ idContrato: number }}
+ */
+function crearReserva(
+  idCliente,
+  idUsuario,
+  fechaReserva,
+  fechaDevolucionPactada,
+  depositoMonto,
+  depositoDni,
+  items,
+  pagos,
+  dniCliente,
+  nombreCliente,
+  telefonoCliente
+) {
+  if (!items || items.length === 0) {
+    throw new Error('La reserva debe contener al menos un ítem.');
+  }
+
+  if (fechaDevolucionPactada < fechaReserva) {
+    throw new Error('La fecha de devolución debe ser posterior a la fecha de reserva.');
+  }
+
+  const idClienteReal = _autoCrearCliente(idCliente, dniCliente, nombreCliente, telefonoCliente);
+
+  const ejecutar = db.transaction(() => {
+    const insertContrato = db.prepare(`
+      INSERT INTO CONTRATO (
+        id_cliente, id_usuario, fecha_salida, fecha_devolucion_pactada,
+        deposito_monto, deposito_dni, estado, fecha_reserva,
+        fecha_creacion, fecha_modificacion
+      ) VALUES (?, ?, ?, ?, ?, ?, 'reservado', ?, ?, ?)
+    `);
+
+    const insertDetalle = db.prepare(`
+      INSERT INTO DETALLE_CONTRATO (
+        id_contrato, tipo_item, id_herramienta, id_item_granel,
+        cantidad, precio_dia_aplicado,
+        fecha_devolucion_pactada_item, total_item_snapshot
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const now = localDateTime();
+
+    const resultado = insertContrato.run(
+      idClienteReal,
+      idUsuario,
+      fechaReserva,
+      fechaDevolucionPactada,
+      depositoMonto,
+      depositoDni,
+      fechaReserva,
+      now,
+      now
+    );
+
+    const idContrato = resultado.lastInsertRowid;
+
+    for (const item of items) {
+      if (item.tipo_item === 'individual') {
+        const herramienta = db
+          .prepare(
+            'SELECT precio_dia, estado FROM HERRAMIENTA WHERE id = ? AND activo = 1'
+          )
+          .get(item.id_herramienta);
+
+        if (!herramienta) {
+          throw new Error('Herramienta no encontrada o inactiva: ' + item.id_herramienta);
+        }
+        if (herramienta.estado !== 'disponible') {
+          throw new Error(
+            'La herramienta ' + item.id_herramienta +
+            ' no está disponible (estado: ' + herramienta.estado + ').'
+          );
+        }
+
+        const reservaActiva = db.prepare(`
+          SELECT c.id FROM CONTRATO c
+          JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id
+          WHERE d.id_herramienta = ? AND c.estado = 'reservado' AND c.fecha_reserva >= date('now', 'localtime')
+        `).get(item.id_herramienta);
+        if (reservaActiva) {
+          throw new Error('La herramienta ' + item.id_herramienta + ' ya está reservada.');
+        }
+
+        const fechaDevItem = item.fecha_devolucion_pactada || null;
+        insertDetalle.run(
+          idContrato,
+          'individual',
+          item.id_herramienta,
+          null,
+          1,
+          herramienta.precio_dia,
+          fechaDevItem,
+          item.total_item_snapshot != null ? item.total_item_snapshot : null
+        );
+
+        db.prepare("UPDATE HERRAMIENTA SET estado = 'reservado' WHERE id = ?")
+          .run(item.id_herramienta);
+
+      } else if (item.tipo_item === 'granel') {
+        if (!item.cantidad || item.cantidad < 1) {
+          throw new Error('La cantidad para ítems a granel debe ser al menos 1.');
+        }
+
+        const granel = db
+          .prepare('SELECT precio_dia, cantidad_disponible FROM ITEM_GRANEL WHERE id = ? AND activo = 1')
+          .get(item.id_item_granel);
+
+        if (!granel) {
+          throw new Error('Ítem a granel no encontrado o inactivo: ' + item.id_item_granel);
+        }
+        if (granel.cantidad_disponible < item.cantidad) {
+          throw new Error(
+            'Stock insuficiente. Disponible: ' + granel.cantidad_disponible +
+            ', solicitado: ' + item.cantidad
+          );
+        }
+
+        const fechaDevItemG = item.fecha_devolucion_pactada || null;
+        insertDetalle.run(
+          idContrato,
+          'granel',
+          null,
+          item.id_item_granel,
+          item.cantidad,
+          granel.precio_dia,
+          fechaDevItemG,
+          item.total_item_snapshot != null ? item.total_item_snapshot : null
+        );
+
+        db.prepare(
+          'UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?'
+        ).run(item.cantidad, item.id_item_granel);
+      }
+    }
+
+    _insertarPagos(idContrato, pagos);
+
+    return { idContrato };
+  });
+
+  return ejecutar();
+}
+
+/**
+ * Convierte una reserva en un alquiler activo.
+ * Cambia estado del contrato a 'alquilado'.
+ * Herramientas individuales pasan a estado 'alquilado'.
+ * Ítems a granel: ya tenían cantidad_alquilada, sin cambios.
+ */
+function convertirReserva(idContrato) {
+  const contrato = db.prepare('SELECT * FROM CONTRATO WHERE id = ?').get(idContrato);
+  if (!contrato) throw new Error('Contrato no encontrado.');
+  if (contrato.estado !== 'reservado') {
+    throw new Error('Solo se pueden convertir contratos en estado reservado.');
+  }
+
+  const ejecutar = db.transaction(() => {
+    db.prepare("UPDATE CONTRATO SET estado = 'alquilado', fecha_modificacion = ? WHERE id = ?")
+      .run(localDateTime(), idContrato);
+
+    const detalles = db.prepare(
+      "SELECT * FROM DETALLE_CONTRATO WHERE id_contrato = ? AND tipo_item = 'individual'"
+    ).all(idContrato);
+
+    for (const d of detalles) {
+      db.prepare("UPDATE HERRAMIENTA SET estado = 'alquilado' WHERE id = ?")
+        .run(d.id_herramienta);
+    }
+
+    return { ok: true };
+  });
+
+  return ejecutar();
+}
+
+/**
+ * Cancela una reserva (manual o automáticamente).
+ * Cambia estado del contrato a 'cancelado'.
+ * Herramientas individuales: vuelven a 'disponible'.
+ * Ítems a granel: decrementa cantidad_alquilada para liberar stock.
+ *
+ * @param {number} idContrato
+ * @param {boolean} [devolverAdelanto=false] - Si es true, los pagos de adelanto se revierten (anulan)
+ */
+function cancelarReserva(idContrato, devolverAdelanto = false) {
+  const contrato = db.prepare('SELECT * FROM CONTRATO WHERE id = ?').get(idContrato);
+  if (!contrato) throw new Error('Contrato no encontrado.');
+  if (contrato.estado !== 'reservado') {
+    throw new Error('Solo se pueden cancelar contratos en estado reservado.');
+  }
+
+  const ejecutar = db.transaction(() => {
+    db.prepare("UPDATE CONTRATO SET estado = 'cancelado', fecha_modificacion = ? WHERE id = ?")
+      .run(localDateTime(), idContrato);
+
+    const detallesGranel = db.prepare(
+      "SELECT * FROM DETALLE_CONTRATO WHERE id_contrato = ? AND tipo_item = 'granel'"
+    ).all(idContrato);
+
+    for (const d of detallesGranel) {
+      db.prepare(
+        'UPDATE ITEM_GRANEL SET cantidad_alquilada = MAX(0, cantidad_alquilada - ?) WHERE id = ?'
+      ).run(d.cantidad, d.id_item_granel);
+    }
+
+    const detallesIndividuales = db.prepare(
+      "SELECT * FROM DETALLE_CONTRATO WHERE id_contrato = ? AND tipo_item = 'individual'"
+    ).all(idContrato);
+
+    for (const d of detallesIndividuales) {
+      db.prepare("UPDATE HERRAMIENTA SET estado = 'disponible' WHERE id = ?")
+        .run(d.id_herramienta);
+    }
+
+    if (devolverAdelanto) {
+      db.prepare(`
+        UPDATE PAGO SET anulado = 1, fecha_anulacion = datetime('now', 'localtime'),
+        motivo_anulacion = 'Cancelación manual de reserva'
+        WHERE id_contrato = ? AND tipo IN ('adelanto') AND (anulado IS NULL OR anulado = 0)
+      `).run(idContrato);
+    }
+
+    return { ok: true };
+  });
+
+  return ejecutar();
+}
+
+/**
+ * Cancela automáticamente las reservas cuya fecha_reserva ya pasó.
+ * Se ejecuta al iniciar la aplicación.
+ * @returns {{ procesadas: number }}
+ */
+function autoCancelarReservas() {
+  const hoy = localDate();
+
+  const reservasVencidas = db.prepare(
+    "SELECT id FROM CONTRATO WHERE estado = 'reservado' AND fecha_reserva < ?"
+  ).all(hoy);
+
+  let procesadas = 0;
+  for (const r of reservasVencidas) {
+    try {
+      cancelarReserva(r.id);
+      procesadas++;
+    } catch (e) {
+      log('[autoCancelarReservas] Error cancelando reserva #' + r.id + ': ' + e.message);
+    }
+  }
+
+  if (procesadas > 0) {
+    log('[autoCancelarReservas] ' + procesadas + ' reserva(s) cancelada(s) automáticamente.');
+  }
+
+  return { procesadas };
 }
 
 /**
@@ -805,4 +1108,4 @@ function anularPago(idPago, motivo) {
   return { id: idPago, anulado: true };
 }
 
-module.exports = { crearContrato, registrarDevolucion, getContratos, registrarPagoAdicional, revertirDevolucionItem, revertirDevolucionGranel, getDevolucionesGranel, anularPago };
+module.exports = { crearContrato, crearReserva, convertirReserva, cancelarReserva, autoCancelarReservas, registrarDevolucion, getContratos, registrarPagoAdicional, revertirDevolucionItem, revertirDevolucionGranel, getDevolucionesGranel, anularPago };
