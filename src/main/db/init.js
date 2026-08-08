@@ -25,7 +25,7 @@ function initDatabase() {
       precio_mes REAL CHECK (precio_mes >= 0),
       precio_venta REAL CHECK (precio_venta >= 0),
       valor_reposicion REAL CHECK (valor_reposicion >= 0),
-      estado TEXT NOT NULL CHECK (estado IN ('disponible', 'alquilado', 'mantenimiento', 'malogrado')),
+      estado TEXT NOT NULL CHECK (estado IN ('disponible', 'reservado', 'alquilado', 'mantenimiento', 'malogrado')),
       fecha_adquisicion TEXT,
       activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
       FOREIGN KEY (id_categoria) REFERENCES CATEGORIA_HERRAMIENTA(id)
@@ -110,12 +110,13 @@ function initDatabase() {
       fecha_salida TEXT NOT NULL,
       fecha_devolucion_pactada TEXT NOT NULL,
       fecha_devolucion_real TEXT,
-      estado TEXT NOT NULL DEFAULT 'alquilado' CHECK (estado IN ('reservado', 'alquilado', 'atrasado', 'devuelto', 'devolución incompleta')),
+      estado TEXT NOT NULL DEFAULT 'alquilado' CHECK (estado IN ('reservado', 'alquilado', 'atrasado', 'devuelto', 'devolución incompleta', 'cancelado')),
       deposito_dni INTEGER NOT NULL DEFAULT 0 CHECK (deposito_dni IN (0, 1)),
       deposito_monto REAL NOT NULL DEFAULT 0 CHECK (deposito_monto >= 0),
       firma_digital_path TEXT,
       notas TEXT,
       fecha_modificacion TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      fecha_reserva TEXT,
       FOREIGN KEY (id_cliente) REFERENCES CLIENTE(id),
       FOREIGN KEY (id_usuario) REFERENCES USUARIO(id)
     );
@@ -460,6 +461,92 @@ QUINTO: El pago del monto total del alquiler se realizará al momento de la entr
 
 SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora por día de atraso según el detalle indicado en la tabla de equipos. El ARRENDATARIO se hace responsable de cualquier daño, pérdida o deterioro de los equipos más allá del desgaste normal de uso.`, 'Cláusulas del contrato de alquiler');
   console.log('[DB] Cláusulas actualizadas correctamente.');
+
+  // Migración: agregar fecha_reserva a CONTRATO
+  try {
+    const hasFechaReserva = db.prepare("PRAGMA table_info('CONTRATO')").all().some(c => c.name === 'fecha_reserva');
+    if (!hasFechaReserva) {
+      db.exec("ALTER TABLE CONTRATO ADD COLUMN fecha_reserva TEXT");
+      console.log('[DB] Migración: columna fecha_reserva agregada a CONTRATO.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración fecha_reserva:', err.message);
+  }
+
+  // Migración: agregar 'cancelado' al CHECK constraint de CONTRATO (requiere recrear la tabla)
+  try {
+    const contratos = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='CONTRATO'").get();
+    if (contratos && !contratos.sql.includes("'cancelado'")) {
+      console.log('[DB] Migración: recreando tabla CONTRATO para agregar estado cancelado...');
+      db.pragma('foreign_keys = OFF');
+      db.exec(`
+        CREATE TABLE CONTRATO_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          id_cliente INTEGER NOT NULL,
+          id_usuario INTEGER NOT NULL,
+          fecha_creacion TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+          fecha_salida TEXT NOT NULL,
+          fecha_devolucion_pactada TEXT NOT NULL,
+          fecha_devolucion_real TEXT,
+          estado TEXT NOT NULL DEFAULT 'alquilado' CHECK (estado IN ('reservado', 'alquilado', 'atrasado', 'devuelto', 'devolución incompleta', 'cancelado')),
+          deposito_dni INTEGER NOT NULL DEFAULT 0 CHECK (deposito_dni IN (0, 1)),
+          deposito_monto REAL NOT NULL DEFAULT 0 CHECK (deposito_monto >= 0),
+          firma_digital_path TEXT,
+          notas TEXT,
+          fecha_modificacion TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+          fecha_reserva TEXT,
+          FOREIGN KEY (id_cliente) REFERENCES CLIENTE(id),
+          FOREIGN KEY (id_usuario) REFERENCES USUARIO(id)
+        );
+        INSERT INTO CONTRATO_new SELECT
+          id, id_cliente, id_usuario, fecha_creacion, fecha_salida,
+          fecha_devolucion_pactada, fecha_devolucion_real, estado,
+          deposito_dni, deposito_monto, firma_digital_path, notas,
+          fecha_modificacion, fecha_reserva
+        FROM CONTRATO;
+        DROP TABLE CONTRATO;
+        ALTER TABLE CONTRATO_new RENAME TO CONTRATO;
+      `);
+      db.pragma('foreign_keys = ON');
+      console.log('[DB] Migración: tabla CONTRATO recreada con CHECK actualizado.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración cancelado:', err.message);
+  }
+
+  // Migración: agregar 'reservado' al CHECK constraint de HERRAMIENTA (requiere recrear la tabla)
+  try {
+    const herramientas = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='HERRAMIENTA'").get();
+    if (herramientas && !herramientas.sql.includes("'reservado'")) {
+      console.log('[DB] Migración: recreando tabla HERRAMIENTA para agregar estado reservado...');
+      db.pragma('foreign_keys = OFF');
+      db.exec(`
+        CREATE TABLE HERRAMIENTA_new (
+          id TEXT PRIMARY KEY NOT NULL,
+          id_categoria TEXT NOT NULL,
+          nombre TEXT NOT NULL,
+          descripcion TEXT,
+          precio_dia REAL NOT NULL CHECK (precio_dia >= 0),
+          precio_minimo REAL CHECK (precio_minimo >= 0),
+          precio_mes REAL CHECK (precio_mes >= 0),
+          precio_venta REAL CHECK (precio_venta >= 0),
+          valor_reposicion REAL CHECK (valor_reposicion >= 0),
+          estado TEXT NOT NULL CHECK (estado IN ('disponible', 'reservado', 'alquilado', 'mantenimiento', 'malogrado')),
+          fecha_adquisicion TEXT,
+          activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
+          FOREIGN KEY (id_categoria) REFERENCES CATEGORIA_HERRAMIENTA(id)
+        );
+        INSERT INTO HERRAMIENTA_new (id, id_categoria, nombre, descripcion, precio_dia, precio_minimo, precio_mes, precio_venta, valor_reposicion, estado, fecha_adquisicion, activo)
+        SELECT id, id_categoria, nombre, descripcion, precio_dia, precio_minimo, precio_mes, precio_venta, valor_reposicion, estado, fecha_adquisicion, activo FROM HERRAMIENTA;
+        DROP TABLE HERRAMIENTA;
+        ALTER TABLE HERRAMIENTA_new RENAME TO HERRAMIENTA;
+      `);
+      db.pragma('foreign_keys = ON');
+      console.log('[DB] Migración: tabla HERRAMIENTA recreada con CHECK actualizado.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración reservado:', err.message);
+  }
 
   // --- Datos semilla (solo primera vez) ---
 

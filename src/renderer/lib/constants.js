@@ -20,6 +20,6 @@ export const SEMANTIC = {
   pendiente:     { variable: 'var(--muted)',   color: 'oklch(0.52 0.005 50)', soft: 'oklch(0.90 0.003 60)', label: 'Pendiente' },
 };
 
-export const ESTADOS_HERRAMIENTA = ['disponible', 'alquilado', 'mantenimiento', 'malogrado'];
+export const ESTADOS_HERRAMIENTA = ['disponible', 'reservado', 'alquilado', 'mantenimiento', 'malogrado'];
 export const ESTADOS_CONTRATO = ['reservado', 'alquilado', 'atrasado', 'devuelto', 'devolución incompleta', 'cancelado'];
 export const ESTADOS_DEVOLUCION = ['pendiente', 'bien', 'dañado', 'no devuelto', 'perdido'];
