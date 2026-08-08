@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, CheckCircle, AlertTriangle, Minus, Plus, ChevronRight, Clock, Star } from 'lucide-react';
+import { X, CheckCircle, AlertTriangle, Minus, Plus, ChevronRight, Clock, Star, Eye } from 'lucide-react';
 import { useToast } from './Toast';
 import UnifiedPaymentModal from './UnifiedPaymentModal';
 import AnularPagoModal from './AnularPagoModal';
 import CalificarContratoModal from './CalificarContratoModal';
+import ImagenVisor from './ImagenVisor';
 import { gruparPagos } from '../lib/gruparPagos';
 import { localDate } from '../lib/date';
 
@@ -60,6 +61,25 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   // Estado para el acordeón de componentes del kit
   const [kitAbierto, setKitAbierto] = useState({});
   const [calificarModal, setCalificarModal] = useState(false);
+  // Visor de imagen de referencia
+  const [visor, setVisor] = useState(null);
+
+  const verImagenItem = async (item) => {
+    try {
+      const tipo = item.id_herramienta ? 'herramienta' : 'granel';
+      const id = item.id_herramienta || item.id_item_granel;
+      if (id == null) return;
+      const r = await window.api.getImagenItem(tipo, id);
+      const nombre = item.item_nombre || item.nombre || 'Ítem';
+      if (r?.ruta) {
+        setVisor({ ruta: r.ruta, titulo: nombre });
+      } else {
+        toast(nombre + ' no tiene imagen de referencia.');
+      }
+    } catch (e) {
+      toast('No se pudo cargar la imagen: ' + (e.message || e), 'error');
+    }
+  };
 
   const cargarHistorialGranel = async (idx, item) => {
     if (!window.api || !item.id_item_granel) return;
@@ -463,6 +483,16 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
                       {esKit ? 'Kit ×' + (item.cantidad || 1) : (esGranel ? 'x' + (item.cantidad || 1) : item.item_codigo || item.id)}
                     </span>
                     <span className={esKit ? 'font-semibold text-[13px]' : 'font-medium text-[13px] truncate flex-1'} style={{ color: 'var(--ink)' }}>{item.item_nombre || item.nombre}</span>
+                    {(item.id_herramienta || item.id_item_granel) && (
+                      <button
+                        onClick={() => verImagenItem(item)}
+                        className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors duration-150 shrink-0"
+                        style={{ color: 'var(--faint)' }}
+                        title="Ver imagen de referencia"
+                      >
+                        <Eye size={12} />
+                      </button>
+                    )}
                     {/* Botones Bien/Dañado solo para items individuales no guardados */}
                     {!esGranel && !esKit && !yaGuardado && (
                       <div className="flex gap-0.5 shrink-0">
@@ -999,6 +1029,13 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
         idCliente={c.id_cliente}
         onClose={() => setCalificarModal(false)}
         onGuardado={() => { toast('Calificación guardada'); }}
+      />
+    )}
+    {visor && (
+      <ImagenVisor
+        ruta={visor.ruta}
+        titulo={visor.titulo}
+        onClose={() => setVisor(null)}
       />
     )}
     </>

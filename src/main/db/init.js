@@ -10,7 +10,8 @@ function initDatabase() {
       precio_dia REAL NOT NULL DEFAULT 0,
       precio_minimo REAL CHECK (precio_minimo >= 0),
       precio_mes REAL CHECK (precio_mes >= 0),
-      precio_venta REAL CHECK (precio_venta >= 0)
+      precio_venta REAL CHECK (precio_venta >= 0),
+      imagen_path TEXT
     );
 
     CREATE TABLE IF NOT EXISTS HERRAMIENTA (
@@ -46,7 +47,8 @@ function initDatabase() {
       cantidad_perdida INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_perdida >= 0),
       cantidad_vendida INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_vendida >= 0),
       cantidad_baja INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_baja >= 0),
-      activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1))
+      activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
+      imagen_path TEXT
     );
 
     CREATE TABLE IF NOT EXISTS KIT (
@@ -270,6 +272,21 @@ function initDatabase() {
     }
   } catch (err) {
     console.error('[DB] Error en migración de mora_dia:', err);
+  }
+
+  // Migración: imagen_path (imágenes de referencia) en CATEGORIA_HERRAMIENTA e ITEM_GRANEL
+  try {
+    const hasCol = (tabla, col) => db.prepare(`PRAGMA table_info(${tabla})`).all().some(c => c.name === col);
+    if (!hasCol('CATEGORIA_HERRAMIENTA', 'imagen_path')) {
+      db.exec('ALTER TABLE CATEGORIA_HERRAMIENTA ADD COLUMN imagen_path TEXT');
+      console.log('[DB] Migración: imagen_path agregada a CATEGORIA_HERRAMIENTA.');
+    }
+    if (!hasCol('ITEM_GRANEL', 'imagen_path')) {
+      db.exec('ALTER TABLE ITEM_GRANEL ADD COLUMN imagen_path TEXT');
+      console.log('[DB] Migración: imagen_path agregada a ITEM_GRANEL.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración de imagen_path:', err);
   }
 
   // Migración: crear AUDIT_GRANEL si no existe (para bases de datos existentes)

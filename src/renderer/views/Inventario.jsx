@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Search, Plus, Pencil, Trash2, Wrench, Package, X, History,
   ChevronDown, ChevronRight, CheckCircle, AlertTriangle, MinusCircle, Layers,
+  ImagePlus,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { SEMANTIC, ESTADOS_HERRAMIENTA } from '../lib/constants';
@@ -128,6 +129,9 @@ export default function Inventario() {
         precio_dia: data.precio_dia,
         cantidad: data.cantidad,
       });
+      if (data.imagenBase64) {
+        await window.api.guardarImagenHerramienta(prefix.id, data.imagenBase64);
+      }
       toast(r.cantidad + ' herramienta(s) de ' + data.nombre + ' creada(s)');
       setModal(null);
       await cargar();
@@ -145,9 +149,14 @@ export default function Inventario() {
     } catch (e) { setError('Error al agregar: ' + (e.message || e)); }
   };
 
-  const handleEditarFamilia = async (idCat, data, nombre) => {
+  const handleEditarFamilia = async (idCat, data, nombre, img) => {
     try {
       await window.api.editarFamilia(idCat, data);
+      if (img?.imagen === null) {
+        await window.api.eliminarImagenHerramienta(idCat);
+      } else if (typeof img?.imagen === 'string') {
+        await window.api.guardarImagenHerramienta(idCat, img.imagen);
+      }
       toast(nombre + ' actualizada');
       setModal(null);
       await cargar();
@@ -195,11 +204,25 @@ export default function Inventario() {
 
   // Granel CRUD
   const handleCrearGranel = async (data) => {
-    try { await window.api.crearMaterial(data); toast('Material creado'); setModal(null); await cargar(); }
+    try {
+      await window.api.crearMaterial(data);
+      if (data.imagenBase64) {
+        await window.api.guardarImagenGranel(data.nombre, data.imagenBase64);
+      }
+      toast('Material creado'); setModal(null); await cargar();
+    }
     catch (e) { setError(e.message); }
   };
-  const handleEditarGranel = async (nombreOrig, data) => {
-    try { await window.api.editarGranelFull(nombreOrig, data); toast('Material actualizado'); setModal(null); await cargar(); }
+  const handleEditarGranel = async (nombreOrig, data, img) => {
+    try {
+      await window.api.editarGranelFull(nombreOrig, data);
+      if (img?.imagen === null) {
+        await window.api.eliminarImagenGranel(nombreOrig);
+      } else if (typeof img?.imagen === 'string') {
+        await window.api.guardarImagenGranel(data.nombre, img.imagen);
+      }
+      toast('Material actualizado'); setModal(null); await cargar();
+    }
     catch (e) { setError(e.message); }
   };
   const handleAjustarStock = async (id, delta) => {
@@ -966,6 +989,70 @@ const Field = ({ label, req, children }) => (
   </div>
 );
 
+/* Campo de imagen de referencia:
+   - rutaInicial: ruta de una imagen ya guardada (se carga y muestra)
+   - onCambio: (dataUrl | null) — null indica que el usuario quitó la imagen */
+function ImagenField({ rutaInicial, onCambio }) {
+  const [preview, setPreview] = useState(null);
+  const [cargando, setCargando] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (!rutaInicial) { setPreview(null); return undefined; }
+    let vivo = true;
+    setCargando(true);
+    window.api.leerImagen(rutaInicial)
+      .then((d) => { if (vivo) setPreview(d); })
+      .catch(() => {})
+      .finally(() => { if (vivo) setCargando(false); });
+    return () => { vivo = false; };
+  }, [rutaInicial]);
+
+  const seleccionar = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      setPreview(dataUrl);
+      onCambio(dataUrl);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const quitar = () => { setPreview(null); onCambio(null); };
+
+  return (
+    <div>
+      <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--muted)' }}>
+        Imagen de referencia
+      </label>
+      {preview ? (
+        <div className="flex items-center gap-2">
+          <img src={preview} alt="Vista previa" className="w-14 h-14 object-cover rounded-lg border shrink-0"
+            style={{ borderColor: 'var(--border)' }} />
+          <div className="flex flex-col gap-1">
+            <button type="button" onClick={() => inputRef.current?.click()}
+              className="h-6 px-2 rounded text-[10px] font-medium text-white transition-colors duration-150"
+              style={{ backgroundColor: 'var(--primary)' }}>Cambiar</button>
+            <button type="button" onClick={quitar}
+              className="h-6 px-2 rounded text-[10px] font-medium transition-colors duration-150"
+              style={{ color: 'var(--danger)', backgroundColor: 'oklch(0.94 0.02 25)' }}>Quitar</button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" onClick={() => inputRef.current?.click()}
+          className="w-full h-9 rounded-lg border border-dashed text-xs font-medium transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center gap-1.5"
+          style={{ color: 'var(--muted)', borderColor: 'var(--border)' }}>
+          <ImagePlus size={13} /> {cargando ? 'Cargando...' : 'Subir imagen'}
+        </button>
+      )}
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={seleccionar} />
+    </div>
+  );
+}
+
 function ModalShell({ title, onClose, children, onSubmit, error }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'oklch(0 0 0 / 0.4)' }} onClick={onClose}>
@@ -990,6 +1077,7 @@ function ModalShell({ title, onClose, children, onSubmit, error }) {
 function ModalCrearFamilia({ onSave, onClose }) {
   const [f, setF] = useState({ nombre: '', precio_dia: '', precio_minimo: '', precio_mes: '', precio_venta: '', cantidad: '1' });
   const [err, setErr] = useState('');
+  const [imagenEstado, setImagenEstado] = useState(null);
   const set = (k, v) => { setF((p) => ({ ...p, [k]: v })); setErr(''); };
 
   const submit = () => {
@@ -1002,6 +1090,7 @@ function ModalCrearFamilia({ onSave, onClose }) {
       precio_mes: f.precio_mes !== '' ? parseFloat(f.precio_mes) : undefined,
       precio_venta: f.precio_venta !== '' ? parseFloat(f.precio_venta) : undefined,
       cantidad: parseInt(f.cantidad, 10) || 1,
+      imagenBase64: imagenEstado || undefined,
     });
   };
 
@@ -1031,6 +1120,7 @@ function ModalCrearFamilia({ onSave, onClose }) {
           <input type="number" step="0.01" min="0" value={f.precio_venta} onChange={(e) => set('precio_venta', e.target.value)} className={inputCls} placeholder="Vender" style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
         </Field>
       </div>
+      <ImagenField onCambio={setImagenEstado} />
     </ModalShell>
   );
 }
@@ -1060,6 +1150,7 @@ function ModalEditarFamilia({ familia, onSave, onClose }) {
     precio_mes: familia.precio_mes ?? '',
     precio_venta: familia.precio_venta ?? '',
   });
+  const [imagenEstado, setImagenEstado] = useState(undefined);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const submit = () => onSave(familia.id_categoria, {
     ...f,
@@ -1067,7 +1158,7 @@ function ModalEditarFamilia({ familia, onSave, onClose }) {
     precio_minimo: f.precio_minimo !== '' ? parseFloat(f.precio_minimo) : undefined,
     precio_mes: f.precio_mes !== '' ? parseFloat(f.precio_mes) : undefined,
     precio_venta: f.precio_venta !== '' ? parseFloat(f.precio_venta) : undefined,
-  }, familia.nombre);
+  }, familia.nombre, { imagen: imagenEstado });
   return (
     <ModalShell title={'Editar ' + familia.nombre} onClose={onClose} onSubmit={submit}>
       <Field label="Nombre">
@@ -1092,12 +1183,14 @@ function ModalEditarFamilia({ familia, onSave, onClose }) {
       ) : (
         <p className="text-[11px]" style={{ color: 'var(--muted)' }}>Sin unidades. Los cambios se aplicarán a las nuevas unidades que agregue.</p>
       )}
+      <ImagenField rutaInicial={familia.imagen_path} onCambio={setImagenEstado} />
     </ModalShell>
   );
 }
 
 function ModalCrearGranel({ onSave, onClose }) {
   const [f, setF] = useState({ nombre: '', precio_nuevo: '', precio_minimo_nuevo: '', precio_mes_nuevo: '', precio_venta_nuevo: '', precio_usado: '', precio_minimo_usado: '', precio_mes_usado: '', precio_venta_usado: '' });
+  const [imagenEstado, setImagenEstado] = useState(null);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const submit = () => {
     if (!f.nombre.trim()) return;
@@ -1111,6 +1204,7 @@ function ModalCrearGranel({ onSave, onClose }) {
       precio_minimo_usado: f.precio_minimo_usado !== '' ? parseFloat(f.precio_minimo_usado) : undefined,
       precio_mes_usado: f.precio_mes_usado !== '' ? parseFloat(f.precio_mes_usado) : undefined,
       precio_venta_usado: f.precio_venta_usado !== '' ? parseFloat(f.precio_venta_usado) : undefined,
+      imagenBase64: imagenEstado || undefined,
     });
   };
   return (
@@ -1132,6 +1226,7 @@ function ModalCrearGranel({ onSave, onClose }) {
           <Field label="Venta S/"><input type="number" step="0.01" min="0" value={f.precio_venta_usado} onChange={(e) => set('precio_venta_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
         </div>
       </div>
+      <ImagenField onCambio={setImagenEstado} />
     </ModalShell>
   );
 }
@@ -1139,6 +1234,7 @@ function ModalCrearGranel({ onSave, onClose }) {
 function ModalEditarGranel({ data, onSave, onClose }) {
   const nuevo = data.variantes?.find(v => v.condicion === 'nuevo') || {};
   const usado = data.variantes?.find(v => v.condicion === 'usado') || {};
+  const imagenActual = nuevo.imagen_path || usado.imagen_path || null;
   const [f, setF] = useState({
     nombre: data.nombre || '',
     precio_nuevo: nuevo.precio_dia ?? '',
@@ -1150,6 +1246,7 @@ function ModalEditarGranel({ data, onSave, onClose }) {
     precio_mes_usado: usado.precio_mes ?? '',
     precio_venta_usado: usado.precio_venta ?? '',
   });
+  const [imagenEstado, setImagenEstado] = useState(undefined);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const submit = () => onSave(data.nombre, {
     nombre: f.nombre.trim(),
@@ -1161,7 +1258,7 @@ function ModalEditarGranel({ data, onSave, onClose }) {
     precio_minimo_usado: f.precio_minimo_usado !== '' ? parseFloat(f.precio_minimo_usado) : undefined,
     precio_mes_usado: f.precio_mes_usado !== '' ? parseFloat(f.precio_mes_usado) : undefined,
     precio_venta_usado: f.precio_venta_usado !== '' ? parseFloat(f.precio_venta_usado) : undefined,
-  });
+  }, { imagen: imagenEstado });
   return (
     <ModalShell title="Editar material" onClose={onClose} onSubmit={submit}>
       <Field label="Nombre" req><input value={f.nombre} onChange={(e) => set('nombre', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} autoFocus /></Field>
@@ -1181,6 +1278,7 @@ function ModalEditarGranel({ data, onSave, onClose }) {
           <Field label="Venta S/"><input type="number" step="0.01" min="0" value={f.precio_venta_usado} onChange={(e) => set('precio_venta_usado', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} /></Field>
         </div>
       </div>
+      <ImagenField rutaInicial={imagenActual} onCambio={setImagenEstado} />
     </ModalShell>
   );
 }

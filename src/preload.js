@@ -63,6 +63,14 @@ contextBridge.exposeInMainWorld('api', {
   abrirArchivo: (ruta) => ipcRenderer.invoke('abrir-archivo', ruta),
   generarPdfPreview: (datos) => ipcRenderer.invoke('generar-pdf-preview', datos),
   leerArchivoBase64: (ruta) => ipcRenderer.invoke('leer-archivo-base64', ruta),
+
+  // Imágenes de referencia
+  guardarImagenHerramienta: (idCategoria, base64) => ipcRenderer.invoke('guardar-imagen-herramienta', idCategoria, base64),
+  eliminarImagenHerramienta: (idCategoria) => ipcRenderer.invoke('eliminar-imagen-herramienta', idCategoria),
+  guardarImagenGranel: (nombre, base64) => ipcRenderer.invoke('guardar-imagen-granel', nombre, base64),
+  eliminarImagenGranel: (nombre) => ipcRenderer.invoke('eliminar-imagen-granel', nombre),
+  getImagenItem: (tipo, id) => ipcRenderer.invoke('get-imagen-item', tipo, id),
+  leerImagen: (ruta) => ipcRenderer.invoke('leer-imagen', ruta),
   getAllConfig: () => ipcRenderer.invoke('get-all-config'),
   saveConfig: (clave, valor) => ipcRenderer.invoke('save-config', clave, valor),
 

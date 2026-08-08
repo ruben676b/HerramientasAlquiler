@@ -751,6 +751,7 @@ function getHerramientasPorCategoria() {
       precio_mes: herramientas[0]?.precio_mes ?? cat.precio_mes ?? null,
       precio_venta: herramientas[0]?.precio_venta ?? cat.precio_venta ?? null,
       nombre: herramientas[0]?.nombre || cat.nombre,
+      imagen_path: cat.imagen_path || null,
     };
   });
 }

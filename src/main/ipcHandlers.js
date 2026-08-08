@@ -45,6 +45,14 @@ const {
 } = require('./services/inventarioService');
 const { consultarDni } = require('./services/reniecService');
 const { generarPdf, guardarFirma, generarPdfDesdeDatos } = require('./services/contratoPdfService');
+const {
+  guardarImagenHerramienta,
+  eliminarImagenHerramienta,
+  guardarImagenGranel,
+  eliminarImagenGranel,
+  getImagenItem,
+  leerImagen,
+} = require('./services/imagenService');
 const { guardarCalificacion } = require('./services/calificacionService');
 const {
   getClientesConCalificacion,
@@ -78,7 +86,8 @@ function registerIpcHandlers() {
       .prepare(
         `SELECT id, nombre, condicion, precio_dia, precio_minimo, precio_mes,
                 cantidad_total, cantidad_disponible, cantidad_danada,
-                cantidad_alquilada, cantidad_perdida, cantidad_vendida, cantidad_baja
+                cantidad_alquilada, cantidad_perdida, cantidad_vendida, cantidad_baja,
+                imagen_path
          FROM ITEM_GRANEL WHERE activo = 1 ORDER BY nombre, condicion`
       )
       .all();
@@ -88,7 +97,8 @@ function registerIpcHandlers() {
     return db
       .prepare(
         `SELECT h.id, h.nombre, h.precio_dia, h.precio_minimo, h.precio_mes,
-                c.nombre AS categoria_nombre, c.id AS categoria_id
+                c.nombre AS categoria_nombre, c.id AS categoria_id,
+                c.imagen_path AS imagen_path
          FROM HERRAMIENTA h
          JOIN CATEGORIA_HERRAMIENTA c ON h.id_categoria = c.id
          WHERE h.estado = 'disponible' AND h.activo = 1
@@ -295,6 +305,31 @@ function registerIpcHandlers() {
   ipcMain.handle('leer-archivo-base64', async (_e, ruta) => {
     const buffer = fs.readFileSync(ruta);
     return buffer.toString('base64');
+  });
+
+  // --- Imágenes de referencia ---
+  ipcMain.handle('guardar-imagen-herramienta', (_e, idCategoria, base64) => {
+    return guardarImagenHerramienta(idCategoria, base64);
+  });
+
+  ipcMain.handle('eliminar-imagen-herramienta', (_e, idCategoria) => {
+    return eliminarImagenHerramienta(idCategoria);
+  });
+
+  ipcMain.handle('guardar-imagen-granel', (_e, nombre, base64) => {
+    return guardarImagenGranel(nombre, base64);
+  });
+
+  ipcMain.handle('eliminar-imagen-granel', (_e, nombre) => {
+    return eliminarImagenGranel(nombre);
+  });
+
+  ipcMain.handle('get-imagen-item', (_e, tipo, id) => {
+    return getImagenItem(tipo, id);
+  });
+
+  ipcMain.handle('leer-imagen', (_e, ruta) => {
+    return leerImagen(ruta);
   });
 
   // --- Configuración ---
