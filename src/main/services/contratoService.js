@@ -662,18 +662,28 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
         continue;
       }
 
-      const esDevuelto = item.estado_devolucion === 'bien' || item.estado_devolucion === 'dañado' || item.estado_devolucion === 'perdido';
+      const esDevuelto = item.estado_devolucion === 'bien' || item.estado_devolucion === 'dañado' || item.estado_devolucion === 'perdido' || item.estado_devolucion === 'vendido';
 
       if (esDevuelto) {
         if (detalle.tipo_item === 'individual') {
           // Actualizar estado y fecha del detalle solo para items individuales
           log('[DIAG registrarDevolucion] ANTES UPDATE id_detalle=' + item.id_detalle + ' estado_devolucion=' + detalle.estado_devolucion);
-          db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ? WHERE id = ?')
-            .run(item.estado_devolucion, fechaDevolucionReal, item.id_detalle);
+          const esNoDevuelto = item.estado_devolucion === 'perdido' || item.estado_devolucion === 'vendido';
+          if (esNoDevuelto) {
+            // Perdido/vendido: registrar costo de reposición o precio de venta en el detalle
+            db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ?, costo_perdida = ? WHERE id = ?')
+              .run(item.estado_devolucion, fechaDevolucionReal, item.costo_perdida || 0, item.id_detalle);
+          } else {
+            db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ? WHERE id = ?')
+              .run(item.estado_devolucion, fechaDevolucionReal, item.id_detalle);
+          }
           const despues = db.prepare('SELECT estado_devolucion, fecha_devolucion_real FROM DETALLE_CONTRATO WHERE id = ?').get(item.id_detalle);
           log('[DIAG registrarDevolucion] DESPUES UPDATE id_detalle=' + item.id_detalle + ' estado_devolucion=' + (despues?.estado_devolucion) + ' fecha=' + (despues?.fecha_devolucion_real));
 
-          const nuevoEstado = item.estado_devolucion === 'dañado' ? 'malogrado' : 'disponible';
+          const nuevoEstado = item.estado_devolucion === 'dañado' ? 'malogrado'
+            : item.estado_devolucion === 'perdido' ? 'perdida'
+            : item.estado_devolucion === 'vendido' ? 'vendida'
+            : 'disponible';
           db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(nuevoEstado, detalle.id_herramienta);
 
           if (item.estado_devolucion === 'dañado') {
@@ -692,6 +702,10 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
                 insertDanoInd.run(idContrato, item.id_detalle, detalle.id_herramienta, d.nombre, d.costo);
               }
             }
+          } else if (esNoDevuelto) {
+            // El costo (reposición o precio de venta) queda en DETALLE_CONTRATO.costo_perdida
+            // y se suma al total del contrato vía getContratos/getDetalleContrato
+            totalDanos += item.costo_perdida || 0;
           }
 
           // Mora individual
@@ -845,8 +859,9 @@ function procesarKitLinea(idContrato, detalle, item, fechaDevolucionReal) {
       if (ci.estado_devolucion === 'pendiente') {
         db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ? WHERE id = ?')
           .run(estadoKit, fechaDevolucionReal, ci.id);
+        const estadoHerramienta = estadoKit === 'perdido' ? 'perdida' : estadoKit === 'vendido' ? 'vendida' : 'disponible';
         db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?')
-          .run('disponible', ci.id_herramienta);
+          .run(estadoHerramienta, ci.id_herramienta);
       }
     }
 
@@ -988,9 +1003,11 @@ function getContratos(filtros = {}) {
              COALESCE(h.descripcion, i.descripcion, k.descripcion) AS item_descripcion,
              k.nombre AS kit_nombre,
              i.condicion AS item_condicion,
-             i.precio_venta AS item_precio_venta
+             COALESCE(i.precio_venta, h.precio_venta, cat.precio_venta) AS item_precio_venta,
+             COALESCE(h.valor_reposicion, h.precio_venta, i.precio_venta, cat.precio_venta) AS item_valor_reposicion
       FROM DETALLE_CONTRATO d
       LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id
+      LEFT JOIN CATEGORIA_HERRAMIENTA cat ON h.id_categoria = cat.id
       LEFT JOIN ITEM_GRANEL i ON d.id_item_granel = i.id
       LEFT JOIN KIT k ON d.id_kit = k.id
       WHERE d.id_contrato = ?
@@ -1092,7 +1109,7 @@ function getContratos(filtros = {}) {
         FROM DAÑO_DEVOLUCION
         WHERE id_contrato = ? AND revertido = 0 AND tipo_item = 'individual'
       `).get(c.id)?.total || 0);
-    const total_perdidas = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_perdida || 0) + (i.tipo_item === 'kit' ? (i.costo_perdida || 0) : 0), 0);
+    const total_perdidas = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_perdida || 0) + ((i.tipo_item === 'kit' || i.estado_devolucion === 'perdido' || i.estado_devolucion === 'vendido') ? (i.costo_perdida || 0) : 0), 0);
 
     return { ...c, items: itemsConAtraso, pagos, dias_atraso: max_dias_atraso, total_atraso, total_contrato: totalContrato, total_danos, total_perdidas };
   });
@@ -1136,10 +1153,11 @@ function revertirDevolucionItem(idDetalle) {
 
   const ejecutar = db.transaction(() => {
     if (detalle.tipo_item === 'individual') {
-      if (detalle.estado_devolucion !== 'bien' && detalle.estado_devolucion !== 'dañado')
+      if (detalle.estado_devolucion !== 'bien' && detalle.estado_devolucion !== 'dañado'
+        && detalle.estado_devolucion !== 'perdido' && detalle.estado_devolucion !== 'vendido')
         throw new Error('El ítem no está en estado devuelto');
 
-      db.prepare("UPDATE DETALLE_CONTRATO SET estado_devolucion = 'pendiente', fecha_devolucion_real = NULL WHERE id = ?")
+      db.prepare("UPDATE DETALLE_CONTRATO SET estado_devolucion = 'pendiente', fecha_devolucion_real = NULL, costo_perdida = NULL WHERE id = ?")
         .run(idDetalle);
 
       db.prepare("UPDATE HERRAMIENTA SET estado = 'alquilado' WHERE id = ?")

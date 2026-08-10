@@ -225,9 +225,11 @@ function getDetalleContrato(idContrato) {
     SELECT d.*, COALESCE(h.nombre, ig.nombre) AS item_nombre,
            COALESCE(h.id, 'MAT') AS item_codigo,
            ig.condicion AS item_condicion,
-           ig.precio_venta AS item_precio_venta
+           COALESCE(ig.precio_venta, h.precio_venta, cat.precio_venta) AS item_precio_venta,
+           COALESCE(h.valor_reposicion, h.precio_venta, ig.precio_venta, cat.precio_venta) AS item_valor_reposicion
     FROM DETALLE_CONTRATO d
     LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id
+    LEFT JOIN CATEGORIA_HERRAMIENTA cat ON h.id_categoria = cat.id
     LEFT JOIN ITEM_GRANEL ig ON d.id_item_granel = ig.id
     WHERE d.id_contrato = ?
   `).all(idContrato);
@@ -268,6 +270,11 @@ function getDetalleContrato(idContrato) {
       item.granel_dev_costo_perdida = dev.total_costo_perdida || 0;
       total_danos += dev.total_costo_reparacion || 0;
       total_perdidas += dev.total_costo_perdida || 0;
+    }
+
+    // Pérdida/venta de herramienta individual: costo guardado en DETALLE_CONTRATO.costo_perdida
+    if (item.estado_devolucion === 'perdido' || item.estado_devolucion === 'vendido') {
+      total_perdidas += item.costo_perdida || 0;
     }
 
     const fechaDevItem = item.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;

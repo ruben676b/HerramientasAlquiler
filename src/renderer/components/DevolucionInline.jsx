@@ -50,6 +50,9 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [editandoCostoPerd, setEditandoCostoPerd] = useState({});
   const [editandoCantGranel, setEditandoCantGranel] = useState({});
   const [costoPerdManual, setCostoPerdManual] = useState({});
+  // Estado para pérdida/venta de herramientas individuales (desplegable "No devuelto")
+  const [noDevueltoAbierto, setNoDevueltoAbierto] = useState({});
+  const [costosNoDevueltos, setCostosNoDevueltos] = useState({});
   const savingRef = useRef({});
   const guardadosRef = useRef({});
   const dirtyRef = useRef({});
@@ -78,6 +81,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [detalleDañosAbierto, setDetalleDañosAbierto] = useState(undefined);
   // Confirmación para deshacer devolución: null | { tipo, idx, idDevolucion?, nombre }
   const [confirmDeshacer, setConfirmDeshacer] = useState(null);
+  const [confirmarVenta, setConfirmarVenta] = useState(null);
 
   const verImagenItem = async (item) => {
     try {
@@ -217,6 +221,8 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
         setPerdidas(p => { const n = { ...p }; delete n[idx]; return n; });
         setCostosPerdida(p => { const n = { ...p }; delete n[idx]; return n; });
         setCostosRep(p => { const n = { ...p }; delete n[idx]; return n; });
+        setCostosNoDevueltos(p => { const n = { ...p }; delete n[idx + '_perdido']; delete n[idx + '_vendido']; return n; });
+        setNoDevueltoAbierto(p => { const n = { ...p }; delete n[idx]; return n; });
         setDañosCat(p => { const n = { ...p }; delete n[idx]; return n; });
         setDañosAgregados(p => { const n = { ...p }; delete n[idx]; return n; });
 setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
@@ -262,6 +268,15 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
       return;
     }
 
+    const ventas = pendientes.filter(({ idx }) => estados[idx] === 'vendido');
+    if (ventas.length > 0) {
+      setConfirmarVenta(ventas);
+      return;
+    }
+    await procesarDevoluciones(pendientes);
+  };
+
+  const procesarDevoluciones = async (pendientes) => {
     setCobrando(true);
     let exitos = 0;
     let fallos = 0;
@@ -271,6 +286,10 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
       guardadosRef.current[idx] = true;
       try {
         const hoy = localDate();
+        const esNoDevuelto = estado === 'perdido' || estado === 'vendido';
+        const montoNoDevuelto = esNoDevuelto
+          ? (parseFloat(costosNoDevueltos[idx + '_' + estado]) || (estado === 'vendido' ? (item.item_precio_venta ?? item.item_valor_reposicion ?? 0) : (item.item_valor_reposicion ?? item.item_precio_venta ?? 0)))
+          : undefined;
         await window.api.registrarDevolucion({
           idContrato: c.id,
           fechaDevolucionReal: hoy,
@@ -278,6 +297,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
             id_detalle: item.id,
             estado_devolucion: estado,
             costo_reparacion: estado === 'dañado' ? ((dañosAgregados[idx] || []).reduce((s, d) => s + (parseFloat(d.costo) || 0), 0)) : undefined,
+            costo_perdida: esNoDevuelto ? montoNoDevuelto : undefined,
             danos: estado === 'dañado' ? (dañosAgregados[idx] || []).map(d => ({ nombre: d.nombre, costo: parseFloat(d.costo) || 0 })) : undefined,
           }],
           observaciones: notas[idx] ? { [item.id]: notas[idx] } : {},
@@ -675,7 +695,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                         <Eye size={12} />
                       </button>
                     )}
-                    {/* Botones Bien/Dañado solo para items individuales no guardados */}
+                    {/* Botones Bien/Dañado + desplegable No devuelto (solo individuales no guardados) */}
                     {!esGranel && !esKit && !yaGuardado && (
                       <div className="flex gap-0.5 shrink-0">
                         {ESTADOS_OPC.map(op => {
@@ -692,6 +712,38 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                             </button>
                           );
                         })}
+                        <div className="relative">
+                          <button onClick={() => setNoDevueltoAbierto(p => ({ ...p, [idx]: !p[idx] }))}
+                            className="flex items-center gap-0.5 px-1.5 h-5 rounded text-[9px] font-medium transition-all duration-150"
+                            style={{
+                              backgroundColor: est === 'perdido' ? 'oklch(0.55 0.19 30)' : est === 'vendido' ? 'oklch(0.45 0.15 250)' : noDevueltoAbierto[idx] ? 'oklch(0.92 0.03 250)' : 'var(--bg)',
+                              color: est === 'perdido' || est === 'vendido' ? '#fff' : 'var(--muted)',
+                              border: est === 'perdido' || est === 'vendido' || noDevueltoAbierto[idx] ? 'none' : '0.5px solid var(--border)',
+                            }}>
+                            {est === 'perdido' ? (
+                              <><X size={10} /> Perdido</>
+                            ) : est === 'vendido' ? (
+                              <><CheckCircle size={10} /> Vendido</>
+                            ) : (
+                              <><ChevronRight size={10} style={{ transform: noDevueltoAbierto[idx] ? 'rotate(90deg)' : 'rotate(0deg)' }} /> No devuelto</>
+                            )}
+                          </button>
+                          {noDevueltoAbierto[idx] && (
+                            <div className="absolute z-20 top-full right-0 mt-1 rounded border shadow-lg p-1 flex flex-col gap-0.5"
+                              style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+                              <button onClick={() => { seleccionarEstado(idx, 'perdido'); setNoDevueltoAbierto(p => ({ ...p, [idx]: false })); }}
+                                className="flex items-center gap-1 px-2 h-6 rounded text-[10px] font-medium text-left whitespace-nowrap"
+                                style={{ backgroundColor: 'var(--bg)', color: 'var(--danger)' }}>
+                                <X size={11} /> Perdido
+                              </button>
+                              <button onClick={() => { seleccionarEstado(idx, 'vendido'); setNoDevueltoAbierto(p => ({ ...p, [idx]: false })); }}
+                                className="flex items-center gap-1 px-2 h-6 rounded text-[10px] font-medium text-left whitespace-nowrap"
+                                style={{ backgroundColor: 'var(--bg)', color: 'oklch(0.45 0.15 250)' }}>
+                                <CheckCircle size={11} /> Vendido
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                     <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
@@ -706,10 +758,10 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                     {yaGuardado && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
                         style={{
-                          backgroundColor: item.estado_devolucion === 'dañado' ? 'oklch(0.55 0.12 70)' : item.estado_devolucion === 'perdido' ? 'oklch(0.55 0.19 30)' : 'oklch(0.50 0.13 155)',
+                          backgroundColor: item.estado_devolucion === 'dañado' ? 'oklch(0.55 0.12 70)' : item.estado_devolucion === 'perdido' ? 'oklch(0.55 0.19 30)' : item.estado_devolucion === 'vendido' ? 'oklch(0.45 0.15 250)' : 'oklch(0.50 0.13 155)',
                           color: '#fff',
                         }}>
-                        {item.estado_devolucion === 'dañado' ? 'Dañado' : item.estado_devolucion === 'perdido' ? 'Perdido' : 'Devuelto'}
+                        {item.estado_devolucion === 'dañado' ? 'Dañado' : item.estado_devolucion === 'perdido' ? 'Perdido' : item.estado_devolucion === 'vendido' ? 'Vendido' : 'Devuelto'}
                       </span>
                     )}
                     {esKit && pendKit > 0 && !kitAbierto[item.id] && (
@@ -892,6 +944,12 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                                     onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
                                     className="w-14 h-5 px-0.5 rounded text-[9px] border text-center font-mono dev-nospin"
                                     style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                                  {!costoPerdManual[idx] && item.item_precio_venta && (
+                                    <span className="text-[8px] px-0.5 py-0.5 rounded whitespace-nowrap"
+                                      style={{ color: 'oklch(0.40 0.12 250)', backgroundColor: 'oklch(0.93 0.05 250)' }}>
+                                      Sugerido S/{item.item_precio_venta} c/u
+                                    </span>
+                                  )}
                                 </span>
                               )}
                             </div>
@@ -979,6 +1037,28 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                       <ChipsDaños idx={idx} />
                     </>
                   )}
+                  {/* Perdido/Vendido: monto (reposición o precio de venta) — solo individual */}
+                  {!esGranel && !esKit && (est === 'perdido' || est === 'vendido') && !yaGuardado && (
+                    <div className="flex items-center gap-2 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
+                      <span className="text-[10px] shrink-0" style={{ color: 'var(--muted)' }}>
+                        {est === 'vendido' ? 'Precio de venta: S/' : 'Valor de reposición: S/'}
+                      </span>
+                      <input type="number" step="0.01" min="0"
+                        value={costosNoDevueltos[idx + '_' + est] ?? (est === 'vendido' ? (item.item_precio_venta ?? item.item_valor_reposicion ?? '') : (item.item_valor_reposicion ?? item.item_precio_venta ?? ''))}
+                        onChange={e => setCostosNoDevueltos(p => ({ ...p, [idx + '_' + est]: e.target.value }))}
+                        className="w-20 h-6 px-1 rounded text-xs border text-center font-mono dev-nospin"
+                        style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+                      {(est === 'vendido' ? (item.item_precio_venta ?? item.item_valor_reposicion) : (item.item_valor_reposicion ?? item.item_precio_venta)) != null && (
+                        <span className="text-[9px] px-1 py-0.5 rounded whitespace-nowrap"
+                          style={{ color: 'oklch(0.40 0.12 250)', backgroundColor: 'oklch(0.93 0.05 250)' }}>
+                          Sugerido: S/{(est === 'vendido' ? (item.item_precio_venta ?? item.item_valor_reposicion) : (item.item_valor_reposicion ?? item.item_precio_venta))}
+                        </span>
+                      )}
+                      <span className="text-[9px]" style={{ color: 'var(--faint)' }}>
+                        {est === 'vendido' ? 'El cliente se lleva la herramienta' : 'Sale del stock'}
+                      </span>
+                    </div>
+                  )}
                 </>
               );
               };
@@ -990,10 +1070,10 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                 const styleCard = {
                   borderColor: yaG
                     ? 'oklch(0.50 0.13 155)'
-                    : (estK ? ESTADOS_OPC.find(o => o.id === estK)?.bg + '60' : 'var(--border)'),
+                    : (estK ? ((ESTADOS_OPC.find(o => o.id === estK)?.bg || (estK === 'perdido' ? 'oklch(0.55 0.19 30)' : 'oklch(0.45 0.15 250)')) + '60') : 'var(--border)'),
                   backgroundColor: yaG
                     ? 'oklch(0.95 0.05 155)'
-                    : (estK ? 'oklch(0.97 0.04 70)' : 'var(--surface)'),
+                    : (estK ? (ESTADOS_OPC.find(o => o.id === estK) ? 'oklch(0.97 0.04 70)' : 'oklch(0.96 0.04 260)') : 'var(--surface)'),
                 };
                 const cardBody = (
                   <div className="rounded-lg border px-3 py-2 text-xs transition-all duration-150"
@@ -1348,6 +1428,28 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
         onConfirm={ejecutarDeshacer}
         onCancel={() => setConfirmDeshacer(null)}
       />
+    )}
+    {confirmarVenta && (
+      <ConfirmModal
+        open={true}
+        title={'Confirmar venta' + (confirmarVenta.length > 1 ? ' de ' + confirmarVenta.length + ' herramientas' : ' de herramienta')}
+        message={'Se cobrará el monto indicado y la herramienta quedará marcada como VENDIDA en el inventario, sin posibilidad de alquilarse.'}
+        confirmLabel={'Sí, vender'}
+        danger={true}
+        onConfirm={() => { const v = confirmarVenta; setConfirmarVenta(null); procesarDevoluciones(v); }}
+        onCancel={() => setConfirmarVenta(null)}
+      >
+        <ul className="mt-2 space-y-1 text-left text-xs" style={{ color: 'var(--ink)' }}>
+          {confirmarVenta.map(({ item, idx }) => (
+            <li key={item.id} className="flex items-center justify-between gap-2">
+              <span className="truncate">{item.item_codigo} · {item.item_nombre}</span>
+              <span className="font-mono shrink-0">
+                S/ {parseFloat(costosNoDevueltos[idx + '_vendido']) || (item.item_precio_venta ?? item.item_valor_reposicion ?? 0)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </ConfirmModal>
     )}
     {visor && (
       <ImagenVisor

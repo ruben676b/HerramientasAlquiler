@@ -8,6 +8,8 @@ export const SEMANTIC = {
   malogrado:     { variable: 'var(--danger)',  color: 'oklch(0.52 0.20 25)',  soft: 'oklch(0.93 0.04 25)',  label: 'Malogrado' },
   reservado:               { variable: 'var(--info)',    color: 'oklch(0.55 0.08 240)', soft: 'oklch(0.93 0.04 240)', label: 'Reservado' },
   alquilado:                { variable: 'var(--warning)', color: 'oklch(0.65 0.14 75)',  soft: 'oklch(0.93 0.05 75)',  label: 'Alquilado' },
+  perdida:                  { variable: 'var(--danger)',  color: 'oklch(0.52 0.20 25)',  soft: 'oklch(0.93 0.04 25)',  label: 'Perdida' },
+  vendida:                  { variable: 'var(--info)',    color: 'oklch(0.45 0.13 250)', soft: 'oklch(0.93 0.05 250)', label: 'Vendida' },
   atrasado:                 { variable: 'var(--danger)',  color: 'oklch(0.52 0.20 25)',  soft: 'oklch(0.93 0.04 25)',  label: 'Atrasado' },
   devuelto:                 { variable: 'var(--success)', color: 'oklch(0.55 0.15 160)', soft: 'oklch(0.93 0.05 160)', label: 'Devuelto' },
   'devolución incompleta':   { variable: 'var(--danger)',  color: 'oklch(0.52 0.20 25)',  soft: 'oklch(0.93 0.04 25)',  label: 'Dev. incompleta' },
@@ -20,6 +22,6 @@ export const SEMANTIC = {
   pendiente:     { variable: 'var(--muted)',   color: 'oklch(0.52 0.005 50)', soft: 'oklch(0.90 0.003 60)', label: 'Pendiente' },
 };
 
-export const ESTADOS_HERRAMIENTA = ['disponible', 'reservado', 'alquilado', 'mantenimiento', 'malogrado'];
+export const ESTADOS_HERRAMIENTA = ['disponible', 'reservado', 'alquilado', 'mantenimiento', 'malogrado', 'perdida', 'vendida'];
 export const ESTADOS_CONTRATO = ['reservado', 'alquilado', 'atrasado', 'devuelto', 'devolución incompleta', 'cancelado'];
-export const ESTADOS_DEVOLUCION = ['pendiente', 'bien', 'dañado', 'no devuelto', 'perdido'];
+export const ESTADOS_DEVOLUCION = ['pendiente', 'bien', 'dañado', 'no devuelto', 'perdido', 'vendido'];

@@ -25,7 +25,7 @@ function initDatabase() {
       precio_mes REAL CHECK (precio_mes >= 0),
       precio_venta REAL CHECK (precio_venta >= 0),
       valor_reposicion REAL CHECK (valor_reposicion >= 0),
-      estado TEXT NOT NULL CHECK (estado IN ('disponible', 'reservado', 'alquilado', 'mantenimiento', 'malogrado')),
+      estado TEXT NOT NULL CHECK (estado IN ('disponible', 'reservado', 'alquilado', 'mantenimiento', 'malogrado', 'perdida', 'vendida')),
       fecha_adquisicion TEXT,
       activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
       FOREIGN KEY (id_categoria) REFERENCES CATEGORIA_HERRAMIENTA(id)
@@ -131,7 +131,7 @@ function initDatabase() {
       id_kit INTEGER,
       cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
       precio_dia_aplicado REAL NOT NULL CHECK (precio_dia_aplicado >= 0),
-      estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto', 'perdido')),
+      estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto', 'perdido', 'vendido')),
       fecha_devolucion_real TEXT,
       fecha_devolucion_pactada_item TEXT,
       total_item_snapshot REAL,
@@ -453,6 +453,62 @@ function initDatabase() {
     console.error('[DB] Error en migración tarifa_aplicada:', err);
   }
 
+  // Migración: agregar 'vendido' al CHECK constraint de DETALLE_CONTRATO (requiere recrear la tabla)
+  try {
+    const detalleSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='DETALLE_CONTRATO'").get();
+    if (detalleSql && !detalleSql.sql.includes("'vendido'")) {
+      console.log('[DB] Migración: recreando tabla DETALLE_CONTRATO para agregar estado vendido...');
+      db.pragma('foreign_keys = OFF');
+      db.transaction(() => {
+        db.exec(`
+          CREATE TABLE DETALLE_CONTRATO_NUEVA (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_contrato INTEGER NOT NULL,
+            tipo_item TEXT NOT NULL CHECK (tipo_item IN ('individual', 'granel', 'kit')),
+            id_herramienta TEXT,
+            id_item_granel INTEGER,
+            id_kit INTEGER,
+            cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+            precio_dia_aplicado REAL NOT NULL CHECK (precio_dia_aplicado >= 0),
+            estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto', 'perdido', 'vendido')),
+            fecha_devolucion_real TEXT,
+            fecha_devolucion_pactada_item TEXT,
+            total_item_snapshot REAL,
+            tarifa_aplicada TEXT NOT NULL DEFAULT 'dia' CHECK (tarifa_aplicada IN ('dia', 'minimo', 'mes')),
+            costo_perdida REAL CHECK (costo_perdida >= 0),
+            FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
+            FOREIGN KEY (id_herramienta) REFERENCES HERRAMIENTA(id),
+            FOREIGN KEY (id_item_granel) REFERENCES ITEM_GRANEL(id),
+            FOREIGN KEY (id_kit) REFERENCES KIT(id),
+            CHECK (
+              (tipo_item = 'individual' AND id_herramienta NOT NULL AND id_item_granel IS NULL AND cantidad = 1) OR
+              (tipo_item = 'granel' AND id_item_granel NOT NULL AND id_herramienta IS NULL) OR
+              (tipo_item = 'kit' AND id_kit NOT NULL AND id_herramienta IS NULL AND id_item_granel IS NULL)
+            )
+          );
+          INSERT INTO DETALLE_CONTRATO_NUEVA (
+            id, id_contrato, tipo_item, id_herramienta, id_item_granel, id_kit,
+            cantidad, precio_dia_aplicado, estado_devolucion, fecha_devolucion_real,
+            fecha_devolucion_pactada_item, total_item_snapshot, tarifa_aplicada, costo_perdida
+          )
+          SELECT id, id_contrato, tipo_item, id_herramienta, id_item_granel, id_kit,
+                 cantidad, precio_dia_aplicado, estado_devolucion, fecha_devolucion_real,
+                 fecha_devolucion_pactada_item, total_item_snapshot, tarifa_aplicada, costo_perdida
+          FROM DETALLE_CONTRATO;
+          DROP TABLE DETALLE_CONTRATO;
+          ALTER TABLE DETALLE_CONTRATO_NUEVA RENAME TO DETALLE_CONTRATO;
+        `);
+        // Asegurar secuencia AUTOINCREMENT (PAGO y DEVOLUCION_GRANEL referencian ids)
+        db.exec(`UPDATE sqlite_sequence SET seq = (SELECT MAX(id) FROM DETALLE_CONTRATO) WHERE name = 'DETALLE_CONTRATO'`);
+      })();
+      db.pragma('foreign_keys = ON');
+      console.log('[DB] Migración: tabla DETALLE_CONTRATO recreada con estado vendido.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración vendido:', err);
+    try { db.pragma('foreign_keys = ON'); } catch (e) {}
+  }
+
   // Migración: id_contrato en MANTENIMIENTO (para desglose de daños en inventario)
   try {
     const mantMigrado = db.prepare("SELECT valor FROM CONFIGURACION WHERE clave = 'mantenimiento_id_contrato_migrado'").get();
@@ -571,6 +627,40 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     }
   } catch (err) {
     console.error('[DB] Error en migración reservado:', err.message);
+  }
+
+  // Migración: agregar 'perdida' y 'vendida' al CHECK constraint de HERRAMIENTA (requiere recrear la tabla)
+  try {
+    const herramientas2 = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='HERRAMIENTA'").get();
+    if (herramientas2 && !herramientas2.sql.includes("'perdida'")) {
+      console.log('[DB] Migración: recreando tabla HERRAMIENTA para agregar estados perdida/vendida...');
+      db.pragma('foreign_keys = OFF');
+      db.exec(`
+        CREATE TABLE HERRAMIENTA_new (
+          id TEXT PRIMARY KEY NOT NULL,
+          id_categoria TEXT NOT NULL,
+          nombre TEXT NOT NULL,
+          descripcion TEXT,
+          precio_dia REAL NOT NULL CHECK (precio_dia >= 0),
+          precio_minimo REAL CHECK (precio_minimo >= 0),
+          precio_mes REAL CHECK (precio_mes >= 0),
+          precio_venta REAL CHECK (precio_venta >= 0),
+          valor_reposicion REAL CHECK (valor_reposicion >= 0),
+          estado TEXT NOT NULL CHECK (estado IN ('disponible', 'reservado', 'alquilado', 'mantenimiento', 'malogrado', 'perdida', 'vendida')),
+          fecha_adquisicion TEXT,
+          activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
+          FOREIGN KEY (id_categoria) REFERENCES CATEGORIA_HERRAMIENTA(id)
+        );
+        INSERT INTO HERRAMIENTA_new (id, id_categoria, nombre, descripcion, precio_dia, precio_minimo, precio_mes, precio_venta, valor_reposicion, estado, fecha_adquisicion, activo)
+        SELECT id, id_categoria, nombre, descripcion, precio_dia, precio_minimo, precio_mes, precio_venta, valor_reposicion, estado, fecha_adquisicion, activo FROM HERRAMIENTA;
+        DROP TABLE HERRAMIENTA;
+        ALTER TABLE HERRAMIENTA_new RENAME TO HERRAMIENTA;
+      `);
+      db.pragma('foreign_keys = ON');
+      console.log('[DB] Migración: tabla HERRAMIENTA recreada con estados perdida/vendida.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración perdida/vendida:', err.message);
   }
 
   // Migración: columnas para papelera (soft delete) en CONTRATO

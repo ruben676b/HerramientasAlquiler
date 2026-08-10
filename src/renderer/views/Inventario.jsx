@@ -16,7 +16,7 @@ import { useToast } from '../components/Toast';
    INVENTARIO — Vista por familias
    ================================================================ */
 
-const ESTADO_ICON = { disponible: CheckCircle, alquilado: Package, mantenimiento: AlertTriangle, malogrado: MinusCircle };
+const ESTADO_ICON = { disponible: CheckCircle, alquilado: Package, mantenimiento: AlertTriangle, malogrado: MinusCircle, perdida: MinusCircle, vendida: X };
 
 export default function Inventario() {
   const [tab, setTab] = useState('herramientas');

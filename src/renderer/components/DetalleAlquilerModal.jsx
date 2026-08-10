@@ -14,6 +14,8 @@ const DEVOLUCION_ICONS = {
   'bien': { icon: CheckCircle, color: 'oklch(0.50 0.13 155)' },
   'dañado': { icon: AlertTriangle, color: 'oklch(0.55 0.13 70)' },
   'no devuelto': { icon: XCircle, color: 'oklch(0.40 0 0)' },
+  'perdido': { icon: XCircle, color: 'oklch(0.52 0.20 25)' },
+  'vendido': { icon: CheckCircle, color: 'oklch(0.45 0.13 250)' },
   'pendiente': { icon: Clock, color: 'var(--muted)' },
 };
 

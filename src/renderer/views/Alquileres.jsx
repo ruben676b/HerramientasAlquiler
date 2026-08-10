@@ -534,10 +534,10 @@ export default function Alquileres() {
                                               {item.estado_devolucion && item.estado_devolucion !== 'pendiente' && (
                                                 <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
                                                   style={{
-                                                    backgroundColor: item.estado_devolucion === 'bien' ? 'oklch(0.93 0.05 160)' : item.estado_devolucion === 'no devuelto' ? 'oklch(0.95 0.03 25)' : 'oklch(0.93 0.05 75)',
-                                                    color: item.estado_devolucion === 'bien' ? 'var(--success)' : item.estado_devolucion === 'no devuelto' ? 'var(--danger)' : 'var(--warning)',
+                                                    backgroundColor: item.estado_devolucion === 'bien' ? 'oklch(0.93 0.05 160)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'oklch(0.95 0.03 25)' : item.estado_devolucion === 'vendido' ? 'oklch(0.93 0.05 250)' : 'oklch(0.93 0.05 75)',
+                                                    color: item.estado_devolucion === 'bien' ? 'var(--success)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'var(--danger)' : item.estado_devolucion === 'vendido' ? 'oklch(0.45 0.13 250)' : 'var(--warning)',
                                                   }}>
-                                                  {item.estado_devolucion === 'bien' ? '\u2713 Devuelto' : item.estado_devolucion === 'no devuelto' ? 'Perdido' : 'Da\u00f1ado'}
+                                                  {item.estado_devolucion === 'bien' ? '\u2713 Devuelto' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'Perdido' : item.estado_devolucion === 'vendido' ? 'Vendido' : 'Da\u00f1ado'}
                                                   {item.danos_devueltos && item.danos_devueltos.length > 0 && (
                                                     <span className="ml-1" style={{ color: 'var(--faint)' }}>
                                                       {item.danos_devueltos.map(d => d.nombre).join(', ')}

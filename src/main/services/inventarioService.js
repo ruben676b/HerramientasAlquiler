@@ -678,6 +678,8 @@ function cambiarEstado(id, nuevoEstado) {
     disponible: ['mantenimiento', 'malogrado'],
     mantenimiento: ['disponible', 'malogrado'],
     malogrado: ['disponible', 'mantenimiento'],
+    perdida: ['disponible'],
+    vendida: ['disponible'],
   };
 
   const transiciones = permitidos[h.estado];
