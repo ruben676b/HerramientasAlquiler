@@ -41,6 +41,7 @@ export default function Alquileres() {
   const [anulandoPago, setAnulandoPago] = useState(null);
   const [devolucionActiva, setDevolucionActiva] = useState(null);
   const [addGarantiaId, setAddGarantiaId] = useState(null);
+  const [gruposEq, setGruposEq] = useState({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [garantiaMonto, setGarantiaMonto] = useState('');
   const [garantiaMetodo, setGarantiaMetodo] = useState('efectivo');
@@ -491,89 +492,142 @@ export default function Alquileres() {
                                     <p className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>
                                       Tarifa diaria total: S/ {(c.subtotal_diario || 0).toFixed(2)}
                                     </p>
-                                    {c.items?.map((item, idx) => {
-                                      const esGranel = item.item_condicion;
-                                      const sub = (item.total_item || ((item.precio_dia_aplicado || 0) * (item.dias_item || dias) * (item.cantidad || 1))) + (item.monto_atraso_item || 0);
-                                      return (
-                                        <div key={idx} className="space-y-0.5">
-                                          {/* Fila 1: Badge + Nombre + Tarifa + Atraso badge */}
-                                          <div className="flex items-center gap-1 flex-wrap">
-                                            {!esGranel ? (
-                                              <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
-                                                style={{ backgroundColor: 'oklch(0.40 0.12 240)', color: '#fff' }}>
-                                                {item.item_codigo}
+                                    {(() => {
+                                      const renderEquipoFila = (item, idx, filaKey) => {
+                                        const esGranel = !!item.item_condicion;
+                                        const sub = (item.total_item || ((item.precio_dia_aplicado || 0) * (item.dias_item || dias) * (item.cantidad || 1))) + (item.monto_atraso_item || 0);
+                                        return (
+                                          <div key={filaKey} className="space-y-0.5">
+                                            {/* Fila 1: Badge + Nombre + Tarifa + Atraso badge */}
+                                            <div className="flex items-center gap-1 flex-wrap">
+                                              {!esGranel ? (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
+                                                  style={{ backgroundColor: 'oklch(0.40 0.12 240)', color: '#fff' }}>
+                                                  {item.item_codigo}
+                                                </span>
+                                              ) : (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                                                  style={{
+                                                    backgroundColor: item.item_condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)',
+                                                    color: item.item_condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)',
+                                                  }}>x{item.cantidad}</span>
+                                              )}
+                                              <span className="text-[13px] leading-tight font-semibold" style={{ color: 'var(--ink)' }}>{item.item_nombre}</span>
+                                              <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
+                                                S/ {(item.precio_dia_aplicado || 0).toFixed(2)}/d&iacute;a{esGranel ? ' c/u' : ''}
                                               </span>
-                                            ) : (
-                                              <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                                                style={{
-                                                  backgroundColor: item.item_condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)',
-                                                  color: item.item_condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)',
-                                                }}>x{item.cantidad}</span>
-                                            )}
-                                            <span className="text-[13px] leading-tight font-semibold" style={{ color: 'var(--ink)' }}>{item.item_nombre}</span>
-                                            <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
-                                              S/ {(item.precio_dia_aplicado || 0).toFixed(2)}/d&iacute;a{esGranel ? ' c/u' : ''}
-                                            </span>
-                                            {(item.dias_atraso_item || 0) > 0 && (
-                                              <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                                                style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>
-                                                &#9888; +{item.dias_atraso_item} d&iacute;a{item.dias_atraso_item !== 1 ? 's' : ''}
-                                              </span>
-                                            )}
-                                            {item.estado_devolucion && item.estado_devolucion !== 'pendiente' && (
-                                              <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                                                style={{
-                                                  backgroundColor: item.estado_devolucion === 'bien' ? 'oklch(0.93 0.05 160)' : item.estado_devolucion === 'no devuelto' ? 'oklch(0.95 0.03 25)' : 'oklch(0.93 0.05 75)',
-                                                  color: item.estado_devolucion === 'bien' ? 'var(--success)' : item.estado_devolucion === 'no devuelto' ? 'var(--danger)' : 'var(--warning)',
-                                                }}>
-                                                {item.estado_devolucion === 'bien' ? '\u2713 Devuelto' : item.estado_devolucion === 'no devuelto' ? 'Perdido' : 'Da\u00f1ado'}
-                                                {item.danos_devueltos && item.danos_devueltos.length > 0 && (
-                                                  <span className="ml-1" style={{ color: 'var(--faint)' }}>
-                                                    {item.danos_devueltos.map(d => d.nombre).join(', ')}
-                                                  </span>
-                                                )}
-                                              </span>
-                                            )}
-                                          </div>
-                                          {/* Fila 2: Fechas */}
-                                          <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
-                                            <span />
-                                            <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                                              Salida: {fmtFechaCorta(c.fecha_salida)} &middot; Pactada: {fmtFechaCorta(item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada)}
-                                              &middot; Base: {item.dias_item || 0} d&iacute;a{(item.dias_item || 0) !== 1 ? 's' : ''}
-                                            </span>
-                                          </div>
-                                          {/* Granel: resumen devolución */}
-                                          {esGranel && (item.granel_dev_bien || item.granel_dev_danada || item.granel_dev_perdida || 0) > 0 && (
+                                              {(item.dias_atraso_item || 0) > 0 && (
+                                                <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                                                  style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>
+                                                  &#9888; +{item.dias_atraso_item} d&iacute;a{item.dias_atraso_item !== 1 ? 's' : ''}
+                                                </span>
+                                              )}
+                                              {item.estado_devolucion && item.estado_devolucion !== 'pendiente' && (
+                                                <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                                                  style={{
+                                                    backgroundColor: item.estado_devolucion === 'bien' ? 'oklch(0.93 0.05 160)' : item.estado_devolucion === 'no devuelto' ? 'oklch(0.95 0.03 25)' : 'oklch(0.93 0.05 75)',
+                                                    color: item.estado_devolucion === 'bien' ? 'var(--success)' : item.estado_devolucion === 'no devuelto' ? 'var(--danger)' : 'var(--warning)',
+                                                  }}>
+                                                  {item.estado_devolucion === 'bien' ? '\u2713 Devuelto' : item.estado_devolucion === 'no devuelto' ? 'Perdido' : 'Da\u00f1ado'}
+                                                  {item.danos_devueltos && item.danos_devueltos.length > 0 && (
+                                                    <span className="ml-1" style={{ color: 'var(--faint)' }}>
+                                                      {item.danos_devueltos.map(d => d.nombre).join(', ')}
+                                                    </span>
+                                                  )}
+                                                </span>
+                                              )}
+                                            </div>
+                                            {/* Fila 2: Fechas */}
                                             <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
                                               <span />
-                                              <span className="text-[11px] flex items-center gap-2">
-                                                <span style={{ color: 'var(--muted)' }}>Dev:</span>
-                                                {(item.granel_dev_bien || 0) > 0 && <span style={{ color: 'var(--success)' }}>{item.granel_dev_bien} bien</span>}
-                                                {(item.granel_dev_danada || 0) > 0 && <span style={{ color: 'oklch(0.55 0.13 70)' }}>{item.granel_dev_danada} dañ</span>}
-                                                {(item.granel_dev_perdida || 0) > 0 && <span style={{ color: 'var(--danger)' }}>{item.granel_dev_perdida} perd</span>}
-                                                {(item.granel_pendiente || 0) > 0 && <span style={{ color: 'var(--faint)' }}>pend: {item.granel_pendiente}</span>}
-                                                {(item.granel_pendiente === 0) && <span className="font-medium" style={{ color: 'var(--success)' }}>Completo</span>}
+                                              <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                                                Salida: {fmtFechaCorta(c.fecha_salida)} &middot; Pactada: {fmtFechaCorta(item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada)}
+                                                &middot; Base: {item.dias_item || 0} d&iacute;a{(item.dias_item || 0) !== 1 ? 's' : ''}
                                               </span>
-                                              <span />
                                             </div>
-                                          )}
-                                          {/* Fila 3: Base S/ + Mora + Total */}
-                                          <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
-                                            <span />
-                                            <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                                              Base S/ {(item.total_item || (item.precio_dia_aplicado || 0) * (item.dias_item || 1) * (item.cantidad || 1)).toFixed(0)}
-                                              {(item.dias_atraso_item || 0) > 0 && (
-                                                <span style={{ color: 'var(--danger)' }}> + Mora S/ {(item.monto_atraso_item || 0).toFixed(0)}</span>
-                                              )}
-                                            </span>
-                                            <span className="font-mono tabular-nums text-[12px] font-bold" style={{ color: 'var(--ink)' }}>
-                                              S/ {sub.toFixed(2)}
-                                            </span>
+                                            {/* Granel: resumen devolución */}
+                                            {esGranel && (item.granel_dev_bien || item.granel_dev_danada || item.granel_dev_perdida || 0) > 0 && (
+                                              <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
+                                                <span />
+                                                <span className="text-[11px] flex items-center gap-2">
+                                                  <span style={{ color: 'var(--muted)' }}>Dev:</span>
+                                                  {(item.granel_dev_bien || 0) > 0 && <span style={{ color: 'var(--success)' }}>{item.granel_dev_bien} bien</span>}
+                                                  {(item.granel_dev_danada || 0) > 0 && <span style={{ color: 'oklch(0.55 0.13 70)' }}>{item.granel_dev_danada} dañ</span>}
+                                                  {(item.granel_dev_perdida || 0) > 0 && <span style={{ color: 'var(--danger)' }}>{item.granel_dev_perdida} perd</span>}
+                                                  {(item.granel_pendiente || 0) > 0 && <span style={{ color: 'var(--faint)' }}>pend: {item.granel_pendiente}</span>}
+                                                  {(item.granel_pendiente === 0) && <span className="font-medium" style={{ color: 'var(--success)' }}>Completo</span>}
+                                                </span>
+                                                <span />
+                                              </div>
+                                            )}
+                                            {/* Fila 3: Base S/ + Mora + Total */}
+                                            <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
+                                              <span />
+                                              <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                                                Base S/ {(item.total_item || (item.precio_dia_aplicado || 0) * (item.dias_item || 1) * (item.cantidad || 1)).toFixed(0)}
+                                                {(item.dias_atraso_item || 0) > 0 && (
+                                                  <span style={{ color: 'var(--danger)' }}> + Mora S/ {(item.monto_atraso_item || 0).toFixed(0)}</span>
+                                                )}
+                                              </span>
+                                              <span className="font-mono tabular-nums text-[12px] font-bold" style={{ color: 'var(--ink)' }}>
+                                                S/ {sub.toFixed(2)}
+                                              </span>
+                                            </div>
                                           </div>
-                                        </div>
-                                      );
-                                    })}
+                                        );
+                                      };
+                                      const filas = [];
+                                      const porPrefijo = new Map();
+                                      (c.items || []).forEach((item, idx) => {
+                                        const esGranelI = !!item.item_condicion;
+                                        const esIndividual = !esGranelI && item.item_codigo && /^[A-Za-z]+\-\d+/.test(item.item_codigo);
+                                        if (esIndividual) {
+                                          const prefix = item.item_codigo.split('-')[0];
+                                          let g = porPrefijo.get(prefix);
+                                          if (!g) { g = { prefix, nombre: item.item_nombre, items: [] }; porPrefijo.set(prefix, g); filas.push(g); }
+                                          g.items.push({ item, idx });
+                                        } else {
+                                          filas.push({ prefix: null, items: [{ item, idx }] });
+                                        }
+                                      });
+                                      return filas.map((g, gi) => {
+                                        if (g.prefix === null) {
+                                          const { item, idx } = g.items[0];
+                                          return renderEquipoFila(item, idx, 'u-' + idx);
+                                        }
+                                        const key = c.id + '|' + g.prefix;
+                                        const abierto = !!gruposEq[key];
+                                        const totalGrupo = g.items.reduce((a, { item }) => a + ((item.total_item || ((item.precio_dia_aplicado || 0) * (item.dias_item || dias) * (item.cantidad || 1))) + (item.monto_atraso_item || 0)), 0);
+                                        const pendientes = g.items.filter(({ item }) => !item.estado_devolucion || item.estado_devolucion === 'pendiente').length;
+                                        return (
+                                          <div key={gi} className="rounded-xl transition-colors duration-150 overflow-hidden"
+                                            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg)' }}>
+                                            <div className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none"
+                                              onClick={() => setGruposEq(p => ({ ...p, [key]: !p[key] }))}>
+                                              <ChevronRight size={14} className="shrink-0" style={{ color: 'var(--muted)', transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform 150ms' }} />
+                                              <span className="flex-1 min-w-0 text-[13px] font-semibold truncate" style={{ color: 'var(--ink)' }}>
+                                                {g.nombre}
+                                                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-lg font-bold align-middle"
+                                                  style={{ backgroundColor: 'oklch(0.40 0.12 240 / 0.12)', color: 'var(--info)' }}>&times;{g.items.length}</span>
+                                              </span>
+                                              {pendientes > 0 ? (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                                                  style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>{pendientes} pendiente{pendientes !== 1 ? 's' : ''}</span>
+                                              ) : (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                                                  style={{ backgroundColor: 'oklch(0.93 0.05 160)', color: 'var(--success)' }}>Completo</span>
+                                              )}
+                                              <span className="font-mono text-[11px] font-bold shrink-0" style={{ color: 'var(--ink)' }}>S/ {totalGrupo.toFixed(2)}</span>
+                                            </div>
+                                            {abierto && (
+                                              <div className="px-2 pb-2 space-y-1.5">
+                                                {g.items.map(({ item, idx }) => renderEquipoFila(item, idx, g.prefix + '-' + idx))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      });
+                                    })()}
                                   </div>
                                 )}
                               </div>

@@ -35,6 +35,7 @@ function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre TEXT NOT NULL,
       condicion TEXT NOT NULL CHECK (condicion IN ('nuevo', 'usado')),
+      descripcion TEXT,
       precio_dia REAL NOT NULL CHECK (precio_dia >= 0),
       mora_dia REAL NOT NULL DEFAULT 0 CHECK (mora_dia >= 0),
       precio_minimo REAL CHECK (precio_minimo >= 0),
@@ -317,6 +318,17 @@ function initDatabase() {
     }
   } catch (err) {
     console.error('[DB] Error en migración de imagen_path:', err);
+  }
+
+  // Migración: descripcion en ITEM_GRANEL (bases de datos existentes)
+  try {
+    const hasCol = (tabla, col) => db.prepare(`PRAGMA table_info(${tabla})`).all().some(c => c.name === col);
+    if (!hasCol('ITEM_GRANEL', 'descripcion')) {
+      db.exec('ALTER TABLE ITEM_GRANEL ADD COLUMN descripcion TEXT');
+      console.log('[DB] Migración: descripcion agregada a ITEM_GRANEL.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración de descripcion:', err);
   }
 
   // Migración: crear AUDIT_GRANEL si no existe (para bases de datos existentes)

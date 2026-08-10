@@ -1,4 +1,5 @@
 import { X, Plus, Circle, CheckCircle2, Clock, ChevronLeft, ChevronRight, User, Wrench, DollarSign, Search, AlertTriangle, Package, FileText, Star, Info } from 'lucide-react';
+import DescripcionPopover from './DescripcionPopover';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import ConfirmModal from './ConfirmModal';
 import { useSessions } from '../contexts/SessionsContext';
@@ -202,7 +203,7 @@ function SessionForm({ session }) {
     setFechaDevolucionRaw(data.fechaDevolucion || defaultFechaLoad);
     setFechaReserva(data.fechaReserva || (session.tipo === 'reserva' ? fmtLocalDate(new Date(Date.now() + 86400000)) : ''));
     setClienteSeleccionado(data.clienteSeleccionado || null);
-    setItems((data.items || []).map(it => ({ ...it, tarifa: it.tarifa || (it.usar_precio_mes ? 'mes' : 'dia') })));
+    setItems((data.items || []).map(it => ({ ...it, descripcion: it.item_descripcion || it.descripcion || null, tarifa: it.tarifa || (it.usar_precio_mes ? 'mes' : 'dia') })));
     setStep(data.step || 0);
     setError('');
     setBusquedaEquipo('');
@@ -283,6 +284,7 @@ function SessionForm({ session }) {
   const [items, setItems] = useState(saved.items || []);
   const [totalEditando, setTotalEditando] = useState({});
   const [cantEditando, setCantEditando] = useState({});
+  const [gruposAbiertos, setGruposAbiertos] = useState({});
   const inputTotalRefs = useRef({});
   const inputCantRefs = useRef({});
 
@@ -433,7 +435,7 @@ function SessionForm({ session }) {
     }
     if (h.estado !== 'disponible' && !editContratoId) return;
     if (h.estado !== 'disponible' && editContratoId && !h._enContratoEditado) return;
-    setItems([...items, { tipo: 'individual', id_herramienta: h.id, nombre: h.nombre, precio_dia: h.precio_dia, precio_minimo: h.precio_minimo, precio_mes: h.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: 'dia' }]);
+    setItems([...items, { tipo: 'individual', id_herramienta: h.id, nombre: h.nombre, descripcion: h.descripcion, precio_dia: h.precio_dia, precio_minimo: h.precio_minimo, precio_mes: h.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: 'dia' }]);
     setBusquedaEquipo('');
   };
 
@@ -443,7 +445,7 @@ function SessionForm({ session }) {
     if (existente) {
       setItems(items.map((i) => i.id_item_granel === g.id ? { ...i, cantidad: i.cantidad + 1 } : i));
     } else {
-      setItems([...items, { tipo: 'granel', id_item_granel: g.id, nombre: g.nombre, condicion: g.condicion, precio_dia: g.precio_dia, precio_minimo: g.precio_minimo, precio_mes: g.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: 'dia' }]);
+      setItems([...items, { tipo: 'granel', id_item_granel: g.id, nombre: g.nombre, descripcion: g.descripcion, condicion: g.condicion, precio_dia: g.precio_dia, precio_minimo: g.precio_minimo, precio_mes: g.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: 'dia' }]);
     }
     setBusquedaEquipo('');
   };
@@ -456,7 +458,7 @@ function SessionForm({ session }) {
     if (enLista) {
       setItems(items.map((i) => i.id_kit === k.id ? { ...i, cantidad: i.cantidad + 1 } : i));
     } else {
-      setItems([...items, { tipo: 'kit', id_kit: k.id, nombre: k.nombre, precio_dia: k.precio_dia, precio_minimo: k.precio_minimo, precio_mes: k.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: 'dia', _componentes: k.componentes || [], _disponibilidad: k.disponibilidad || 0 }]);
+      setItems([...items, { tipo: 'kit', id_kit: k.id, nombre: k.nombre, descripcion: k.descripcion, precio_dia: k.precio_dia, precio_minimo: k.precio_minimo, precio_mes: k.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: 'dia', _componentes: k.componentes || [], _disponibilidad: k.disponibilidad || 0 }]);
     }
     setBusquedaEquipo('');
   };
@@ -636,6 +638,229 @@ function SessionForm({ session }) {
 
   const setTarifaItem = (idx, tarifa) => {
     setItems(items.map((it, i) => i === idx ? { ...it, tarifa, total_editado: undefined } : it));
+  };
+
+  /* --- Agrupación visual de unidades individuales por familia --- */
+  const grupos = useMemo(() => {
+    const out = [];
+    const porPrefijo = new Map();
+    itemsConDias.forEach((item, idx) => {
+      if (item.id_herramienta) {
+        const prefix = item.id_herramienta.split('-')[0];
+        let g = porPrefijo.get(prefix);
+        if (!g) {
+          g = { key: 'i-' + prefix, tipo: 'grupo', prefix, nombre: item.nombre, descripcion: item.descripcion, items: [] };
+          porPrefijo.set(prefix, g);
+          out.push(g);
+        }
+        g.items.push({ ...item, _idx: idx });
+      } else {
+        out.push({ key: 'u-' + idx, tipo: 'unidad', items: [{ ...item, _idx: idx }] });
+      }
+    });
+    return out;
+  }, [itemsConDias]);
+
+  const toggleGrupo = (key) => setGruposAbiertos(p => ({ ...p, [key]: !p[key] }));
+  const quitarUltimaDelGrupo = (g) => {
+    const ultimo = g.items[g.items.length - 1];
+    if (ultimo) quitarItem(ultimo._idx);
+  };
+  const quitarGrupo = (g) => {
+    setItems(items.filter(i => !(i.id_herramienta && i.id_herramienta.split('-')[0] === g.prefix)));
+  };
+
+  const renderItemCard = (item, idx, cardKey) => {
+    const esGranel = !!item.id_item_granel;
+    const esKit = !!item.id_kit;
+    const tarifa = item.tarifa || 'dia';
+    const refInfo = infoTarifa(item);
+    const subCalc = item.sub_calc;
+    const sub = item.total_editado != null ? item.total_editado : subCalc;
+    const bajoMinimo = tarifa === 'dia' && item.precio_minimo != null && sub < item.precio_minimo * item.dias_item * item.cantidad;
+    return (
+      <div key={cardKey}
+        className="px-4 py-3 rounded-xl transition-colors duration-150 group"
+        style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg)' }}>
+        {/* Línea 1: Badge + Nombre + Quitar */}
+        <div className="flex items-center gap-2">
+          {item.id_herramienta ? (
+            <span className="inline-flex px-2 py-0.5 rounded-lg font-mono text-xs font-bold shrink-0"
+              style={{ backgroundColor: 'oklch(0.53 0.135 55 / 0.10)', color: 'var(--primary)' }}>
+              {item.id_herramienta}
+            </span>
+          ) : esKit ? (
+            <span className="inline-flex px-2 py-0.5 rounded-lg text-xs font-medium shrink-0"
+              style={{ backgroundColor: 'oklch(0.50 0.11 155 / 0.12)', color: 'var(--success)' }}>
+              Kit
+            </span>
+          ) : (
+            <span className="inline-flex px-2 py-0.5 rounded-lg text-xs font-medium shrink-0"
+              style={{
+                backgroundColor: item.condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)',
+                color: item.condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)'
+              }}>{item.condicion}</span>
+          )}
+          <span className="flex-1 flex items-center gap-1.5 min-w-0 text-sm font-medium" style={{ color: 'var(--ink)' }}>
+            <span className="truncate">{item.nombre}</span>
+            <DescripcionPopover text={item.descripcion} />
+          </span>
+          <button onClick={() => quitarItem(idx)}
+            className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-red-50 dark:hover:bg-red-950 shrink-0"
+            style={{ color: 'var(--muted)' }}><X size={14} /></button>
+        </div>
+
+        {/* Línea 1b: Cantidad (solo granel y kits) */}
+        {(esGranel || esKit) && (
+          <div className="flex items-center gap-2 mt-2 text-xs">
+            <span style={{ color: 'var(--muted)' }}>Cantidad:</span>
+            <button onClick={() => cambiarCantidad(idx, -1)}
+              className="w-5 h-5 rounded flex items-center justify-center text-sm font-bold hover:bg-black/5"
+              style={{ color: 'var(--muted)' }}>&#8722;</button>
+            {cantEditando[idx] ? (
+              <input
+                ref={el => inputCantRefs.current[idx] = el}
+                type="number" min="1"
+                defaultValue={item.cantidad}
+                onBlur={e => { const max = item._maxDisponible || 999; const v = Math.max(1, Math.min(parseInt(e.target.value) || 1, max)); setItems(items.map((it, i) => i === idx ? { ...it, cantidad: v, total_editado: undefined } : it)); setCantEditando(p => ({ ...p, [idx]: false })); }}
+                onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                className="w-10 h-5 px-0.5 rounded text-xs text-center font-mono border"
+                style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }}
+                autoFocus
+              />
+            ) : (
+              <span onClick={() => { setCantEditando(p => ({ ...p, [idx]: true })); setTimeout(() => inputCantRefs.current[idx]?.select(), 60); }}
+                className="w-8 text-center font-mono text-sm font-semibold cursor-pointer px-0.5 rounded hover:bg-black/5"
+                style={{ color: 'var(--ink)' }}>{item.cantidad}</span>
+            )}
+            <button onClick={() => cambiarCantidad(idx, 1)}
+              className="w-5 h-5 rounded flex items-center justify-center text-sm font-bold hover:bg-black/5"
+              style={{ color: 'var(--muted)' }}>+</button>
+            <span className="text-[10px]" style={{ color: 'var(--faint)' }}>unid.</span>
+            <span className="text-[10px] ml-auto shrink-0" style={{
+              color: item.cantidad >= item._maxDisponible ? 'var(--danger)' : 'var(--muted)'
+            }}>
+              Stock: {item._stockOriginal} disp.
+            </span>
+          </div>
+        )}
+
+        {/* Componentes del kit */}
+        {esKit && (
+          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+            {(item._componentes || []).map((c, i) => (
+              <span key={i} className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: 'var(--surface)', color: 'var(--faint)' }}>
+                {(c.cantidad * (item.cantidad || 1)) + '× ' + c.nombre}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Línea 2: Fecha por ítem + botones rápidos */}
+        <div className="flex items-center gap-2 mt-1.5 text-xs" style={{ color: 'var(--muted)' }}>
+          <span>Desde: {new Date(fechaSalida + 'T00:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          <span style={{ color: 'var(--border)' }}>|</span>
+          <span className="flex items-center gap-1">
+            Hasta:
+            <input type="date" value={item.fecha_devolucion_item || fechaDevolucion}
+              onChange={(e) => cambiarFechaItem(idx, e.target.value)}
+              className="h-6 px-1 rounded text-[10px] border"
+              style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)', width: 120 }} />
+          </span>
+          {[
+            { label: '1d', dias: 0 },
+            { label: '1sem', dias: 6 },
+            { label: '1mes', dias: 29 },
+          ].map(b => {
+            const fechaItem = item.fecha_devolucion_item || fechaDevolucion;
+            const activo = fechaItem === sumarDias(fechaSalida, b.dias);
+            return (
+              <button key={b.label} onClick={() => cambiarFechaItem(idx, sumarDias(fechaSalida, b.dias))}
+                className="h-5 px-1.5 rounded text-[9px] font-medium transition-all duration-150"
+                style={{
+                  backgroundColor: activo ? 'oklch(0.53 0.135 55)' : 'var(--surface)',
+                  color: activo ? '#fff' : 'var(--muted)',
+                  border: !activo ? '0.5px solid var(--border)' : 'none',
+                }}>
+                {b.label}
+              </button>
+            );
+          })}
+          <span className="font-medium" style={{ color: 'var(--info)' }}>
+            ({item.dias_item} d&iacute;a{item.dias_item !== 1 ? 's' : ''})
+          </span>
+        </div>
+
+        {/* Línea 3: Tarifa + Total editable */}
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <span className="flex gap-px rounded overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
+            <button onClick={() => setTarifaItem(idx, 'dia')}
+              title="Precio normal por día"
+              className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
+              style={{
+                backgroundColor: tarifa === 'dia' ? 'oklch(0.53 0.135 55)' : 'var(--bg)',
+                color: tarifa === 'dia' ? '#fff' : 'var(--muted)',
+              }}>S/ {(item.precio_dia || 0).toFixed(0)}/día</button>
+            {item.precio_minimo != null && (
+              <button onClick={() => setTarifaItem(idx, 'minimo')}
+                title="Precio mínimo por día"
+                className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
+                style={{
+                  backgroundColor: tarifa === 'minimo' ? 'oklch(0.55 0.12 240)' : 'var(--bg)',
+                  color: tarifa === 'minimo' ? '#fff' : 'var(--muted)',
+                }}>Min S/ {item.precio_minimo.toFixed(0)}</button>
+            )}
+            {item.precio_mes != null && (
+              <button onClick={() => setTarifaItem(idx, 'mes')}
+                title="Precio mensual (tarifa plana)"
+                className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
+                style={{
+                  backgroundColor: tarifa === 'mes' ? 'oklch(0.50 0.11 155)' : 'var(--bg)',
+                  color: tarifa === 'mes' ? '#fff' : 'var(--muted)',
+                }}>S/ {item.precio_mes.toFixed(0)}/mes</button>
+            )}
+          </span>
+          <span className="text-[10px]" style={{ color: 'var(--faint)' }}>
+            {refInfo.label === '/mes' ? 'plana por mes' : 'por día'}
+          </span>
+          <span style={{ color: 'var(--border)' }}>|</span>
+          <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Total:</span>
+          {totalEditando[idx] ? (
+            <input
+              ref={el => inputTotalRefs.current[idx] = el}
+              type="number" step="0.01" min="0"
+              defaultValue={sub}
+              onBlur={e => finalizarEdicionTotal(idx, e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') finalizarEdicionTotal(idx, e.target.value); }}
+              className="w-24 h-6 px-1 rounded text-xs border font-mono text-center"
+              style={{
+                backgroundColor: 'var(--surface)',
+                color: 'var(--ink)',
+                borderColor: bajoMinimo ? 'var(--danger)' : 'var(--success)',
+                outline: `2px solid ${bajoMinimo ? 'var(--danger)' : 'var(--success)'}`,
+              }}
+              autoFocus
+            />
+          ) : (
+            <span
+              onClick={() => iniciarEdicionTotal(idx)}
+              className="font-mono font-bold text-sm cursor-pointer px-1.5 py-0.5 rounded hover:bg-black/5"
+              style={{ color: 'var(--ink)' }}>
+              S/ {sub.toFixed(2)}
+            </span>
+          )}
+          {item.total_editado != null && (() => {
+            const baseCalc = item.sub_calc;
+            const diff = item.total_editado - baseCalc;
+            return diff !== 0 ? (
+              <span className="text-[9px]" style={{ color: 'var(--danger)' }}>
+                ({diff < 0 ? '\u2013S/ ' + Math.abs(diff).toFixed(0) : '+S/ ' + diff.toFixed(0)})
+              </span>
+            ) : null;
+          })()}
+        </div>
+      </div>
+    );
   };
 
   const totalEquipos = itemsConDias.reduce((a, item) => a + item.sub_calc, 0);
@@ -1055,7 +1280,10 @@ const itemsData = itemsConDias.map(item => ({
                           <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
                             style={{ backgroundColor: r.condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)', color: r.condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)' }}>{r.condicion}</span>
                         )}
-                        <span className="flex-1" style={{ color: 'var(--ink)' }}>{r.nombre}</span>
+                        <span className="flex-1 flex items-center gap-1.5 min-w-0" style={{ color: 'var(--ink)' }}>
+                          <span className="truncate">{r.nombre}</span>
+                          <DescripcionPopover text={r.descripcion} />
+                        </span>
                         <span className="text-[9px] px-1 py-0.5 rounded font-medium shrink-0"
                           style={{ backgroundColor: esHerr ? 'oklch(0.55 0.08 240 / 0.10)' : (r._tipo === 'kit' ? 'oklch(0.50 0.11 155 / 0.10)' : 'oklch(0.62 0.13 75 / 0.10)'), color: esHerr ? 'var(--info)' : (r._tipo === 'kit' ? 'var(--success)' : 'var(--warning)') }}>
                           {esHerr ? 'Herr.' : (r._tipo === 'kit' ? 'Kit' : 'Mat.')}
@@ -1090,194 +1318,47 @@ const itemsData = itemsConDias.map(item => ({
                 </div>
               ) : (
                 <>
-                  {itemsConDias.map((item, idx) => {
-                    const esGranel = !!item.id_item_granel;
-                    const esKit = !!item.id_kit;
-                    const tarifa = item.tarifa || 'dia';
-                    const refInfo = infoTarifa(item);
-                    const subCalc = item.sub_calc;
-                    const sub = item.total_editado != null ? item.total_editado : subCalc;
-                    const bajoMinimo = tarifa === 'dia' && item.precio_minimo != null && sub < item.precio_minimo * item.dias_item * item.cantidad;
+                  {grupos.map((g) => {
+                    if (g.tipo === 'unidad') {
+                      const item = g.items[0];
+                      return renderItemCard(item, item._idx, g.key);
+                    }
+                    const abierto = !!gruposAbiertos[g.key];
+                    const totalGrupo = g.items.reduce((a, it) => a + (it.total_editado != null ? it.total_editado : it.sub_calc), 0);
                     return (
-                      <div key={idx}
-                        className="px-4 py-3 rounded-xl transition-colors duration-150 group"
+                      <div key={g.key} className="rounded-xl transition-colors duration-150 overflow-hidden"
                         style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg)' }}>
-                        {/* Línea 1: Badge + Nombre + Quitar */}
-                        <div className="flex items-center gap-2">
-                          {item.id_herramienta ? (
-                            <span className="inline-flex px-2 py-0.5 rounded-lg font-mono text-xs font-bold shrink-0"
+                        <div className="flex items-center gap-2 px-3 py-2.5 cursor-pointer select-none"
+                          onClick={() => toggleGrupo(g.key)}>
+                          <ChevronRight size={14} className="shrink-0" style={{ color: 'var(--muted)', transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform 150ms' }} />
+                          <span className="flex-1 flex items-center gap-1.5 min-w-0 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                            <span className="truncate">{g.nombre}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-lg font-bold shrink-0"
                               style={{ backgroundColor: 'oklch(0.53 0.135 55 / 0.10)', color: 'var(--primary)' }}>
-                              {item.id_herramienta}
+                              &times;{g.items.length}
                             </span>
-                          ) : esKit ? (
-                            <span className="inline-flex px-2 py-0.5 rounded-lg text-xs font-medium shrink-0"
-                              style={{ backgroundColor: 'oklch(0.50 0.11 155 / 0.12)', color: 'var(--success)' }}>
-                              Kit
-                            </span>
-                          ) : (
-                            <span className="inline-flex px-2 py-0.5 rounded-lg text-xs font-medium shrink-0"
-                              style={{
-                                backgroundColor: item.condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)',
-                                color: item.condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)'
-                              }}>{item.condicion}</span>
-                          )}
-                          <span className="flex-1 text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>
-                            {item.nombre}
+                            <DescripcionPopover text={g.descripcion} />
                           </span>
-                          <button onClick={() => quitarItem(idx)}
-                            className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-red-50 dark:hover:bg-red-950 shrink-0"
+                          <span className="font-mono text-xs font-bold shrink-0" style={{ color: 'var(--ink)' }}>
+                            S/ {totalGrupo.toFixed(2)}
+                          </span>
+                          <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
+                            {abierto ? 'ocultar' : g.items.length + ' unidad' + (g.items.length !== 1 ? 'es' : '')}
+                          </span>
+                          <button title="Quitar la última unidad agregada"
+                            onClick={(e) => { e.stopPropagation(); quitarUltimaDelGrupo(g); }}
+                            className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 shrink-0"
+                            style={{ color: 'var(--muted)' }}>&#8722;</button>
+                          <button title="Quitar todas"
+                            onClick={(e) => { e.stopPropagation(); quitarGrupo(g); }}
+                            className="p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-950 shrink-0"
                             style={{ color: 'var(--muted)' }}><X size={14} /></button>
                         </div>
-
-                        {/* Línea 1b: Cantidad (solo granel y kits) */}
-                        {(esGranel || esKit) && (
-                          <div className="flex items-center gap-2 mt-2 text-xs">
-                            <span style={{ color: 'var(--muted)' }}>Cantidad:</span>
-                            <button onClick={() => cambiarCantidad(idx, -1)}
-                              className="w-5 h-5 rounded flex items-center justify-center text-sm font-bold hover:bg-black/5"
-                              style={{ color: 'var(--muted)' }}>&#8722;</button>
-                            {cantEditando[idx] ? (
-                              <input
-                                ref={el => inputCantRefs.current[idx] = el}
-                                type="number" min="1"
-                                defaultValue={item.cantidad}
-                                onBlur={e => { const max = item._maxDisponible || 999; const v = Math.max(1, Math.min(parseInt(e.target.value) || 1, max)); setItems(items.map((it, i) => i === idx ? { ...it, cantidad: v, total_editado: undefined } : it)); setCantEditando(p => ({ ...p, [idx]: false })); }}
-                                onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-                                className="w-10 h-5 px-0.5 rounded text-xs text-center font-mono border"
-                                style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }}
-                                autoFocus
-                              />
-                            ) : (
-                              <span onClick={() => { setCantEditando(p => ({ ...p, [idx]: true })); setTimeout(() => inputCantRefs.current[idx]?.select(), 60); }}
-                                className="w-8 text-center font-mono text-sm font-semibold cursor-pointer px-0.5 rounded hover:bg-black/5"
-                                style={{ color: 'var(--ink)' }}>{item.cantidad}</span>
-                            )}
-                            <button onClick={() => cambiarCantidad(idx, 1)}
-                              className="w-5 h-5 rounded flex items-center justify-center text-sm font-bold hover:bg-black/5"
-                              style={{ color: 'var(--muted)' }}>+</button>
-                            <span className="text-[10px]" style={{ color: 'var(--faint)' }}>unid.</span>
-                            <span className="text-[10px] ml-auto shrink-0" style={{
-                              color: item.cantidad >= item._maxDisponible ? 'var(--danger)' : 'var(--muted)'
-                            }}>
-                              Stock: {item._stockOriginal} disp.
-                            </span>
+                        {abierto && (
+                          <div className="px-2 pb-2 space-y-2">
+                            {g.items.map(it => renderItemCard(it, it._idx, it.id_herramienta || ('u-' + (it.id_item_granel || it.id_kit || it._idx))))}
                           </div>
                         )}
-
-                        {/* Componentes del kit */}
-                        {esKit && (
-                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                            {(item._componentes || []).map((c, i) => (
-                              <span key={i} className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: 'var(--surface)', color: 'var(--faint)' }}>
-                                {(c.cantidad * (item.cantidad || 1)) + '× ' + c.nombre}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Línea 2: Fecha por ítem + botones rápidos */}
-                        <div className="flex items-center gap-2 mt-1.5 text-xs" style={{ color: 'var(--muted)' }}>
-                          <span>Desde: {new Date(fechaSalida + 'T00:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                          <span style={{ color: 'var(--border)' }}>|</span>
-                          <span className="flex items-center gap-1">
-                            Hasta:
-                            <input type="date" value={item.fecha_devolucion_item || fechaDevolucion}
-                              onChange={(e) => cambiarFechaItem(idx, e.target.value)}
-                              className="h-6 px-1 rounded text-[10px] border"
-                              style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)', width: 120 }} />
-                          </span>
-                          {[
-                            { label: '1d', dias: 0 },
-                            { label: '1sem', dias: 6 },
-                            { label: '1mes', dias: 29 },
-                          ].map(b => {
-                            const fechaItem = item.fecha_devolucion_item || fechaDevolucion;
-                            const activo = fechaItem === sumarDias(fechaSalida, b.dias);
-                            return (
-                              <button key={b.label} onClick={() => cambiarFechaItem(idx, sumarDias(fechaSalida, b.dias))}
-                                className="h-5 px-1.5 rounded text-[9px] font-medium transition-all duration-150"
-                                style={{
-                                  backgroundColor: activo ? 'oklch(0.53 0.135 55)' : 'var(--surface)',
-                                  color: activo ? '#fff' : 'var(--muted)',
-                                  border: !activo ? '0.5px solid var(--border)' : 'none',
-                                }}>
-                                {b.label}
-                              </button>
-                            );
-                          })}
-                          <span className="font-medium" style={{ color: 'var(--info)' }}>
-                            ({item.dias_item} d&iacute;a{item.dias_item !== 1 ? 's' : ''})
-                          </span>
-                        </div>
-
-                        {/* Línea 3: Tarifa + Total editable */}
-                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                          <span className="flex gap-px rounded overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
-                            <button onClick={() => setTarifaItem(idx, 'dia')}
-                              title="Precio normal por día"
-                              className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
-                              style={{
-                                backgroundColor: tarifa === 'dia' ? 'oklch(0.53 0.135 55)' : 'var(--bg)',
-                                color: tarifa === 'dia' ? '#fff' : 'var(--muted)',
-                              }}>S/ {(item.precio_dia || 0).toFixed(0)}/día</button>
-                            {item.precio_minimo != null && (
-                              <button onClick={() => setTarifaItem(idx, 'minimo')}
-                                title="Precio mínimo por día"
-                                className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
-                                style={{
-                                  backgroundColor: tarifa === 'minimo' ? 'oklch(0.55 0.12 240)' : 'var(--bg)',
-                                  color: tarifa === 'minimo' ? '#fff' : 'var(--muted)',
-                                }}>Min S/ {item.precio_minimo.toFixed(0)}</button>
-                            )}
-                            {item.precio_mes != null && (
-                              <button onClick={() => setTarifaItem(idx, 'mes')}
-                                title="Precio mensual (tarifa plana)"
-                                className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
-                                style={{
-                                  backgroundColor: tarifa === 'mes' ? 'oklch(0.50 0.11 155)' : 'var(--bg)',
-                                  color: tarifa === 'mes' ? '#fff' : 'var(--muted)',
-                                }}>S/ {item.precio_mes.toFixed(0)}/mes</button>
-                            )}
-                          </span>
-                          <span className="text-[10px]" style={{ color: 'var(--faint)' }}>
-                            {refInfo.label === '/mes' ? 'plana por mes' : 'por día'}
-                          </span>
-                          <span style={{ color: 'var(--border)' }}>|</span>
-                          <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Total:</span>
-                          {totalEditando[idx] ? (
-                            <input
-                              ref={el => inputTotalRefs.current[idx] = el}
-                              type="number" step="0.01" min="0"
-                              defaultValue={sub}
-                              onBlur={e => finalizarEdicionTotal(idx, e.target.value)}
-                              onKeyDown={e => { if (e.key === 'Enter') finalizarEdicionTotal(idx, e.target.value); }}
-                              className="w-24 h-6 px-1 rounded text-xs border font-mono text-center"
-                              style={{
-                                backgroundColor: 'var(--surface)',
-                                color: 'var(--ink)',
-                                borderColor: bajoMinimo ? 'var(--danger)' : 'var(--success)',
-                                outline: `2px solid ${bajoMinimo ? 'var(--danger)' : 'var(--success)'}`,
-                              }}
-                              autoFocus
-                            />
-                          ) : (
-                            <span
-                              onClick={() => iniciarEdicionTotal(idx)}
-                              className="font-mono font-bold text-sm cursor-pointer px-1.5 py-0.5 rounded hover:bg-black/5"
-                              style={{ color: 'var(--ink)' }}>
-                              S/ {sub.toFixed(2)}
-                            </span>
-                          )}
-                          {item.total_editado != null && (() => {
-                            const baseCalc = item.sub_calc;
-                            const diff = item.total_editado - baseCalc;
-                            return diff !== 0 ? (
-                              <span className="text-[9px]" style={{ color: 'var(--danger)' }}>
-                                ({diff < 0 ? '\u2013S/ ' + Math.abs(diff).toFixed(0) : '+S/ ' + diff.toFixed(0)})
-                              </span>
-                            ) : null;
-                          })()}
-                        </div>
                       </div>
                     );
                   })}
@@ -1391,25 +1472,49 @@ const itemsData = itemsConDias.map(item => ({
                     <p style={{ color: 'var(--faint)' }}>Sin equipos</p>
                   ) : (
                     <div className="space-y-1">
-                      {itemsConDias.map((item, idx) => {
-                        const subItem = item.total_editado != null ? item.total_editado : item.sub_calc;
-                        return (
-                          <div key={idx} className="flex items-center gap-2">
-                            <span className="font-mono text-[9px] shrink-0" style={{ color: 'var(--info)' }}>
-                              {item.id_herramienta || item.condicion}
-                            </span>
-                            <span className="flex-1 truncate text-[12px]" style={{ color: 'var(--ink)' }}>
-                              {item.nombre}{item.id_item_granel ? ` x${item.cantidad}` : ''}
-                              <span className="text-[10px] ml-1" style={{ color: 'var(--info)' }}>
-                                ({item.dias_item} d&iacute;a{item.dias_item !== 1 ? 's' : ''})
+                      {(() => {
+                        const filas = [];
+                        const porPrefijo = new Map();
+                        itemsConDias.forEach((item) => {
+                          if (item.id_herramienta) {
+                            const prefix = item.id_herramienta.split('-')[0];
+                            let g = porPrefijo.get(prefix);
+                            if (!g) {
+                              g = { prefix, nombre: item.nombre, items: [] };
+                              porPrefijo.set(prefix, g);
+                              filas.push(g);
+                            }
+                            g.items.push(item);
+                          } else {
+                            filas.push({ prefix: null, nombre: item.nombre, items: [item] });
+                          }
+                        });
+                        return filas.map((f, i) => {
+                          const total = f.items.reduce((a, it) => a + (it.total_editado != null ? it.total_editado : it.sub_calc), 0);
+                          const cant = f.items.length;
+                          const first = f.items[0];
+                          const multi = !!first.id_herramienta && cant > 1;
+                          return (
+                            <div key={i} className="flex items-center gap-2">
+                              <span className="font-mono text-[9px] shrink-0" style={{ color: 'var(--info)' }}>
+                                {multi ? first.id_herramienta.split('-')[0] : (first.id_herramienta || first.condicion)}
                               </span>
-                            </span>
-                            <span className="font-mono shrink-0 text-[12px]" style={{ color: 'var(--ink)' }}>
-                              S/ {subItem.toFixed(2)}
-                            </span>
-                          </div>
-                        );
-                      })}
+                              <span className="flex-1 truncate text-[12px]" style={{ color: 'var(--ink)' }}>
+                                {f.nombre}
+                                {first.id_herramienta ? (multi ? ' ×' + cant : '') : (' x' + (first.cantidad || 1))}
+                                {!multi && (
+                                  <span className="text-[10px] ml-1" style={{ color: 'var(--info)' }}>
+                                    ({first.dias_item} d&iacute;a{first.dias_item !== 1 ? 's' : ''})
+                                  </span>
+                                )}
+                              </span>
+                              <span className="font-mono shrink-0 text-[12px]" style={{ color: 'var(--ink)' }}>
+                                S/ {total.toFixed(2)}
+                              </span>
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   )}
                   <hr style={{ borderColor: 'var(--border)', marginTop: 8, marginBottom: 6 }} />

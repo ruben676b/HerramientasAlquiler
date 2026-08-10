@@ -984,6 +984,7 @@ function getContratos(filtros = {}) {
              CASE WHEN d.tipo_item = 'kit' THEN 'KIT-' || d.id_kit
                   ELSE COALESCE(h.id, 'MAT') END AS item_codigo,
              COALESCE(h.nombre, i.nombre, k.nombre) AS item_nombre,
+             COALESCE(h.descripcion, i.descripcion, k.descripcion) AS item_descripcion,
              k.nombre AS kit_nombre,
              i.condicion AS item_condicion,
              i.precio_venta AS item_precio_venta

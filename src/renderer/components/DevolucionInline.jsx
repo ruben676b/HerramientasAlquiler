@@ -61,6 +61,8 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [cargandoHistorial, setCargandoHistorial] = useState({});
   // Estado para el acordeón de componentes del kit
   const [kitAbierto, setKitAbierto] = useState({});
+  // Estado para el agrupamiento visual de unidades individuales por familia
+  const [gruposAbiertos, setGruposAbiertos] = useState({});
   const [calificarModal, setCalificarModal] = useState(false);
   // Visor de imagen de referencia
   const [visor, setVisor] = useState(null);
@@ -1031,7 +1033,58 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                   </div>
                 );
               };
-              return ordenPadres.map(i => renderItemCard(items[i], i));
+              const ordenGrupos = [];
+              const porPrefijoG = new Map();
+              ordenPadres.forEach(i => {
+                const it = items[i];
+                const esIndividual = !!it.id_herramienta;
+                if (esIndividual) {
+                  const codigo = it.item_codigo || it.id || '';
+                  const m = codigo.match(/^([A-Za-z]+)-/);
+                  const prefix = m ? m[1] : codigo;
+                  let g = porPrefijoG.get(prefix);
+                  if (!g) { g = { prefix, nombre: it.item_nombre || it.nombre, indices: [] }; porPrefijoG.set(prefix, g); ordenGrupos.push(g); }
+                  g.indices.push(i);
+                } else {
+                  ordenGrupos.push({ prefix: null, indices: [i] });
+                }
+              });
+              return ordenGrupos.map((g, gi) => {
+                if (g.prefix === null) {
+                  return renderItemCard(items[g.indices[0]], g.indices[0]);
+                }
+                const abierto = !!gruposAbiertos[g.prefix];
+                const pendientes = g.indices.filter(i => {
+                  const it = items[i];
+                  return !it.estado_devolucion || it.estado_devolucion === 'pendiente';
+                }).length;
+                return (
+                  <div key={'g-' + g.prefix} className="rounded-xl transition-all duration-150 overflow-hidden mb-1.5"
+                    style={{ border: '1px solid var(--border)', backgroundColor: 'var(--surface)' }}>
+                    <div className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none"
+                      onClick={() => setGruposAbiertos(p => ({ ...p, [g.prefix]: !p[g.prefix] }))}>
+                      <ChevronRight size={14} className="shrink-0" style={{ color: 'var(--muted)', transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform 150ms' }} />
+                      <span className="flex-1 min-w-0 text-[13px] font-semibold truncate" style={{ color: 'var(--ink)' }}>
+                        {g.nombre}
+                        <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-lg font-bold align-middle"
+                          style={{ backgroundColor: 'oklch(0.40 0.12 240 / 0.12)', color: 'var(--info)' }}>&times;{g.indices.length}</span>
+                      </span>
+                      {pendientes > 0 ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                          style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>{pendientes} pendiente{pendientes !== 1 ? 's' : ''}</span>
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                          style={{ backgroundColor: 'oklch(0.93 0.05 160)', color: 'var(--success)' }}>Completo</span>
+                      )}
+                    </div>
+                    {abierto && (
+                      <div className="px-2 pb-2 space-y-1.5">
+                        {g.indices.map(i => renderItemCard(items[i], i))}
+                      </div>
+                    )}
+                  </div>
+                );
+              });
             })()
           )}
           {individualesPendientes > 0 && (

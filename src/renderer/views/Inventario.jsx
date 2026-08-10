@@ -9,6 +9,7 @@ import { SEMANTIC, ESTADOS_HERRAMIENTA } from '../lib/constants';
 import Button from '../components/ui/button';
 import ConfirmModal from '../components/ConfirmModal';
 import KitEditorModal from '../components/KitEditorModal';
+import DescripcionPopover from '../components/DescripcionPopover';
 import { useToast } from '../components/Toast';
 
 /* ================================================================
@@ -114,10 +115,11 @@ export default function Inventario() {
 
   const handleCrearFamilia = async (data) => {
     try {
-      const prefix = await window.api.crearCategoria({ nombre: data.nombre });
+      const prefix = await window.api.crearCategoria({ nombre: data.nombre, descripcion: data.descripcion });
       const r = await window.api.crearLote({
         id_categoria: prefix.id,
         nombre: data.nombre,
+        descripcion: data.descripcion,
         precio_dia: data.precio_dia,
         cantidad: data.cantidad,
       });
@@ -396,7 +398,10 @@ export default function Inventario() {
                           <div key={h.id}>
                             <div className="group/row flex items-center gap-3 px-4 py-2 text-sm transition-colors duration-150 hover:bg-[var(--surface)]" style={{ borderBottom: '1px solid var(--border)' }}>
                               <span className="font-mono text-xs font-medium w-16 shrink-0" style={{ color: 'var(--primary)' }}>{h.id}</span>
-                              <span className="flex-1" style={{ color: 'var(--ink)' }}>{h.nombre}</span>
+                              <span className="flex-1 flex items-center gap-1.5 min-w-0" style={{ color: 'var(--ink)' }}>
+                                <span className="truncate">{h.nombre}</span>
+                                <DescripcionPopover text={h.descripcion} />
+                              </span>
                             {h.estado === 'alquilado' ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0"
                                 style={{ backgroundColor: s?.soft, color: s?.variable }}>
@@ -456,6 +461,7 @@ export default function Inventario() {
                     <span className="shrink-0">{isOpen ? <ChevronDown size={16} style={{ color: 'var(--muted)' }} /> : <ChevronRight size={16} style={{ color: 'var(--muted)' }} />}</span>
                     <div className="flex-1 min-w-0">
                       <span className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{g.nombre}</span>
+                      <DescripcionPopover text={g.variantes[0]?.descripcion || g.variantes[1]?.descripcion} className="ml-1 align-middle" />
                       <span className="text-xs ml-2" style={{ color: 'var(--muted)' }}>
                         S/ {g.variantes.find(v=>v.condicion==='nuevo')?.precio_dia?.toFixed(2) || '—'} nuevo · S/ {g.variantes.find(v=>v.condicion==='usado')?.precio_dia?.toFixed(2) || '—'} usado
                       </span>
@@ -557,7 +563,7 @@ export default function Inventario() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{k.nombre}</span>
-                        {k.descripcion && <span className="text-xs truncate" style={{ color: 'var(--faint)' }}>{k.descripcion}</span>}
+                        <DescripcionPopover text={k.descripcion} />
                       </div>
                       <div className="flex items-center gap-3 mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>
                         <span>{k.componentes?.length || 0} componente{(k.componentes?.length || 0) !== 1 ? 's' : ''}</span>
@@ -1142,7 +1148,7 @@ function ModalShell({ title, onClose, children, onSubmit, error }) {
 }
 
 function ModalCrearFamilia({ onSave, onClose }) {
-  const [f, setF] = useState({ nombre: '', precio_dia: '', precio_minimo: '', precio_mes: '', precio_venta: '', cantidad: '1' });
+  const [f, setF] = useState({ nombre: '', descripcion: '', precio_dia: '', precio_minimo: '', precio_mes: '', precio_venta: '', cantidad: '1' });
   const [err, setErr] = useState('');
   const [imagenEstado, setImagenEstado] = useState(null);
   const set = (k, v) => { setF((p) => ({ ...p, [k]: v })); setErr(''); };
@@ -1152,6 +1158,7 @@ function ModalCrearFamilia({ onSave, onClose }) {
     if (!f.precio_dia || parseFloat(f.precio_dia) < 0) return setErr('Ingrese un precio válido.');
     onSave({
       nombre: f.nombre.trim(),
+      descripcion: f.descripcion.trim() || null,
       precio_dia: parseFloat(f.precio_dia) || 0,
       precio_minimo: f.precio_minimo !== '' ? parseFloat(f.precio_minimo) : undefined,
       precio_mes: f.precio_mes !== '' ? parseFloat(f.precio_mes) : undefined,
@@ -1165,6 +1172,11 @@ function ModalCrearFamilia({ onSave, onClose }) {
     <ModalShell title="Nueva herramienta" onClose={onClose} onSubmit={submit} error={err}>
       <Field label="Nombre" req>
         <input value={f.nombre} onChange={(e) => set('nombre', e.target.value)} className={inputCls} placeholder="Ej: Roto Martillo" autoFocus
+          style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+      </Field>
+      <Field label="Descripción (opcional)">
+        <textarea value={f.descripcion} onChange={(e) => set('descripcion', e.target.value)} rows={2}
+          className={inputCls + ' h-auto py-2 resize-none'} placeholder="Ej: Marca Bosch, modelo GBH 2-26"
           style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
       </Field>
       <div className="grid grid-cols-2 gap-2">
@@ -1212,6 +1224,7 @@ function ModalAgregarUnidades({ familia, onSave, onClose }) {
 function ModalEditarFamilia({ familia, onSave, onClose }) {
   const [f, setF] = useState({
     nombre: familia.nombre || '',
+    descripcion: familia.herramientas?.[0]?.descripcion || familia.categoria_desc || familia.descripcion || '',
     precio_dia: familia.precio_dia ?? '',
     precio_minimo: familia.precio_minimo ?? '',
     precio_mes: familia.precio_mes ?? '',
@@ -1221,6 +1234,7 @@ function ModalEditarFamilia({ familia, onSave, onClose }) {
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const submit = () => onSave(familia.id_categoria, {
     ...f,
+    descripcion: f.descripcion.trim() || null,
     precio_dia: parseFloat(f.precio_dia) || 0,
     precio_minimo: f.precio_minimo !== '' ? parseFloat(f.precio_minimo) : undefined,
     precio_mes: f.precio_mes !== '' ? parseFloat(f.precio_mes) : undefined,
@@ -1230,6 +1244,11 @@ function ModalEditarFamilia({ familia, onSave, onClose }) {
     <ModalShell title={'Editar ' + familia.nombre} onClose={onClose} onSubmit={submit}>
       <Field label="Nombre">
         <input value={f.nombre} onChange={(e) => set('nombre', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} autoFocus />
+      </Field>
+      <Field label="Descripción (opcional)">
+        <textarea value={f.descripcion} onChange={(e) => set('descripcion', e.target.value)} rows={2}
+          className={inputCls + ' h-auto py-2 resize-none'} placeholder="Ej: Marca Bosch, modelo GBH 2-26"
+          style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
       </Field>
       <div className="grid grid-cols-4 gap-2">
         <Field label="Precio/día S/">
@@ -1256,13 +1275,14 @@ function ModalEditarFamilia({ familia, onSave, onClose }) {
 }
 
 function ModalCrearGranel({ onSave, onClose }) {
-  const [f, setF] = useState({ nombre: '', precio_nuevo: '', precio_minimo_nuevo: '', precio_mes_nuevo: '', precio_venta_nuevo: '', precio_usado: '', precio_minimo_usado: '', precio_mes_usado: '', precio_venta_usado: '' });
+  const [f, setF] = useState({ nombre: '', descripcion: '', precio_nuevo: '', precio_minimo_nuevo: '', precio_mes_nuevo: '', precio_venta_nuevo: '', precio_usado: '', precio_minimo_usado: '', precio_mes_usado: '', precio_venta_usado: '' });
   const [imagenEstado, setImagenEstado] = useState(null);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const submit = () => {
     if (!f.nombre.trim()) return;
     onSave({
       nombre: f.nombre.trim(),
+      descripcion: f.descripcion.trim() || null,
       precio_nuevo: parseFloat(f.precio_nuevo) || 0,
       precio_minimo_nuevo: f.precio_minimo_nuevo !== '' ? parseFloat(f.precio_minimo_nuevo) : undefined,
       precio_mes_nuevo: f.precio_mes_nuevo !== '' ? parseFloat(f.precio_mes_nuevo) : undefined,
@@ -1277,6 +1297,11 @@ function ModalCrearGranel({ onSave, onClose }) {
   return (
     <ModalShell title="Nuevo material" onClose={onClose} onSubmit={submit}>
       <Field label="Nombre" req><input value={f.nombre} onChange={(e) => set('nombre', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} placeholder="Ej: Tabla 3m" autoFocus /></Field>
+      <Field label="Descripción (opcional)">
+        <textarea value={f.descripcion} onChange={(e) => set('descripcion', e.target.value)} rows={2}
+          className={inputCls + ' h-auto py-2 resize-none'} placeholder="Ej: Tablas de pino cepilladas 3m x 30cm"
+          style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+      </Field>
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-[11px] font-medium mb-1 block" style={{ color: 'var(--success)' }}>Nuevo</label>
@@ -1304,6 +1329,7 @@ function ModalEditarGranel({ data, onSave, onClose }) {
   const imagenActual = nuevo.imagen_path || usado.imagen_path || null;
   const [f, setF] = useState({
     nombre: data.nombre || '',
+    descripcion: nuevo.descripcion || usado.descripcion || '',
     precio_nuevo: nuevo.precio_dia ?? '',
     precio_minimo_nuevo: nuevo.precio_minimo ?? '',
     precio_mes_nuevo: nuevo.precio_mes ?? '',
@@ -1317,6 +1343,7 @@ function ModalEditarGranel({ data, onSave, onClose }) {
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const submit = () => onSave(data.nombre, {
     nombre: f.nombre.trim(),
+    descripcion: f.descripcion.trim() || null,
     precio_nuevo: parseFloat(f.precio_nuevo) || 0,
     precio_minimo_nuevo: f.precio_minimo_nuevo !== '' ? parseFloat(f.precio_minimo_nuevo) : undefined,
     precio_mes_nuevo: f.precio_mes_nuevo !== '' ? parseFloat(f.precio_mes_nuevo) : undefined,
@@ -1329,6 +1356,11 @@ function ModalEditarGranel({ data, onSave, onClose }) {
   return (
     <ModalShell title="Editar material" onClose={onClose} onSubmit={submit}>
       <Field label="Nombre" req><input value={f.nombre} onChange={(e) => set('nombre', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} autoFocus /></Field>
+      <Field label="Descripción (opcional)">
+        <textarea value={f.descripcion} onChange={(e) => set('descripcion', e.target.value)} rows={2}
+          className={inputCls + ' h-auto py-2 resize-none'} placeholder="Ej: Tablas de pino cepilladas 3m x 30cm"
+          style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+      </Field>
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-[11px] font-medium mb-1 block" style={{ color: 'var(--success)' }}>Nuevo</label>

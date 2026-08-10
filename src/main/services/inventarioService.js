@@ -165,20 +165,20 @@ function getGranelAgrupado() {
   return Object.values(mapa);
 }
 
-function crearMaterial({ nombre, precio_nuevo, precio_minimo_nuevo, precio_mes_nuevo, precio_venta_nuevo, precio_usado, precio_minimo_usado, precio_mes_usado, precio_venta_usado }) {
+function crearMaterial({ nombre, descripcion, precio_nuevo, precio_minimo_nuevo, precio_mes_nuevo, precio_venta_nuevo, precio_usado, precio_minimo_usado, precio_mes_usado, precio_venta_usado }) {
   if (!nombre) throw new Error('El nombre del material es obligatorio.');
 
   const insert = db.prepare(`
-    INSERT INTO ITEM_GRANEL (nombre, condicion, precio_dia, mora_dia, precio_minimo, precio_mes, precio_venta, cantidad_total, cantidad_disponible)
-    VALUES (?, ?, ?, 0, ?, ?, ?, 0, 0)
+    INSERT INTO ITEM_GRANEL (nombre, condicion, descripcion, precio_dia, mora_dia, precio_minimo, precio_mes, precio_venta, cantidad_total, cantidad_disponible)
+    VALUES (?, ?, ?, ?, 0, ?, ?, ?, 0, 0)
   `);
 
   const tx = db.transaction(() => {
-    insert.run(nombre, 'nuevo', precio_nuevo || 0,
+    insert.run(nombre, 'nuevo', descripcion || null, precio_nuevo || 0,
       precio_minimo_nuevo != null ? precio_minimo_nuevo : null,
       precio_mes_nuevo != null ? precio_mes_nuevo : null,
       precio_venta_nuevo != null ? precio_venta_nuevo : null);
-    insert.run(nombre, 'usado', precio_usado || 0,
+    insert.run(nombre, 'usado', descripcion || null, precio_usado || 0,
       precio_minimo_usado != null ? precio_minimo_usado : null,
       precio_mes_usado != null ? precio_mes_usado : null,
       precio_venta_usado != null ? precio_venta_usado : null);
@@ -231,7 +231,7 @@ function agregarStockGranel(id, cantidad) {
   return { id, agregado: cantidad };
 }
 
-function editarGranelFull(nombreOriginal, { nombre, precio_nuevo, precio_minimo_nuevo, precio_mes_nuevo, precio_venta_nuevo, precio_usado, precio_minimo_usado, precio_mes_usado, precio_venta_usado }) {
+function editarGranelFull(nombreOriginal, { nombre, descripcion, precio_nuevo, precio_minimo_nuevo, precio_mes_nuevo, precio_venta_nuevo, precio_usado, precio_minimo_usado, precio_mes_usado, precio_venta_usado }) {
   if (!nombre) throw new Error('El nombre es obligatorio.');
 
   const tx = db.transaction(() => {
@@ -242,17 +242,19 @@ function editarGranelFull(nombreOriginal, { nombre, precio_nuevo, precio_minimo_
       const entries = Object.entries(fields).filter(([k, v]) => v !== undefined);
       if (entries.length === 0) return;
       const sql = 'UPDATE ITEM_GRANEL SET ' + entries.map(([k]) => k + ' = ?').join(', ') + ' WHERE nombre = ? AND condicion = ? AND activo = 1';
-      const params = entries.map(([, v]) => (v != null ? v : null));
+      const params = entries.map(([, v]) => (v != null && v !== '' ? v : null));
       params.push(nombre, cond);
       db.prepare(sql).run(...params);
     };
     updateCond('nuevo', {
+      descripcion: descripcion,
       precio_dia: precio_nuevo,
       precio_minimo: precio_minimo_nuevo,
       precio_mes: precio_mes_nuevo,
       precio_venta: precio_venta_nuevo,
     });
     updateCond('usado', {
+      descripcion: descripcion,
       precio_dia: precio_usado,
       precio_minimo: precio_minimo_usado,
       precio_mes: precio_mes_usado,
@@ -559,7 +561,8 @@ function agregarUnidades(id_categoria, cantidad) {
       const id = id_categoria + '-' + num;
       const nombre = ultima?.nombre || cat.nombre;
       const precio = ultima?.precio_dia ?? cat.precio_dia ?? 0;
-      insert.run(id, id_categoria, nombre, null, precio);
+      const descripcion = ultima?.descripcion ?? cat.descripcion ?? null;
+      insert.run(id, id_categoria, nombre, descripcion, precio);
       creadas.push(id);
     }
   });
@@ -590,7 +593,7 @@ function editarFamilia(id_categoria, { nombre, precio_dia, precio_minimo, precio
 
     // Actualizar categoría (solo campos que aplican a categoría)
     const catValues = {};
-    for (const k of ['nombre', 'precio_dia', 'precio_minimo', 'precio_mes', 'precio_venta']) {
+    for (const k of ['nombre', 'precio_dia', 'precio_minimo', 'precio_mes', 'precio_venta', 'descripcion']) {
       if (updates[k] !== undefined) catValues[k] = updates[k];
     }
     if (Object.keys(catValues).length > 0) {
