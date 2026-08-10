@@ -14,6 +14,7 @@ import AnularPagoModal from '../components/AnularPagoModal';
 import { gruparPagos } from '../lib/gruparPagos';
 import DevolucionInline from '../components/DevolucionInline';
 import CalificarContratoModal from '../components/CalificarContratoModal';
+import TagChip from '../components/TagChip';
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -440,6 +441,14 @@ export default function Alquileres() {
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 text-xs mt-1 flex-wrap">
+                        {c.etiquetas?.length > 0 && (
+                          <>
+                            {c.etiquetas.slice(0, 2).map((t) => <TagChip key={t.id} tag={t} />)}
+                            {c.etiquetas.length > 2 && (
+                              <span className="text-[9px] font-semibold" style={{ color: 'var(--faint)' }}>+{c.etiquetas.length - 2}</span>
+                            )}
+                          </>
+                        )}
                         {c.cliente_dni && (
                           <span className="px-2 py-0.5 rounded-[10px] text-[11px] font-mono font-semibold"
                             style={{ backgroundColor: 'oklch(0.50 0.13 240)', color: '#fff' }}>

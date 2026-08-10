@@ -8,7 +8,7 @@ const { localDate } = require('../utils/date');
  * @returns {Array<{ id, nombre, dni, telefono, en_lista_negra, promedio_estrellas, total_calificaciones, total_alquileres }>}
  */
 function getClientesConCalificacion() {
-  return db.prepare(`
+  const clientes = db.prepare(`
     SELECT c.id, c.tipo, c.nombre, c.dni, c.ruc, c.telefono, c.direccion, c.email,
            c.en_lista_negra, c.fecha_registro,
            ROUND(AVG(cal.estrellas), 1) AS promedio_estrellas,
@@ -20,6 +20,8 @@ function getClientesConCalificacion() {
     GROUP BY c.id
     ORDER BY c.nombre ASC
   `).all();
+
+  return adjuntarEtiquetas(clientes);
 }
 
 /**
@@ -30,7 +32,7 @@ function getClientesConCalificacion() {
  */
 function buscarClientesConCalificacion(termino) {
   const patron = '%' + termino + '%';
-  return db.prepare(`
+  const clientes = db.prepare(`
     SELECT c.id, c.tipo, c.nombre, c.dni, c.ruc, c.telefono, c.direccion, c.email,
            c.en_lista_negra, c.fecha_registro,
            ROUND(AVG(cal.estrellas), 1) AS promedio_estrellas,
@@ -42,6 +44,141 @@ function buscarClientesConCalificacion(termino) {
     GROUP BY c.id
     ORDER BY c.nombre ASC
   `).all(patron, patron);
+
+  return adjuntarEtiquetas(clientes);
+}
+
+/**
+ * Devuelve todas las etiquetas de cliente activas, ordenadas alfabéticamente.
+ *
+ * @returns {Array<{ id, nombre, color }>}
+ */
+function getEtiquetas() {
+  return db.prepare(`
+    SELECT id, nombre, color
+    FROM ETIQUETA_CLIENTE
+    WHERE activo = 1
+    ORDER BY nombre ASC
+  `).all();
+}
+
+/**
+ * Crea una etiqueta de cliente.
+ *
+ * @param {string} nombre
+ * @param {string} color Hue oklch (ej: '160')
+ * @returns {{ id: number }}
+ */
+function crearEtiqueta(nombre, color) {
+  const nom = String(nombre || '').trim();
+  if (!nom) throw new Error('El nombre de la etiqueta no puede estar vacío.');
+  try {
+    const r = db.prepare('INSERT INTO ETIQUETA_CLIENTE (nombre, color) VALUES (?, ?)')
+      .run(nom, color || '160');
+    return { id: r.lastInsertRowid };
+  } catch (err) {
+    if (String(err.code || '').includes('UNIQUE')) {
+      throw new Error('Ya existe una etiqueta con ese nombre.');
+    }
+    throw err;
+  }
+}
+
+/**
+ * Edita una etiqueta de cliente.
+ */
+function editarEtiqueta(id, nombre, color) {
+  const nom = String(nombre || '').trim();
+  if (!nom) throw new Error('El nombre de la etiqueta no puede estar vacío.');
+  try {
+    const r = db.prepare('UPDATE ETIQUETA_CLIENTE SET nombre = ?, color = ? WHERE id = ? AND activo = 1')
+      .run(nom, color || '160', id);
+    if (r.changes === 0) throw new Error('Etiqueta no encontrada.');
+    return { id };
+  } catch (err) {
+    if (String(err.code || '').includes('UNIQUE')) {
+      throw new Error('Ya existe una etiqueta con ese nombre.');
+    }
+    throw err;
+  }
+}
+
+/**
+ * Elimina una etiqueta. Las asignaciones se borran en cascada.
+ */
+function eliminarEtiqueta(id) {
+  const r = db.prepare('DELETE FROM ETIQUETA_CLIENTE WHERE id = ? AND activo = 1').run(id);
+  if (r.changes === 0) throw new Error('Etiqueta no encontrada.');
+  return { id };
+}
+
+/**
+ * Reemplaza las etiquetas asignadas a un cliente (delete + insert atómico).
+ *
+ * @param {number} idCliente
+ * @param {number[]} idsEtiquetas
+ */
+function asignarEtiquetasCliente(idCliente, idsEtiquetas) {
+  const ids = (idsEtiquetas || []).map(Number).filter(id => Number.isInteger(id) && id > 0);
+  db.transaction(() => {
+    db.prepare('DELETE FROM CLIENTE_ETIQUETA WHERE id_cliente = ?').run(idCliente);
+    const insert = db.prepare('INSERT OR IGNORE INTO CLIENTE_ETIQUETA (id_cliente, id_etiqueta) VALUES (?, ?)');
+    for (const id of ids) insert.run(idCliente, id);
+  })();
+  return { idCliente, etiquetas: ids };
+}
+
+/**
+ * Devuelve un Map de id_cliente -> etiquetas [{id, nombre, color}].
+ * Una sola query para adjuntar etiquetas a cualquier conjunto de filas.
+ */
+function _etiquetasPorCliente() {
+  const filas = db.prepare(`
+    SELECT ce.id_cliente, e.id, e.nombre, e.color
+    FROM CLIENTE_ETIQUETA ce
+    JOIN ETIQUETA_CLIENTE e ON e.id = ce.id_etiqueta
+    WHERE e.activo = 1
+    ORDER BY e.nombre ASC
+  `).all();
+
+  const porCliente = new Map();
+  for (const f of filas) {
+    if (!porCliente.has(f.id_cliente)) porCliente.set(f.id_cliente, []);
+    porCliente.get(f.id_cliente).push({ id: f.id, nombre: f.nombre, color: f.color });
+  }
+  return porCliente;
+}
+
+/**
+ * Adjunta el arreglo de etiquetas a una lista de clientes (una sola query).
+ * Las filas se indexan por su campo `id` (id del cliente).
+ *
+ * @param {Array} clientes
+ * @returns {Array}
+ */
+function adjuntarEtiquetas(clientes) {
+  if (!clientes || clientes.length === 0) return clientes;
+  const porCliente = _etiquetasPorCliente();
+  return clientes.map(c => ({
+    ...c,
+    etiquetas: porCliente.get(c.id) || [],
+  }));
+}
+
+/**
+ * Adjunta etiquetas a filas que exponen el id del cliente en `id_cliente`
+ * (por ejemplo, contratos). Indexa por `f.id_cliente`.
+ *
+ * @param {Array} filas
+ * @returns {Array}
+ */
+function adjuntarEtiquetasPorCliente(filas) {
+  if (!filas || filas.length === 0) return filas;
+  const porCliente = _etiquetasPorCliente();
+  return filas.map(f => ({
+    ...f,
+    etiquetas: porCliente.get(f.id_cliente) || [],
+  }));
 }
 
 /**
@@ -185,6 +322,12 @@ function getDetalleContrato(idContrato) {
 module.exports = {
   getClientesConCalificacion,
   buscarClientesConCalificacion,
+  getEtiquetas,
+  crearEtiqueta,
+  editarEtiqueta,
+  eliminarEtiqueta,
+  asignarEtiquetasCliente,
+  adjuntarEtiquetasPorCliente,
   getContratosCliente,
   getDetalleContrato,
 };

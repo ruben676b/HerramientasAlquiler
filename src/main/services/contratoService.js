@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('../db/database');
 const { localDate, localDateTime } = require('../utils/date');
+const { adjuntarEtiquetasPorCliente } = require('./clienteService');
 
 const LOG_FILE = path.join(os.tmpdir(), 'sistema-alquiler-debug.log');
 function log(msg) {
@@ -978,7 +979,7 @@ function getContratos(filtros = {}) {
   const contratos = db.prepare(sql).all(...params);
 
   // Enriquecer con items y días de atraso
-  return contratos.map(c => {
+  const contratosEnriquecidos = contratos.map(c => {
     const items = db.prepare(`
       SELECT d.*,
              CASE WHEN d.tipo_item = 'kit' THEN 'KIT-' || d.id_kit
@@ -1095,6 +1096,8 @@ function getContratos(filtros = {}) {
 
     return { ...c, items: itemsConAtraso, pagos, dias_atraso: max_dias_atraso, total_atraso, total_contrato: totalContrato, total_danos, total_perdidas };
   });
+
+  return adjuntarEtiquetasPorCliente(contratosEnriquecidos);
 }
 
 /**

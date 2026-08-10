@@ -9,6 +9,7 @@ import SignaturePad from './SignaturePad';
 import StarRating, { CalificacionBadge } from './StarRating';
 import DetalleClienteModal from './DetalleClienteModal';
 import Button from './ui/button';
+import TagChip from './TagChip';
 
 const fmtLocalDate = (d) => {
   const year = d.getFullYear();
@@ -1041,15 +1042,27 @@ const itemsData = itemsConDias.map(item => ({
                   {dniFocus && sugerenciasDni.length > 0 && (
                     <div className="fixed z-[100] bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-lg max-h-44 overflow-y-auto"
                       style={{ top: (dniRef.current?.getBoundingClientRect().bottom || 0) + 4, left: dniRef.current?.getBoundingClientRect().left || 0, width: dniRef.current?.getBoundingClientRect().width || 300 }}>
-                      {sugerenciasDni.map((c) => (
-                        <button key={c.id} onClick={() => seleccionarCliente(c)}
-                          className="w-full text-left px-3 py-2 text-xs transition-colors duration-150 hover:bg-[var(--surface)] flex justify-between items-center"
-                          style={{ backgroundColor: c.en_lista_negra ? 'oklch(0.95 0.015 25)' : 'transparent' }}>
-                          <span style={{ color: 'var(--ink)' }}>{c.nombre}</span>
-                          <span className="font-mono" style={{ color: 'var(--muted)' }}>{c.dni}</span>
-                          {c.en_lista_negra ? <span className="text-[9px] font-bold ml-1" style={{ color: 'var(--danger)' }}>LISTA NEGRA</span> : null}
-                        </button>
-                      ))}
+                  {sugerenciasDni.map((c) => (
+                    <button key={c.id} onClick={() => seleccionarCliente(c)}
+                      className="w-full text-left px-3 py-2 text-xs transition-colors duration-150 hover:bg-[var(--surface)] flex items-center justify-between gap-2"
+                      style={{ backgroundColor: c.en_lista_negra ? 'oklch(0.95 0.015 25)' : 'transparent' }}>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate" style={{ color: 'var(--ink)' }}>{c.nombre}</span>
+                          {c.en_lista_negra ? <span className="text-[9px] font-bold shrink-0" style={{ color: 'var(--danger)' }}>LISTA NEGRA</span> : null}
+                        </div>
+                        {c.etiquetas?.length > 0 && (
+                          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                            {c.etiquetas.slice(0, 2).map((t) => <TagChip key={t.id} tag={t} />)}
+                            {c.etiquetas.length > 2 && (
+                              <span className="text-[9px] font-semibold" style={{ color: 'var(--faint)' }}>+{c.etiquetas.length - 2}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <span className="font-mono shrink-0" style={{ color: 'var(--muted)' }}>{c.dni}</span>
+                    </button>
+                  ))}
                     </div>
                   )}
                 </div>
@@ -1096,9 +1109,19 @@ const itemsData = itemsConDias.map(item => ({
                   style={{ top: (nombreRef.current?.getBoundingClientRect().bottom || 0) + 4, left: nombreRef.current?.getBoundingClientRect().left || 0, width: nombreRef.current?.getBoundingClientRect().width || 300 }}>
                   {sugerenciasNombre.map((c) => (
                     <button key={c.id} onClick={() => seleccionarCliente(c)}
-                      className="w-full text-left px-3 py-2 text-xs transition-colors duration-150 hover:bg-[var(--surface)] flex justify-between">
-                      <span style={{ color: 'var(--ink)' }}>{c.nombre}</span>
-                      {c.dni && <span className="font-mono" style={{ color: 'var(--muted)' }}>{c.dni}</span>}
+                      className="w-full text-left px-3 py-2 text-xs transition-colors duration-150 hover:bg-[var(--surface)] flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <span className="truncate block" style={{ color: 'var(--ink)' }}>{c.nombre}</span>
+                        {c.etiquetas?.length > 0 && (
+                          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                            {c.etiquetas.slice(0, 2).map((t) => <TagChip key={t.id} tag={t} />)}
+                            {c.etiquetas.length > 2 && (
+                              <span className="text-[9px] font-semibold" style={{ color: 'var(--faint)' }}>+{c.etiquetas.length - 2}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {c.dni && <span className="font-mono shrink-0" style={{ color: 'var(--muted)' }}>{c.dni}</span>}
                     </button>
                   ))}
                 </div>
@@ -1114,25 +1137,32 @@ const itemsData = itemsConDias.map(item => ({
             ) : null}
 
             {clienteSeleccionado && (
-              <div className="flex items-center gap-2 px-1">
-                <CalificacionBadge
-                  promedio={clienteSeleccionado.promedio_estrellas}
-                  total={clienteSeleccionado.total_calificaciones}
-                />
-                {clienteSeleccionado.promedio_estrellas && (
-                  <StarRating value={clienteSeleccionado.promedio_estrellas} readonly size={12} />
+              <div className="space-y-1.5 px-1">
+                <div className="flex items-center gap-2">
+                  <CalificacionBadge
+                    promedio={clienteSeleccionado.promedio_estrellas}
+                    total={clienteSeleccionado.total_calificaciones}
+                  />
+                  {clienteSeleccionado.promedio_estrellas && (
+                    <StarRating value={clienteSeleccionado.promedio_estrellas} readonly size={12} />
+                  )}
+                  <span className="text-[10px]" style={{ color: 'var(--faint)' }}>
+                    {clienteSeleccionado.total_alquileres || 0} alquiler{clienteSeleccionado.total_alquileres !== 1 ? 'es' : ''}
+                  </span>
+                  <button
+                    onClick={() => setDetalleCliente(clienteSeleccionado)}
+                    className="p-1 rounded-md hover:bg-[var(--surface)] transition-colors"
+                    style={{ color: 'var(--faint)' }}
+                    title="Ver detalle del cliente"
+                  >
+                    <Info size={12} />
+                  </button>
+                </div>
+                {clienteSeleccionado.etiquetas?.length > 0 && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {clienteSeleccionado.etiquetas.map((t) => <TagChip key={t.id} tag={t} />)}
+                  </div>
                 )}
-                <span className="text-[10px]" style={{ color: 'var(--faint)' }}>
-                  {clienteSeleccionado.total_alquileres || 0} alquiler{clienteSeleccionado.total_alquileres !== 1 ? 'es' : ''}
-                </span>
-                <button
-                  onClick={() => setDetalleCliente(clienteSeleccionado)}
-                  className="p-1 rounded-md hover:bg-[var(--surface)] transition-colors"
-                  style={{ color: 'var(--faint)' }}
-                  title="Ver detalle del cliente"
-                >
-                  <Info size={12} />
-                </button>
               </div>
             )}
 

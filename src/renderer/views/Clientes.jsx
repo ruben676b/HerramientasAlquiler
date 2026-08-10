@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Users, Star, Phone, CreditCard, Calendar, ChevronRight, Package, User } from 'lucide-react';
+import { Search, Users, Star, Phone, CreditCard, Calendar, ChevronRight, Package, User, Tag, Pencil } from 'lucide-react';
 import StarRating, { CalificacionBadge } from '../components/StarRating';
 import DetalleAlquilerModal from '../components/DetalleAlquilerModal';
+import TagChip from '../components/TagChip';
+import GestionEtiquetasModal from '../components/GestionEtiquetasModal';
+import EtiquetasClienteModal from '../components/EtiquetasClienteModal';
 
 const ESTADO_STYLES = {
   'alquilado': { bg: 'oklch(0.93 0.04 240)', color: 'oklch(0.45 0.10 240)' },
@@ -20,6 +23,22 @@ export default function Clientes() {
   const [loadingContratos, setLoadingContratos] = useState(false);
   const [detalleContrato, setDetalleContrato] = useState(null);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
+  const [gestionEtiquetas, setGestionEtiquetas] = useState(false);
+  const [clienteEtiquetas, setClienteEtiquetas] = useState(null);
+
+  // Recargar clientes (usado tras cambios de etiquetas) manteniendo la selección
+  const refrescarClientes = useCallback(async (termino = busqueda) => {
+    if (!window.api) return;
+    try {
+      const data = termino
+        ? await window.api.buscarClientesPanel(termino)
+        : await window.api.getClientesPanel();
+      setClientes(data);
+      setSelectedCliente((sel) => (sel ? data.find((c) => c.id === sel.id) || sel : sel));
+    } catch (err) {
+      console.error('Error refrescando clientes:', err);
+    }
+  }, [busqueda]);
 
   // Cargar clientes
   const cargarClientes = useCallback(async (termino = '') => {
@@ -87,12 +106,20 @@ export default function Clientes() {
             >
               <Users size={16} style={{ color: 'oklch(0.55 0.08 240)' }} />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <h1 className="text-base font-bold leading-tight" style={{ color: 'var(--ink)' }}>Clientes</h1>
               <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
                 {clientes.length} cliente{clientes.length !== 1 ? 's' : ''} registrado{clientes.length !== 1 ? 's' : ''}
               </p>
             </div>
+            <button
+              onClick={() => setGestionEtiquetas(true)}
+              className="h-8 px-2.5 rounded-lg text-[11px] font-medium flex items-center gap-1.5 border transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5 shrink-0"
+              style={{ color: 'var(--muted)', borderColor: 'var(--border)' }}
+              title="Gestionar etiquetas de clientes"
+            >
+              <Tag size={13} /> Etiquetas
+            </button>
           </div>
 
           {/* Buscador */}
@@ -208,6 +235,26 @@ export default function Clientes() {
                   value={selectedCliente.promedio_estrellas ? selectedCliente.promedio_estrellas.toFixed(1) + ' ★' : '—'}
                 />
               </div>
+
+              {/* Etiquetas */}
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
+                <span className="text-[10px] font-medium flex items-center gap-1" style={{ color: 'var(--faint)' }}>
+                  <Tag size={10} /> Etiquetas:
+                </span>
+                {selectedCliente.etiquetas?.length > 0 ? (
+                  selectedCliente.etiquetas.map((t) => <TagChip key={t.id} tag={t} size="sm" />)
+                ) : (
+                  <span className="text-[10px]" style={{ color: 'var(--faint)' }}>Sin etiquetas</span>
+                )}
+                <button
+                  onClick={() => setClienteEtiquetas(selectedCliente)}
+                  className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  style={{ color: 'var(--muted)' }}
+                  title="Editar etiquetas del cliente"
+                >
+                  <Pencil size={11} />
+                </button>
+              </div>
             </div>
 
             {/* Lista de contratos */}
@@ -264,6 +311,21 @@ export default function Clientes() {
           onClose={() => setDetalleContrato(null)}
         />
       )}
+
+      {/* Modal de gestión de etiquetas */}
+      <GestionEtiquetasModal
+        open={gestionEtiquetas}
+        onClose={() => setGestionEtiquetas(false)}
+        onChanged={() => refrescarClientes()}
+      />
+
+      {/* Modal de asignación de etiquetas a cliente */}
+      <EtiquetasClienteModal
+        open={!!clienteEtiquetas}
+        cliente={clienteEtiquetas}
+        onClose={() => setClienteEtiquetas(null)}
+        onChanged={() => refrescarClientes()}
+      />
     </div>
   );
 }
@@ -314,6 +376,18 @@ function ClienteItem({ cliente, isSelected, onClick }) {
             {cliente.telefono && <span>· {cliente.telefono}</span>}
             {cliente.total_alquileres > 0 && <span>· {cliente.total_alquileres} alq.</span>}
           </div>
+          {cliente.etiquetas?.length > 0 && (
+            <div className="flex items-center gap-1 mt-1 flex-wrap">
+              {cliente.etiquetas.slice(0, 2).map((t) => (
+                <TagChip key={t.id} tag={t} />
+              ))}
+              {cliente.etiquetas.length > 2 && (
+                <span className="text-[9px] font-semibold" style={{ color: isSelected ? 'oklch(1 0 0 / 0.6)' : 'var(--faint)' }}>
+                  +{cliente.etiquetas.length - 2}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Estrellas */}

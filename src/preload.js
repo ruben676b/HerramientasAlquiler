@@ -11,6 +11,14 @@ contextBridge.exposeInMainWorld('api', {
   getClientes: () => ipcRenderer.invoke('get-clientes'),
   buscarClientes: (termino) => ipcRenderer.invoke('buscar-clientes', termino),
 
+  // Etiquetas de clientes
+  getEtiquetas: () => ipcRenderer.invoke('get-etiquetas'),
+  crearEtiqueta: (nombre, color) => ipcRenderer.invoke('crear-etiqueta', nombre, color),
+  editarEtiqueta: (id, nombre, color) => ipcRenderer.invoke('editar-etiqueta', id, nombre, color),
+  eliminarEtiqueta: (id) => ipcRenderer.invoke('eliminar-etiqueta', id),
+  asignarEtiquetasCliente: (idCliente, idsEtiquetas) =>
+    ipcRenderer.invoke('asignar-etiquetas-cliente', idCliente, idsEtiquetas),
+
   // Contratos
   crearContrato: (data) => ipcRenderer.invoke('crear-contrato', data),
   crearReserva: (data) => ipcRenderer.invoke('crear-reserva', data),

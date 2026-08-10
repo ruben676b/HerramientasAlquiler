@@ -71,6 +71,12 @@ const { guardarCalificacion } = require('./services/calificacionService');
 const {
   getClientesConCalificacion,
   buscarClientesConCalificacion,
+  getEtiquetas,
+  crearEtiqueta,
+  editarEtiqueta,
+  eliminarEtiqueta,
+  asignarEtiquetasCliente,
+  adjuntarEtiquetas,
   getContratosCliente,
   getDetalleContrato,
 } = require('./services/clienteService');
@@ -124,17 +130,40 @@ function registerIpcHandlers() {
   // --- Clientes ---
 
   ipcMain.handle('get-clientes', () => {
-    return db
+    const clientes = db
       .prepare(
         `SELECT id, tipo, nombre, dni, telefono, direccion, email,
                 en_lista_negra, fecha_registro
          FROM CLIENTE WHERE activo = 1 ORDER BY nombre`
       )
       .all();
+    return adjuntarEtiquetas(clientes);
   });
 
   ipcMain.handle('buscar-clientes', (_event, termino) => {
     return buscarClientesConCalificacion(termino);
+  });
+
+  // --- Etiquetas de clientes ---
+
+  ipcMain.handle('get-etiquetas', () => {
+    return getEtiquetas();
+  });
+
+  ipcMain.handle('crear-etiqueta', (_e, nombre, color) => {
+    return crearEtiqueta(nombre, color);
+  });
+
+  ipcMain.handle('editar-etiqueta', (_e, id, nombre, color) => {
+    return editarEtiqueta(id, nombre, color);
+  });
+
+  ipcMain.handle('eliminar-etiqueta', (_e, id) => {
+    return eliminarEtiqueta(id);
+  });
+
+  ipcMain.handle('asignar-etiquetas-cliente', (_e, idCliente, idsEtiquetas) => {
+    return asignarEtiquetasCliente(idCliente, idsEtiquetas);
   });
 
   // --- Contratos ---
