@@ -548,6 +548,27 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     console.error('[DB] Error en migración reservado:', err.message);
   }
 
+  // Migración: columnas para papelera (soft delete) en CONTRATO
+  try {
+    const hasPapelera = db.prepare("PRAGMA table_info('CONTRATO')").all().some(c => c.name === 'papelera');
+    if (!hasPapelera) {
+      db.exec("ALTER TABLE CONTRATO ADD COLUMN papelera INTEGER NOT NULL DEFAULT 0");
+      console.log('[DB] Migración: columna papelera agregada a CONTRATO.');
+    }
+    const hasFechaPapelera = db.prepare("PRAGMA table_info('CONTRATO')").all().some(c => c.name === 'fecha_papelera');
+    if (!hasFechaPapelera) {
+      db.exec("ALTER TABLE CONTRATO ADD COLUMN fecha_papelera TEXT");
+      console.log('[DB] Migración: columna fecha_papelera agregada a CONTRATO.');
+    }
+    const hasMotivoEliminacion = db.prepare("PRAGMA table_info('CONTRATO')").all().some(c => c.name === 'motivo_eliminacion');
+    if (!hasMotivoEliminacion) {
+      db.exec("ALTER TABLE CONTRATO ADD COLUMN motivo_eliminacion TEXT");
+      console.log('[DB] Migración: columna motivo_eliminacion agregada a CONTRATO.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración papelera:', err);
+  }
+
   // --- Datos semilla (solo primera vez) ---
 
   const yaSembrado = db.prepare(

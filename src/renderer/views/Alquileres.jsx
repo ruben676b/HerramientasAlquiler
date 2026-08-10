@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Search, Plus, ChevronDown, ChevronRight, Calendar, Clock,
   XCircle, X, CheckCircle, AlertTriangle, FileText, ArrowRight, Star,
-  Ban, RefreshCw,
+  Ban, RefreshCw, Trash2, Edit, RotateCcw,
 } from 'lucide-react';
 import { SEMANTIC } from '../lib/constants';
 import Button from '../components/ui/button';
@@ -48,17 +48,22 @@ export default function Alquileres() {
   const [calificarContrato, setCalificarContrato] = useState(null);
   const [cancelarReservaId, setCancelarReservaId] = useState(null);
   const [convirtiendo, setConvirtiendo] = useState(null);
+  const [eliminandoContrato, setEliminandoContrato] = useState(null);
+  const [deleteMotivo, setDeleteMotivo] = useState('');
+  const [restaurandoContrato, setRestaurandoContrato] = useState(null);
   const [devGarantiaMonto, setDevGarantiaMonto] = useState('');
   const [devGarantiaMetodo, setDevGarantiaMetodo] = useState('efectivo');
   const searchRef = useRef(null);
-  const { openDialog } = useSessions();
+  const { openDialog, openEditDialog, sessions } = useSessions();
   const toast = useToast();
 
   const cargar = async () => {
     if (!window.api) return;
     setCargando(true);
     try {
-      const c = await window.api.getContratos({ busqueda });
+      const filtros = { busqueda };
+      if (estadoFiltro === 'papelera') filtros.papelera = 1;
+      const c = await window.api.getContratos(filtros);
       setTodosContratos(c);
     } catch (e) { setError(e.message); }
     finally { setCargando(false); }
@@ -67,7 +72,9 @@ export default function Alquileres() {
   const recargar = async () => {
     if (!window.api) return;
     try {
-      const c = await window.api.getContratos({ busqueda });
+      const filtros = { busqueda };
+      if (estadoFiltro === 'papelera') filtros.papelera = 1;
+      const c = await window.api.getContratos(filtros);
       if (window.api.log) {
         const granelItems = c[0]?.items?.filter(i => i.id_item_granel).map(i => ({ id: i.id, id_item_granel: i.id_item_granel, cantidad: i.cantidad, granel_pendiente: i.granel_pendiente, granel_dev_bien: i.granel_dev_bien, granel_dev_danada: i.granel_dev_danada, granel_dev_perdida: i.granel_dev_perdida }));
         window.api.log('[DEBUG recargar] contratos: ' + c.length + ' granelItems: ' + JSON.stringify(granelItems));
@@ -138,6 +145,31 @@ export default function Alquileres() {
     }
   };
 
+  const handleEliminarContrato = async () => {
+    if (!window.api || !eliminandoContrato) return;
+    try {
+      await window.api.eliminarContrato(eliminandoContrato.id, deleteMotivo || 'Sin motivo');
+      toast('Contrato #' + eliminandoContrato.id + ' enviado a papelera (7 dias para restaurar).');
+      setEliminandoContrato(null);
+      setDeleteMotivo('');
+      recargar();
+    } catch (e) {
+      toast(e.message || 'Error al eliminar contrato', 'error');
+    }
+  };
+
+  const handleRestaurarContrato = async () => {
+    if (!window.api || !restaurandoContrato) return;
+    try {
+      await window.api.restaurarContrato(restaurandoContrato.id);
+      toast('Contrato #' + restaurandoContrato.id + ' restaurado exitosamente.');
+      setRestaurandoContrato(null);
+      recargar();
+    } catch (e) {
+      toast(e.message || 'Error al restaurar contrato', 'error');
+    }
+  };
+
   useEffect(() => { cargar(); }, [busqueda, estadoFiltro, refreshTrigger]);
 
   useEffect(() => {
@@ -175,6 +207,7 @@ export default function Alquileres() {
     c['devolucion incompleta'] = contratosConPendiente.filter(x => x.estado === 'devolucion incompleta').length;
     c['reservado'] = contratosConPendiente.filter(x => x.estado === 'reservado').length;
     c['cancelado'] = contratosConPendiente.filter(x => x.estado === 'cancelado').length;
+    c['papelera'] = contratosConPendiente.filter(x => x.papelera === 1).length;
     return c;
   }, [contratosConPendiente]);
 
@@ -183,6 +216,7 @@ export default function Alquileres() {
     if (estadoFiltro === 'deudores') return contratosConPendiente.filter(c => c._pendiente > 0);
     if (estadoFiltro === 'atrasado') return contratosConPendiente.filter(c => c.dias_atraso > 0 && !(c.estado === 'devuelto' && c._pendiente <= 0));
     if (estadoFiltro === 'devuelto') return contratosConPendiente.filter(c => c.estado === 'devuelto' && c._pendiente <= 0);
+    if (estadoFiltro === 'papelera') return contratosConPendiente.filter(c => c.papelera === 1);
     return contratosConPendiente.filter(c => c.estado === estadoFiltro);
   }, [contratosConPendiente, estadoFiltro]);
 
@@ -220,6 +254,30 @@ export default function Alquileres() {
           </div>
         </div>
 
+        {sessions.filter(s => !s.saved).length > 0 && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm"
+            style={{ backgroundColor: 'oklch(0.93 0.04 240)', color: 'var(--info)', border: '0.5px solid var(--info)' }}>
+            <Clock size={15} />
+            <span>
+              {sessions.filter(s => !s.saved && s.tipo === 'alquiler').length > 0 &&
+                <strong>{sessions.filter(s => !s.saved && s.tipo === 'alquiler').length} alquiler{sessions.filter(s => !s.saved && s.tipo === 'alquiler').length !== 1 ? 'es' : ''}</strong>}
+              {sessions.filter(s => !s.saved && s.tipo === 'alquiler').length > 0 && sessions.filter(s => !s.saved && s.tipo === 'reserva').length > 0 && ' y '}
+              {sessions.filter(s => !s.saved && s.tipo === 'reserva').length > 0 &&
+                <strong>{sessions.filter(s => !s.saved && s.tipo === 'reserva').length} reserva{sessions.filter(s => !s.saved && s.tipo === 'reserva').length !== 1 ? 's' : ''}</strong>}
+              {' pendiente' + (sessions.filter(s => !s.saved).length !== 1 ? 's' : '') + ' sin guardar'}
+            </span>
+            <button
+              onClick={() => {
+                const tipo = sessions.filter(s => !s.saved)[0]?.tipo || 'alquiler';
+                openDialog(tipo);
+              }}
+              className="ml-auto px-2.5 h-7 rounded text-xs font-medium transition-all duration-150"
+              style={{ backgroundColor: 'var(--info)', color: '#fff', border: 'none' }}>
+              Continuar
+            </button>
+          </div>
+        )}
+
         {error && (
           <div className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: 'oklch(0.94 0.02 25)', color: 'var(--danger)' }}>
             {error} <button onClick={() => setError(null)} className="ml-2 underline">Cerrar</button>
@@ -245,6 +303,7 @@ export default function Alquileres() {
               .map(e => ({ id: e, label: e === 'devolucion incompleta' ? 'Dev. incompleta' : e.charAt(0).toUpperCase() + e.slice(1) })),
             { id: 'reservado', label: 'Reservado', info: true },
             { id: 'cancelado', label: 'Cancelado', muted: true },
+            { id: 'papelera', label: 'Papelera', danger: true },
           ].map(f => {
             const activo = estadoFiltro === f.id;
             let bgColor = 'var(--surface)';
@@ -325,6 +384,17 @@ export default function Alquileres() {
                 } else {
                   badges.push({ text: 'Reservado', bg: 'oklch(0.93 0.04 240)', color: 'var(--info)', icon: false });
                 }
+              } else if (c.papelera === 1) {
+                borderColor = 'oklch(0.40 0.12 25)';
+                const diasRest = (() => {
+                  if (!c.fecha_papelera) return 7;
+                  const fp = new Date(c.fecha_papelera + 'T00:00:00');
+                  const hoy = new Date();
+                  hoy.setHours(0, 0, 0, 0);
+                  const diff = Math.floor((hoy - fp) / 86400000);
+                  return Math.max(0, 7 - diff);
+                })();
+                badges.push({ text: `Papelera · ${diasRest} dia${diasRest !== 1 ? 's' : ''} restante${diasRest !== 1 ? 's' : ''}`, bg: 'oklch(0.93 0.02 25)', color: 'var(--danger)', icon: true });
               } else if (c.estado === 'cancelado') {
                 borderColor = 'var(--muted)';
                 badges.push({ text: 'Reserva cancelada', bg: 'oklch(0.90 0.003 60)', color: 'var(--muted)', icon: false });
@@ -716,73 +786,116 @@ export default function Alquileres() {
 
                             </div>
 
-                            {/* ===== ACCIONES ===== */}
-                            <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderTop: '0.5px solid var(--border)' }}>
-                              <button
-                                onClick={async () => {
-                                  if (!window.api) return;
-                                  try {
-                                    const pdfPath = await window.api.generarContratoPdf(c.id);
-                                    const b64 = await window.api.leerArchivoBase64(pdfPath);
-                                    setPdfPreviewUrl('data:application/pdf;base64,' + b64);
-                                  } catch (e) {
-                                    toast('Error al abrir contrato', 'error');
-                                  }
-                                }}
-                                className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
-                                style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)', border: '0.5px solid var(--border)' }}
-                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg)'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
-                              >
-                                <FileText size={12} /> Ver contrato
-                              </button>
-                              {c.estado === 'reservado' ? (
-                                <>
-                                  <button
-                                    onClick={() => handleConvertirReserva(c.id)}
-                                    disabled={convirtiendo === c.id}
-                                    className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
-                                    style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none', opacity: convirtiendo === c.id ? 0.6 : 1 }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}
-                                  >
-                                    {convirtiendo === c.id ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle size={12} />}
-                                    Alquilar
-                                  </button>
-                                  <button
-                                    onClick={() => setCancelarReservaId(c.id)}
-                                    className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
-                                    style={{ backgroundColor: 'oklch(0.95 0.02 25)', color: 'var(--danger)', border: '0.5px solid var(--danger)' }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.90 0.04 25)'; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.95 0.02 25)'; }}
-                                  >
-                                    <Ban size={12} /> Cancelar Reserva
-                                  </button>
-                                </>
-                              ) : c.estado === 'cancelado' ? null : (
-                                <>
-                                  <button
-                                    onClick={() => setCalificarContrato(c)}
-                                    className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
-                                    style={{ backgroundColor: 'oklch(0.62 0.17 80 / 0.12)', color: 'oklch(0.52 0.17 80)', border: '0.5px solid oklch(0.62 0.17 80 / 0.3)' }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.2)'; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.12)'; }}
-                                  >
-                                    <Star size={12} /> Calificar
-                                  </button>
-                                  <button
-                                    onClick={() => setDevolucionActiva(devolucionActiva === c.id ? null : c.id)}
-                                    className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
-                                    style={{ backgroundColor: devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)', color: '#fff', border: 'none' }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = devolucionActiva === c.id ? 'oklch(0.40 0.14 25)' : 'oklch(0.43 0.14 55)'; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)'; }}
-                                  >
-                                    {devolucionActiva === c.id ? <X size={12} /> : (pendiente > 0 && <AlertTriangle size={12} />)}
-                                    {devolucionActiva === c.id ? 'Cancelar devolución' : 'Devolución' + (pendiente > 0 ? ' (con deuda)' : '')} <ArrowRight size={12} />
-                                  </button>
-                                </>
-                              )}
-                            </div>
+                             {/* ===== ACCIONES ===== */}
+                             <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderTop: '0.5px solid var(--border)' }}>
+                               <button
+                                 onClick={async () => {
+                                   if (!window.api) return;
+                                   try {
+                                     const pdfPath = await window.api.generarContratoPdf(c.id);
+                                     const b64 = await window.api.leerArchivoBase64(pdfPath);
+                                     setPdfPreviewUrl('data:application/pdf;base64,' + b64);
+                                   } catch (e) {
+                                     toast('Error al abrir contrato', 'error');
+                                   }
+                                 }}
+                                 className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
+                                 style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)', border: '0.5px solid var(--border)' }}
+                                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg)'; }}
+                                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
+                               >
+                                 <FileText size={12} /> Ver contrato
+                               </button>
+                               {c.papelera === 1 ? (
+                                 <button
+                                   onClick={() => setRestaurandoContrato(c)}
+                                   className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
+                                   style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}
+                                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
+                                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}
+                                 >
+                                   <RotateCcw size={12} /> Restaurar
+                                 </button>
+                               ) : c.estado === 'reservado' ? (
+                                 <>
+                                   <button
+                                      onClick={() => openEditDialog(c)}
+                                     className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
+                                     style={{ backgroundColor: 'var(--surface)', color: 'var(--info)', border: '0.5px solid var(--info)' }}
+                                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.93 0.04 240)'; }}
+                                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
+                                   >
+                                     <Edit size={12} /> Editar
+                                   </button>
+                                   <button
+                                     onClick={() => handleConvertirReserva(c.id)}
+                                     disabled={convirtiendo === c.id}
+                                     className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
+                                     style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none', opacity: convirtiendo === c.id ? 0.6 : 1 }}
+                                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
+                                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}
+                                   >
+                                     {convirtiendo === c.id ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                                     Alquilar
+                                   </button>
+                                   <button
+                                     onClick={() => setCancelarReservaId(c.id)}
+                                     className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
+                                     style={{ backgroundColor: 'oklch(0.95 0.02 25)', color: 'var(--danger)', border: '0.5px solid var(--danger)' }}
+                                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.90 0.04 25)'; }}
+                                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.95 0.02 25)'; }}
+                                   >
+                                     <Ban size={12} /> Cancelar Reserva
+                                   </button>
+                                 </>
+                               ) : c.estado === 'cancelado' ? null : (
+                                 <>
+                                   {(c.estado === 'alquilado' || c.estado === 'atrasado') && (
+                                     <>
+                                       <button
+                                         onClick={() => openEditDialog(c)}
+                                         className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
+                                         style={{ backgroundColor: 'var(--surface)', color: 'var(--info)', border: '0.5px solid var(--info)' }}
+                                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.93 0.04 240)'; }}
+                                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
+                                       >
+                                         <Edit size={12} /> Editar
+                                       </button>
+                                       <button
+                                         onClick={() => setEliminandoContrato(c)}
+                                         className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
+                                         style={{ backgroundColor: 'var(--surface)', color: 'var(--danger)', border: '0.5px solid var(--danger)' }}
+                                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.95 0.02 25)'; }}
+                                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
+                                       >
+                                         <Trash2 size={12} /> Eliminar
+                                       </button>
+                                     </>
+                                   )}
+                                   <button
+                                     onClick={() => setCalificarContrato(c)}
+                                     className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
+                                     style={{ backgroundColor: 'oklch(0.62 0.17 80 / 0.12)', color: 'oklch(0.52 0.17 80)', border: '0.5px solid oklch(0.62 0.17 80 / 0.3)' }}
+                                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.2)'; }}
+                                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.12)'; }}
+                                   >
+                                     <Star size={12} /> Calificar
+                                   </button>
+                                   {c.estado !== 'devuelto' && (
+                                     <button
+                                       onClick={() => setDevolucionActiva(devolucionActiva === c.id ? null : c.id)}
+                                       className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
+                                       style={{ backgroundColor: devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)', color: '#fff', border: 'none' }}
+                                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = devolucionActiva === c.id ? 'oklch(0.40 0.14 25)' : 'oklch(0.43 0.14 55)'; }}
+                                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)'; }}
+                                     >
+                                       {devolucionActiva === c.id ? <X size={12} /> : (pendiente > 0 && <AlertTriangle size={12} />)}
+                                       {devolucionActiva === c.id ? 'Cancelar devolución' : 'Devolución' + (pendiente > 0 ? ' (con deuda)' : '')} <ArrowRight size={12} />
+                                     </button>
+                                   )}
+                                 </>
+                               )}
+                             </div>
                           </>)}
                       </div>
                     </div>
@@ -832,7 +945,44 @@ export default function Alquileres() {
             idContrato={calificarContrato.id}
             idCliente={calificarContrato.id_cliente}
             onClose={() => setCalificarContrato(null)}
-            onGuardado={() => { recargar(); toast('Calificación guardada'); }}
+            onGuardado={() => { recargar(); toast('Calificacion guardada'); }}
+          />
+        )}
+
+        {eliminandoContrato && (
+          <ConfirmModal
+            open={!!eliminandoContrato}
+            title="Eliminar contrato"
+            message={`Esta seguro de enviar el contrato #${eliminandoContrato.id} a la papelera?`}
+            confirmLabel="Enviar a papelera"
+            danger
+            onConfirm={handleEliminarContrato}
+            onCancel={() => { setEliminandoContrato(null); setDeleteMotivo(''); }}
+          >
+            <div className="mt-3">
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--muted)' }}>
+                Motivo (opcional)
+              </label>
+              <input
+                type="text"
+                value={deleteMotivo}
+                onChange={e => setDeleteMotivo(e.target.value)}
+                placeholder="Ej: Error al registrar, duplicado..."
+                className="w-full h-9 px-3 rounded-lg text-sm border outline-none"
+                style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
+              />
+            </div>
+          </ConfirmModal>
+        )}
+
+        {restaurandoContrato && (
+          <ConfirmModal
+            open={!!restaurandoContrato}
+            title="Restaurar contrato"
+            message={`Desea restaurar el contrato #${restaurandoContrato.id} desde la papelera? Las herramientas volveran al estado que tenian.`}
+            confirmLabel="Restaurar"
+            onConfirm={handleRestaurarContrato}
+            onCancel={() => setRestaurandoContrato(null)}
           />
         )}
 

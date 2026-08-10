@@ -15,6 +15,11 @@ const {
   revertirDevolucionGranel,
   getDevolucionesGranel,
   anularPago,
+  editarContrato,
+  editarReserva,
+  eliminarContrato,
+  restaurarContrato,
+  autoEliminarPapelera,
 } = require('./services/contratoService');
 const { checkActivation, activateLicense, getMachineId } = require('./services/licenseService');
 const {
@@ -195,6 +200,22 @@ function registerIpcHandlers() {
   ipcMain.handle('anular-pago', (_e, data) => {
     const { idPago, motivo } = data;
     return anularPago(idPago, motivo);
+  });
+
+  ipcMain.handle('editar-contrato', (_e, idContrato, data) => {
+    return editarContrato(idContrato, data);
+  });
+
+  ipcMain.handle('editar-reserva', (_e, idContrato, data) => {
+    return editarReserva(idContrato, data);
+  });
+
+  ipcMain.handle('eliminar-contrato', (_e, idContrato, motivo) => {
+    return eliminarContrato(idContrato, motivo);
+  });
+
+  ipcMain.handle('restaurar-contrato', (_e, idContrato) => {
+    return restaurarContrato(idContrato);
   });
 
 // --- Kits ---

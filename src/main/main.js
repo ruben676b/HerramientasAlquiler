@@ -2,7 +2,7 @@ const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 const { initDatabase } = require('./db/init');
 const { registerIpcHandlers } = require('./ipcHandlers');
-const { autoCancelarReservas } = require('./services/contratoService');
+const { autoCancelarReservas, autoEliminarPapelera } = require('./services/contratoService');
 
 const isDev = !app.isPackaged;
 
@@ -21,7 +21,7 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    // mainWindow.webContents.openDevTools({ mode: 'detach' });
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     mainWindow.loadFile(
       path.join(__dirname, '..', '..', 'dist', 'renderer', 'index.html')
@@ -34,6 +34,7 @@ app.whenReady().then(() => {
   initDatabase();
   registerIpcHandlers();
   try { autoCancelarReservas(); } catch (e) { console.error('[autoCancelarReservas] Error:', e.message); }
+  try { autoEliminarPapelera(); } catch (e) { console.error('[autoEliminarPapelera] Error:', e.message); }
   createWindow();
 
   app.on('activate', () => {

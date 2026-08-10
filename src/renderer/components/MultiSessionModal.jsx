@@ -24,10 +24,18 @@ export default function MultiSessionModal() {
 
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  if (!isOpen) return null;
-
   const activeSessions = sessions.filter((s) => !s.saved);
   const activeSession = activeSessions.find((s) => s.id === activeId);
+
+  if (!isOpen) {
+    console.log('[MultiSessionModal] Oculto (isOpen=false)');
+    return null;
+  }
+
+  console.log('[MultiSessionModal] Visible - isOpen:' + isOpen + ' activeId:' + activeId + ' sessions:' + sessions.length + ' activeSessions:' + activeSessions.length + ' foundSession:' + !!activeSession);
+  if (!activeSession) {
+    console.log('[MultiSessionModal] Sin sesion activa. activeSessions:', activeSessions.map(s => ({ id: s.id, tipo: s.tipo })));
+  }
 
   return (
     <div
@@ -201,7 +209,10 @@ function SessionForm({ session }) {
     setSugerenciasDni([]);
     setSugerenciasNombre([]);
     setPagos(data.pagos || []);
+    setDepositoMonto(data.depositoMonto || 0);
     setDepositoDni(data.depositoDni || false);
+    setFirmaBase64(data.firmaBase64 || null);
+    setEditContratoId(data.editContratoId || null);
     // Actualizar nombre de sesión con los datos CARGADOS
     const displayName = nuevoNombre || (nuevoDni.length === 8 ? 'DNI ' + nuevoDni : null);
     if (displayName) {
@@ -260,6 +271,7 @@ function SessionForm({ session }) {
   const [pagos, setPagos] = useState(saved.pagos || []);
   const [depositoMonto, setDepositoMonto] = useState(saved.depositoMonto || 0);
   const [depositoDni, setDepositoDni] = useState(saved.depositoDni || false);
+  const [editContratoId, setEditContratoId] = useState(saved.editContratoId || null);
   const [pagoMonto, setPagoMonto] = useState('');
   const [pagoMetodo, setPagoMetodo] = useState('efectivo');
   const [garantias, setGarantias] = useState([]);
@@ -334,8 +346,8 @@ function SessionForm({ session }) {
 
   // Auto-guardar items
   useEffect(() => {
-    saveFormData(session.id, { dni, nombre, telefono, fechaSalida, fechaDevolucion, fechaReserva, clienteSeleccionado, items, step, firmaBase64, pagos, depositoMonto, depositoDni });
-  }, [items, dni, nombre, telefono, fechaSalida, fechaDevolucion, clienteSeleccionado, session.id, step, pagos]);
+    saveFormData(session.id, { dni, nombre, telefono, fechaSalida, fechaDevolucion, fechaReserva, clienteSeleccionado, items, step, firmaBase64, pagos, depositoMonto, depositoDni, editContratoId });
+  }, [items, dni, nombre, telefono, fechaSalida, fechaDevolucion, clienteSeleccionado, session.id, step, pagos, editContratoId]);
 
   // Sincronizar fechaSalida y fechaDevolucion con fechaReserva en reservas
   useEffect(() => {
@@ -375,7 +387,15 @@ function SessionForm({ session }) {
         return 0;
       })
       .slice(0, 8)
-      .map(h => ({ ...h, _tipo: 'herramienta', _enLista: items.some(i => i.id_herramienta === h.id) }));
+      .map(h => {
+        const enLista = items.some(i => i.id_herramienta === h.id);
+        return {
+          ...h,
+          _tipo: 'herramienta',
+          _enLista: enLista,
+          _enContratoEditado: editContratoId && enLista,
+        };
+      });
     const gran = granelCat
       .filter(g => (g.nombre || '').toLowerCase().includes(q))
       .slice(0, 8)
@@ -406,11 +426,13 @@ function SessionForm({ session }) {
   }, [busquedaEquipo, todasHerramientas, granelCat, kitsCat, items, kitsEnOtrasSesiones]);
 
   const agregarHerramienta = (h) => {
-    if (h.estado !== 'disponible') return;
-    if (items.find((i) => i.id_herramienta === h.id)) {
-      toast(h.id + ' ya está agregada en este alquiler', 'warning');
+    const yaEnEstaSesion = items.find((i) => i.id_herramienta === h.id);
+    if (yaEnEstaSesion) {
+      toast(h.id + ' ya esta agregada en este alquiler', 'warning');
       return;
     }
+    if (h.estado !== 'disponible' && !editContratoId) return;
+    if (h.estado !== 'disponible' && editContratoId && !h._enContratoEditado) return;
     setItems([...items, { tipo: 'individual', id_herramienta: h.id, nombre: h.nombre, precio_dia: h.precio_dia, precio_minimo: h.precio_minimo, precio_mes: h.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: 'dia' }]);
     setBusquedaEquipo('');
   };
@@ -649,7 +671,29 @@ const itemsData = itemsConDias.map(item => ({
 
       let idContrato;
 
-      if (esReserva) {
+      if (editContratoId) {
+        // Modo edicion
+        const editarData = {
+          idCliente: clienteSeleccionado?.id || 0,
+          dniCliente: dni || '',
+          nombreCliente: nombre || '',
+          telefonoCliente: telefono || '',
+          idUsuario: 1,
+          fechaSalida: esReserva ? fechaReserva : fechaSalida,
+          fechaDevolucionPactada: fechaDevolucion,
+          depositoMonto: 0,
+          depositoDni: depositoDni ? 1 : 0,
+          items: itemsData,
+        };
+        if (esReserva) {
+          editarData.fechaReserva = fechaReserva;
+          await window.api.editarReserva(editContratoId, editarData);
+        } else {
+          await window.api.editarContrato(editContratoId, editarData);
+        }
+        idContrato = editContratoId;
+        toast((esReserva ? 'Reserva' : 'Alquiler') + ' #' + editContratoId + ' actualizado correctamente');
+      } else if (esReserva) {
         const resultado = await window.api.crearReserva({
           idCliente: clienteSeleccionado?.id || 0,
           dniCliente: dni || '',
@@ -681,19 +725,20 @@ const itemsData = itemsConDias.map(item => ({
         idContrato = resultado.idContrato;
       }
 
-      if (firmaBase64) {
+      if (firmaBase64 && !editContratoId) {
         await window.api.guardarFirma(idContrato, firmaBase64);
       }
 
-      try {
-        const pdfPath = await window.api.generarContratoPdf(idContrato);
-        toast('Contrato #' + idContrato + ' creado. PDF generado.');
-      } catch {
-        toast('Contrato #' + idContrato + ' creado (sin PDF).', 'warning');
+      if (!editContratoId) {
+        try {
+          const pdfPath = await window.api.generarContratoPdf(idContrato);
+          toast('Contrato #' + idContrato + ' creado. PDF generado.');
+        } catch {
+          toast('Contrato #' + idContrato + ' creado (sin PDF).', 'warning');
+        }
       }
 
       removeSession(session.id);
-      toast((esReserva ? 'Reserva' : 'Alquiler') + ' #' + idContrato + ' guardado correctamente');
       window.dispatchEvent(new CustomEvent('contrato-creado'));
       
       const remainingSessions = sessions.filter(s => !s.saved && s.id !== session.id);
@@ -714,7 +759,9 @@ const itemsData = itemsConDias.map(item => ({
       {/* Header + Step indicator — una sola línea */}
       <div className="shrink-0 flex items-center gap-6 px-5 py-2.5 border-b" style={{ borderColor: 'var(--border)' }}>
         <h2 className="text-base font-bold shrink-0" style={{ color: 'var(--ink)' }}>
-          {esAlquiler ? 'Nuevo Alquiler' : 'Nueva Reserva'}
+          {editContratoId
+            ? (esAlquiler ? 'Editar Alquiler #' : 'Editar Reserva #') + editContratoId
+            : (esAlquiler ? 'Nuevo Alquiler' : 'Nueva Reserva')}
         </h2>
 
         <div className="flex items-center gap-0 flex-1">
@@ -971,7 +1018,7 @@ const itemsData = itemsConDias.map(item => ({
                     const enLista = r._enLista;
                     const enOtraSesion = esHerr && !enLista && herramientasEnOtrasSesiones.has(r.id);
                     const disponible = esHerr
-                      ? (r.estado === 'disponible' && !enLista && !enOtraSesion)
+                      ? ((r.estado === 'disponible' && !enLista && !enOtraSesion) || r._enContratoEditado)
                       : (r._dispEfectivo > 0);
 
                     let tooltip = '';

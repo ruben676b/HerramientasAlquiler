@@ -110,7 +110,8 @@ export function SessionsProvider({ children }) {
           const hasDni = data.dni && data.dni.trim() !== '';
           const hasNombre = data.nombre && data.nombre.trim() !== '';
           const hasItems = data.items && data.items.length > 0;
-          isModified = hasDni || hasNombre || hasItems;
+          const hasEdit = data.editContratoId != null;
+          isModified = hasDni || hasNombre || hasItems || hasEdit;
         } catch {
           isModified = false;
         }
@@ -126,6 +127,78 @@ export function SessionsProvider({ children }) {
     });
   }, []);
 
+  const openEditDialog = (contrato) => {
+    window.api?.log?.('[openEditDialog] INICIO - id:' + (contrato?.id) + ' estado:' + (contrato?.estado) + ' items:' + (contrato?.items?.length || 0));
+    if (!contrato || !contrato.id) {
+      window.api?.log?.('[openEditDialog] ERROR: contrato invalido');
+      return;
+    }
+    const tipo = contrato.estado === 'reservado' ? 'reserva' : 'alquiler';
+    window.api?.log?.('[openEditDialog] tipo:' + tipo);
+
+    const id = nextIdRef.current++;
+    window.api?.log?.('[openEditDialog] nuevo session id:' + id);
+    const newSession = {
+      id, tipo,
+      label: tipo === 'reserva' ? ('Editar Reserva #' + contrato.id) : ('Editar Alquiler #' + contrato.id),
+      step: 0,
+      saved: false,
+      clientName: 'Editar #' + contrato.id + ' - ' + (contrato.cliente_nombre || ''),
+      createdAt: Date.now(),
+      editMode: true,
+    };
+
+    const formData = {
+      editContratoId: contrato.id,
+      editMode: true,
+      dni: contrato.cliente_dni || '',
+      nombre: contrato.cliente_nombre || '',
+      telefono: contrato.cliente_telefono || '',
+      clienteSeleccionado: {
+        id: contrato.id_cliente,
+        nombre: contrato.cliente_nombre,
+        dni: contrato.cliente_dni,
+        telefono: contrato.cliente_telefono,
+      },
+      fechaSalida: contrato.fecha_salida,
+      fechaDevolucion: contrato.fecha_devolucion_pactada,
+      fechaReserva: contrato.fecha_reserva || '',
+      depositoMonto: contrato.deposito_monto || 0,
+      depositoDni: contrato.deposito_dni === 1,
+      items: (contrato.items || [])
+        .filter(item => item.tipo_item === 'kit' || !item.id_kit)
+        .map(item => ({
+          tipo: item.tipo_item,
+          id_herramienta: item.id_herramienta || undefined,
+          id_item_granel: item.id_item_granel || undefined,
+          id_kit: item.id_kit || undefined,
+          nombre: item.item_nombre || item.kit_nombre || '',
+          precio_dia: item.precio_dia_aplicado || 0,
+          precio_minimo: item.precio_minimo,
+          precio_mes: item.precio_mes,
+          cantidad: item.cantidad || 1,
+          condicion: item.item_condicion || undefined,
+          tarifa: item.tarifa_aplicada || 'dia',
+          fecha_devolucion_item: item.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada,
+          _componentes: undefined,
+        })),
+      pagos: [],
+      step: 0,
+      firmaBase64: null,
+    };
+
+    try { localStorage.setItem(DATA_PREFIX + id, JSON.stringify(formData)); } catch(e) { window.api?.log?.('[openEditDialog] localStorage error: ' + e); }
+    window.api?.log?.('[openEditDialog] formData guardado, items count:' + formData.items.length);
+
+    setSessions(prev => {
+      window.api?.log?.('[openEditDialog] setSessions - prev length:' + prev.length + ' new session id:' + id);
+      return [...prev, newSession];
+    });
+    setActiveId(id);
+    setIsOpen(true);
+    window.api?.log?.('[openEditDialog] FIN - isOpen:true activeId:' + id);
+  };
+
   const value = {
     sessions,
     isOpen,
@@ -136,10 +209,12 @@ export function SessionsProvider({ children }) {
     updateSession,
     openDialog,
     closeDialog,
+    openEditDialog,
     setActiveId,
     loadFormData,
     saveFormData,
     clearFormData,
+    setIsOpen,
     activeAlquileres: sessions.filter(s => !s.saved && s.tipo === 'alquiler').length,
     activeReservas: sessions.filter(s => !s.saved && s.tipo === 'reserva').length,
   };

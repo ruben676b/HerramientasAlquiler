@@ -1,7 +1,7 @@
 import { AlertTriangle } from 'lucide-react';
 import Button from './ui/button';
 
-export default function ConfirmModal({ open, title, message, confirmLabel, danger, onConfirm, onCancel }) {
+export default function ConfirmModal({ open, title, message, confirmLabel, danger, onConfirm, onCancel, children }) {
   if (!open) return null;
 
   return (
@@ -17,6 +17,7 @@ export default function ConfirmModal({ open, title, message, confirmLabel, dange
         <div>
           <h3 className="text-base font-bold" style={{ color: 'var(--ink)' }}>{title}</h3>
           <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>{message}</p>
+          {children}
         </div>
         <div className="flex gap-2">
           <button onClick={onCancel} className="flex-1 h-9 rounded-lg text-sm font-medium border transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5"

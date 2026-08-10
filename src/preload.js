@@ -27,6 +27,10 @@ contextBridge.exposeInMainWorld('api', {
   getContratos: (filtros) => ipcRenderer.invoke('get-contratos', filtros),
   registrarPago: (data) => ipcRenderer.invoke('registrar-pago', data),
   anularPago: (data) => ipcRenderer.invoke('anular-pago', data),
+  editarContrato: (id, data) => ipcRenderer.invoke('editar-contrato', id, data),
+  editarReserva: (id, data) => ipcRenderer.invoke('editar-reserva', id, data),
+  eliminarContrato: (id, motivo) => ipcRenderer.invoke('eliminar-contrato', id, motivo),
+  restaurarContrato: (id) => ipcRenderer.invoke('restaurar-contrato', id),
 
   // Sistema
   closeApp: () => ipcRenderer.invoke('close-app'),
