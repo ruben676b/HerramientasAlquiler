@@ -43,6 +43,7 @@ const TIPO_LABELS = {
   deposito: 'Garantía recibida',
   devolucion_deposito: 'Devolución garantía',
   egreso_caja: 'Egreso de caja',
+  venta_inventario: 'Venta de Inventario',
 };
 
 const TIPO_GRUPO = {
@@ -52,6 +53,7 @@ const TIPO_GRUPO = {
   deposito: 'Garantía',
   devolucion_deposito: 'Dev. Garantía',
   egreso_caja: 'Egreso de Caja',
+  venta_inventario: 'Venta de Inventario',
 };
 
 const METODO_CONFIG = {
@@ -501,6 +503,21 @@ export default function Caja() {
                             <>
                               <span className="text-[11px] font-medium truncate" style={{ color: 'var(--ink)' }}>
                                 {mov.notas || 'Sin descripción'}
+                              </span>
+                              <span className="text-[11px]" style={{ color: 'var(--faint)' }}>·</span>
+                              <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--faint)' }}>
+                                <Clock size={9} />
+                                {fmtHora(mov.fecha_pago)}
+                              </span>
+                            </>
+                          ) : mov.esVentaDirecta ? (
+                            <>
+                              <span className="text-[11px] font-medium truncate" style={{ color: 'var(--ink)' }}>
+                                {mov.notas}
+                              </span>
+                              <span className="text-[11px]" style={{ color: 'var(--faint)' }}>·</span>
+                              <span className="text-[11px] truncate" style={{ color: 'var(--muted)' }}>
+                                {mov.cliente_nombre}
                               </span>
                               <span className="text-[11px]" style={{ color: 'var(--faint)' }}>·</span>
                               <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--faint)' }}>

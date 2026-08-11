@@ -22,6 +22,7 @@ const {
   autoEliminarPapelera,
 } = require('./services/contratoService');
 const { checkActivation, activateLicense, getMachineId } = require('./services/licenseService');
+const { registrarVentaInventario } = require('./services/ventaService');
 const {
   getHerramientas,
   crearHerramienta,
@@ -524,8 +525,12 @@ ipcMain.handle('log', (_e, msg) => {
   });
 
   // --- Caja ---
-  ipcMain.handle('get-resumen-caja', (_e, fecha) => {
+  ipcMain.handle('get-resumen-caja', (event, fecha) => {
     return getResumenCaja(fecha);
+  });
+
+  ipcMain.handle('registrar-venta-inventario', (event, data) => {
+    return registrarVentaInventario(data);
   });
 
   ipcMain.handle('registrar-egreso-caja', (_e, data) => {

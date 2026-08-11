@@ -81,16 +81,36 @@ function getResumenCaja(fecha) {
     }
   }
 
+  // 2.5 Totales por método de ventas (de VENTA_INVENTARIO)
+  const totalesVentaInventario = db.prepare(`
+    SELECT
+      metodo,
+      SUM(total) AS total_venta
+    FROM VENTA_INVENTARIO
+    WHERE DATE(fecha) = ?
+    GROUP BY metodo
+  `).all(fecha);
+
+  const ventasMap = { efectivo: 0, yape: 0, plin: 0 };
+  for (const row of totalesVentaInventario) {
+    if (ventasMap[row.metodo] !== undefined) {
+      ventasMap[row.metodo] = row.total_venta || 0;
+    }
+  }
+
   // Construir objeto de totales
   const totalesPorMetodo = { efectivo: 0, yape: 0, plin: 0, totalIngresos: 0, totalEgresos: 0 };
 
   for (const row of totalesMetodoPago) {
     const egresoDirecto = egresosDirectosMap[row.metodo] || 0;
+    const venta = ventasMap[row.metodo] || 0;
     const totalEgresosMetodo = (row.egresos || 0) + egresoDirecto;
-    totalesPorMetodo[row.metodo] = (row.ingresos || 0) - totalEgresosMetodo;
-    totalesPorMetodo.totalIngresos += row.ingresos || 0;
+    const totalIngresosMetodo = (row.ingresos || 0) + venta;
+    totalesPorMetodo[row.metodo] = totalIngresosMetodo - totalEgresosMetodo;
+    totalesPorMetodo.totalIngresos += totalIngresosMetodo;
     totalesPorMetodo.totalEgresos += totalEgresosMetodo;
     delete egresosDirectosMap[row.metodo];
+    delete ventasMap[row.metodo];
   }
 
   // Agregar egresos directos de métodos sin transacciones en PAGO
@@ -98,6 +118,14 @@ function getResumenCaja(fecha) {
     if (egresoDirecto > 0) {
       totalesPorMetodo[metodo] = (totalesPorMetodo[metodo] || 0) - egresoDirecto;
       totalesPorMetodo.totalEgresos += egresoDirecto;
+    }
+  }
+
+  // Agregar ventas de métodos sin transacciones en PAGO
+  for (const [metodo, venta] of Object.entries(ventasMap)) {
+    if (venta > 0) {
+      totalesPorMetodo[metodo] = (totalesPorMetodo[metodo] || 0) + venta;
+      totalesPorMetodo.totalIngresos += venta;
     }
   }
 
@@ -137,6 +165,18 @@ function getResumenCaja(fecha) {
     resumenConcepto.push(egresoFila);
   }
 
+  // Agregar fila de Venta de Inventario a resumenConcepto si existe
+  const ventaFila = { tipo: 'venta_inventario', efectivo: 0, yape: 0, plin: 0, total: 0 };
+  for (const row of totalesVentaInventario) {
+    if (ventaFila[row.metodo] !== undefined) {
+      ventaFila[row.metodo] = row.total_venta || 0;
+      ventaFila.total += row.total_venta || 0;
+    }
+  }
+  if (ventaFila.total > 0) {
+    resumenConcepto.push(ventaFila);
+  }
+
   // 4. Listado detallado de movimientos combinados
   const movimientosPago = db.prepare(`
     SELECT
@@ -171,7 +211,22 @@ function getResumenCaja(fecha) {
     WHERE DATE(fecha) = ?
   `).all(fecha).map(e => ({ ...e, id: 'egreso_' + e.id_egreso, esEgresoDirecto: true }));
 
-  const movimientos = [...movimientosPago, ...movimientosEgreso].sort((a, b) => {
+  const movimientosVenta = db.prepare(`
+    SELECT
+      id AS id_venta,
+      total AS monto,
+      fecha AS fecha_pago,
+      metodo,
+      'venta_inventario' AS tipo,
+      'Venta: ' || cantidad || 'x ' || nombre_item AS notas,
+      NULL AS contrato_num,
+      COALESCE(cliente_nombre, 'Venta Mostrador') AS cliente_nombre,
+      NULL AS cliente_dni
+    FROM VENTA_INVENTARIO
+    WHERE DATE(fecha) = ?
+  `).all(fecha).map(v => ({ ...v, id: 'venta_' + v.id_venta, esVentaDirecta: true }));
+
+  const movimientos = [...movimientosPago, ...movimientosEgreso, ...movimientosVenta].sort((a, b) => {
     return new Date(b.fecha_pago) - new Date(a.fecha_pago);
   });
 
@@ -188,12 +243,16 @@ function getResumenCaja(fecha) {
     SELECT COUNT(*) AS total FROM EGRESO_CAJA WHERE DATE(fecha) = ?
   `).get(fecha).total;
 
+  const totalVentaCount = db.prepare(`
+    SELECT COUNT(*) AS total FROM VENTA_INVENTARIO WHERE DATE(fecha) = ?
+  `).get(fecha).total;
+
   return {
     fecha,
     totalesPorMetodo,
     resumenConcepto,
     movimientos,
-    totalMovimientos: (contadoresPago.total_movimientos || 0) + (totalEgresoCount || 0),
+    totalMovimientos: (contadoresPago.total_movimientos || 0) + (totalEgresoCount || 0) + (totalVentaCount || 0),
     totalContratos: contadoresPago.total_contratos || 0,
   };
 }
