@@ -1,19 +1,65 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import ReactDOM from 'react-dom/client';
 import { ToastProvider } from './components/Toast';
 import { SessionsProvider } from './contexts/SessionsContext';
 import { DevolucionesProvider } from './contexts/DevolucionesContext';
 import ActivationPage from './components/ActivationPage';
+import CajaInicialModal from './components/CajaInicialModal';
+import CierreCajaModal from './components/CierreCajaModal';
 import Layout from './components/Layout';
 import './index.css';
 
+// Context for caja inicial value (accessible from any component)
+const CajaInicialContext = createContext({ cajaInicial: 0 });
+export const useCajaInicial = () => useContext(CajaInicialContext);
+
 function App() {
+  // 'checking' → 'not_activated' → 'activated' → 'caja_inicial' → 'ready'
   const [licenseStatus, setLicenseStatus] = useState('checking');
+  const [cajaInicial, setCajaInicial] = useState(0);
+  const [showCierre, setShowCierre] = useState(false);
 
   useEffect(() => {
     window.api.license.check()
       .then(r => setLicenseStatus(r.activated ? 'activated' : 'not_activated'))
       .catch(() => setLicenseStatus('not_activated'));
+  }, []);
+
+  // When license is activated, move to caja_inicial step
+  useEffect(() => {
+    if (licenseStatus === 'activated') {
+      setLicenseStatus('caja_inicial');
+    }
+  }, [licenseStatus]);
+
+  // Listen for close request from main process
+  useEffect(() => {
+    if (window.api && window.api.onCloseRequested) {
+      const cleanup = window.api.onCloseRequested(() => {
+        // Only show confirmation if caja is open (app is ready)
+        if (licenseStatus === 'ready') {
+          setShowCierre(true);
+        } else {
+          // If caja hasn't been opened yet, just close
+          window.api.closeApp();
+        }
+      });
+      return cleanup;
+    }
+  }, [licenseStatus]);
+
+  const handleCajaInicialConfirm = useCallback((monto) => {
+    setCajaInicial(monto);
+    setLicenseStatus('ready');
+  }, []);
+
+  const handleCierreConfirm = useCallback(() => {
+    setShowCierre(false);
+    window.api.closeApp();
+  }, []);
+
+  const handleCierreCancel = useCallback(() => {
+    setShowCierre(false);
   }, []);
 
   if (licenseStatus === 'checking') {
@@ -31,14 +77,26 @@ function App() {
     return <ActivationPage onActivated={() => setLicenseStatus('activated')} />;
   }
 
+  if (licenseStatus === 'caja_inicial') {
+    return <CajaInicialModal onConfirm={handleCajaInicialConfirm} />;
+  }
+
   return (
-    <ToastProvider>
-      <SessionsProvider>
-        <DevolucionesProvider>
-          <Layout />
-        </DevolucionesProvider>
-      </SessionsProvider>
-    </ToastProvider>
+    <CajaInicialContext.Provider value={{ cajaInicial }}>
+      <ToastProvider>
+        <SessionsProvider>
+          <DevolucionesProvider>
+            <Layout />
+            <CierreCajaModal
+              open={showCierre}
+              cajaInicial={cajaInicial}
+              onConfirm={handleCierreConfirm}
+              onCancel={handleCierreCancel}
+            />
+          </DevolucionesProvider>
+        </SessionsProvider>
+      </ToastProvider>
+    </CajaInicialContext.Provider>
   );
 }
 

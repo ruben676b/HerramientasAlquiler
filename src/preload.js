@@ -33,7 +33,12 @@ contextBridge.exposeInMainWorld('api', {
   restaurarContrato: (id) => ipcRenderer.invoke('restaurar-contrato', id),
 
   // Sistema
-  closeApp: () => ipcRenderer.invoke('close-app'),
+  closeApp: () => ipcRenderer.send('force-quit'),
+  onCloseRequested: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('close-requested', handler);
+    return () => ipcRenderer.removeListener('close-requested', handler);
+  },
   checkDbStatus: () => ipcRenderer.invoke('check-db-status'),
 
   // Inventario

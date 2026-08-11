@@ -3,10 +3,11 @@ import {
   DollarSign, Banknote, Smartphone, CreditCard,
   Calendar, ChevronLeft, ChevronRight, ArrowUpRight,
   ArrowDownLeft, Receipt, TrendingUp, Hash, Clock,
-  RefreshCw,
+  RefreshCw, Wallet,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { localDate } from '../lib/date';
+import { useCajaInicial } from '../main';
 
 /* ================================================================
    CAJA — Resumen financiero diario
@@ -79,6 +80,7 @@ export default function Caja() {
   const [resumen, setResumen] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+  const { cajaInicial } = useCajaInicial();
 
   const cargarDatos = useCallback(async () => {
     if (!window.api) return;
@@ -125,6 +127,11 @@ export default function Caja() {
   const totalNeto = resumen
     ? resumen.totalesPorMetodo.totalIngresos - resumen.totalesPorMetodo.totalEgresos
     : 0;
+
+  const esHoyFecha = fecha === hoy;
+  const totalEfectivoCaja = esHoyFecha
+    ? cajaInicial + (resumen?.totalesPorMetodo?.efectivo || 0)
+    : (resumen?.totalesPorMetodo?.efectivo || 0);
 
   /* ================================================================
      RENDER
@@ -215,6 +222,42 @@ export default function Caja() {
         </div>
       ) : resumen && (
         <>
+          {/* ===== SECCIÓN 0: CAJA INICIAL (solo hoy) ===== */}
+          {esHoyFecha && (
+            <div
+              className="rounded-xl p-3.5 mb-4 flex items-center justify-between"
+              style={{
+                backgroundColor: 'oklch(0.55 0.15 160 / 0.06)',
+                border: '1px solid oklch(0.55 0.15 160 / 0.15)',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: 'oklch(0.55 0.15 160 / 0.12)' }}
+                >
+                  <Wallet size={16} style={{ color: 'oklch(0.55 0.15 160)' }} />
+                </div>
+                <div>
+                  <p className="text-[13px] font-semibold" style={{ color: 'oklch(0.55 0.15 160)' }}>
+                    Caja inicial del día
+                  </p>
+                  <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                    Monto de efectivo al abrir la caja
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[16px] font-bold font-mono" style={{ color: 'oklch(0.55 0.15 160)' }}>
+                  {fmtMoneda(cajaInicial)}
+                </p>
+                <p className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>
+                  Total efectivo en caja: {fmtMoneda(totalEfectivoCaja)}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* ===== SECCIÓN 1: KPI CARDS ===== */}
           <div
             className="grid gap-3 mb-5"

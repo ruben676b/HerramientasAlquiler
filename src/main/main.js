@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const { initDatabase } = require('./db/init');
 const { registerIpcHandlers } = require('./ipcHandlers');
@@ -6,8 +6,11 @@ const { autoCancelarReservas, autoEliminarPapelera } = require('./services/contr
 
 const isDev = !app.isPackaged;
 
+let mainWindow = null;
+let forceQuit = false;
+
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 1024,
@@ -17,6 +20,14 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  // Intercept the window close to ask for confirmation in the renderer
+  mainWindow.on('close', (e) => {
+    if (!forceQuit) {
+      e.preventDefault();
+      mainWindow.webContents.send('close-requested');
+    }
   });
 
   if (isDev) {
@@ -48,4 +59,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+// When the renderer confirms close, force quit
+ipcMain.on('force-quit', () => {
+  forceQuit = true;
+  app.quit();
 });
