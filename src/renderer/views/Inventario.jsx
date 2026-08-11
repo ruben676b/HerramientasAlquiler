@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Search, Plus, Pencil, Trash2, Wrench, Package, X, History,
   ChevronDown, ChevronRight, CheckCircle, AlertTriangle, MinusCircle, Layers,
-  ImagePlus,
+  ImagePlus, Calendar, Clock,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { SEMANTIC, ESTADOS_HERRAMIENTA } from '../lib/constants';
@@ -15,7 +15,13 @@ import { useToast } from '../components/Toast';
    INVENTARIO — Vista por familias
    ================================================================ */
 
-const ESTADO_ICON = { disponible: CheckCircle, alquilado: Package, mantenimiento: AlertTriangle, malogrado: MinusCircle };
+const ESTADO_ICON = {
+  disponible: CheckCircle,
+  reservado: Calendar,
+  alquilado: Package,
+  mantenimiento: AlertTriangle,
+  malogrado: MinusCircle,
+};
 
 export default function Inventario() {
   const [tab, setTab] = useState('herramientas');
@@ -391,13 +397,13 @@ export default function Inventario() {
                     <div style={{ borderTop: '1px solid var(--border)' }}>
                       {f.herramientas.map((h) => {
                         const s = sem[h.estado];
-                        const Icon = ESTADO_ICON[h.estado];
+                        const Icon = ESTADO_ICON[h.estado] || CheckCircle;
                         return (
                           <div key={h.id}>
                             <div className="group/row flex items-center gap-3 px-4 py-2 text-sm transition-colors duration-150 hover:bg-[var(--surface)]" style={{ borderBottom: '1px solid var(--border)' }}>
                               <span className="font-mono text-xs font-medium w-16 shrink-0" style={{ color: 'var(--primary)' }}>{h.id}</span>
                               <span className="flex-1" style={{ color: 'var(--ink)' }}>{h.nombre}</span>
-                            {h.estado === 'alquilado' ? (
+                            {h.estado === 'alquilado' || h.estado === 'reservado' ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0"
                                 style={{ backgroundColor: s?.soft, color: s?.variable }}>
                                 <Icon size={10} /> {h.estado}
@@ -686,6 +692,7 @@ function EstadoDropdown({ h, s, Icon, onChange }) {
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef(null);
   const estados = ['disponible', 'mantenimiento', 'malogrado'];
+  const IconComp = Icon || CheckCircle;
 
   const abrir = (e) => {
     e.stopPropagation();
@@ -714,14 +721,14 @@ function EstadoDropdown({ h, s, Icon, onChange }) {
         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors duration-150"
         style={{ backgroundColor: s?.soft, color: s?.variable }}
       >
-        <Icon size={10} /> {h.estado} ▾
+        <IconComp size={10} /> {h.estado} ▾
       </button>
       {abierto && (
         <div className="fixed z-50 bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-lg py-0.5 min-w-[130px]"
           style={{ top: pos.top, left: pos.left }}>
           {estados.filter(e => e !== h.estado).map((e) => {
             const sem = SEMANTIC[e];
-            const EIcon = ESTADO_ICON[e];
+            const EIcon = ESTADO_ICON[e] || CheckCircle;
             return (
               <button
                 key={e}
