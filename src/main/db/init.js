@@ -279,6 +279,30 @@ function initDatabase() {
       metodo TEXT NOT NULL DEFAULT 'efectivo' CHECK (metodo IN ('efectivo', 'yape', 'plin')),
       fecha TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
+
+    CREATE TABLE IF NOT EXISTS REPORTE (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha_generacion TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      fecha_inicio TEXT NOT NULL,
+      fecha_fin TEXT NOT NULL,
+      total_ingresos REAL NOT NULL DEFAULT 0,
+      total_egresos REAL NOT NULL DEFAULT 0,
+      total_neto REAL NOT NULL DEFAULT 0,
+      totales_metodo TEXT NOT NULL DEFAULT '{}',
+      datos_json TEXT NOT NULL DEFAULT '{}'
+    );
+
+    CREATE TABLE IF NOT EXISTS CAJA_DIARIA (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha TEXT NOT NULL UNIQUE,
+      monto_inicial REAL NOT NULL DEFAULT 0,
+      total_ingresos REAL NOT NULL DEFAULT 0,
+      total_egresos REAL NOT NULL DEFAULT 0,
+      total_neto REAL NOT NULL DEFAULT 0,
+      totales_metodo TEXT NOT NULL DEFAULT '{}',
+      resumen_json TEXT NOT NULL DEFAULT '{}',
+      fecha_cierre TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
   `);
 
   // Trigger: recalcular cantidad_disponible automáticamente en ITEM_GRANEL

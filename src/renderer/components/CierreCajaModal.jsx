@@ -25,8 +25,15 @@ export default function CierreCajaModal({ open, cajaInicial, onConfirm, onCancel
     }
   });
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setLoading(true);
+    try {
+      const hoy = new Date();
+      const fecha = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+      await window.api.guardarCajaDiaria(fecha, cajaInicial);
+    } catch (e) {
+      console.error('Error al guardar caja diaria:', e);
+    }
     setTimeout(() => onConfirm(), 300);
   };
 

@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   { id: 'inventario', label: 'Inventario', icon: Package },
   { id: 'clientes', label: 'Clientes', icon: Users },
   { id: 'caja', label: 'Caja', icon: DollarSign },
-  // { id: 'reportes', label: 'Reportes', icon: BarChart3 },
+  { id: 'reportes', label: 'Reportes', icon: BarChart3 },
   { id: 'configuracion', label: 'Configuración', icon: Settings },
 ];
 

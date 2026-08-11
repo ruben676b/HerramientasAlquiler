@@ -7,6 +7,7 @@ const Inventario = lazy(() => import('../views/Inventario'));
 const Configuracion = lazy(() => import('../views/Configuracion'));
 const Clientes = lazy(() => import('../views/Clientes'));
 const Caja = lazy(() => import('../views/Caja'));
+const Reportes = lazy(() => import('../views/Reportes'));
 
 const VIEWS = {
   alquileres: Alquileres,
@@ -15,17 +16,8 @@ const VIEWS = {
   configuracion: Configuracion,
   clientes: Clientes,
   caja: Caja,
-  reportes: () => <Placeholder titulo="Reportes" />,
+  reportes: Reportes,
 };
-
-function Placeholder({ titulo }) {
-  return (
-    <div className="p-6">
-      <h1 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>{titulo}</h1>
-      <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>Módulo en desarrollo.</p>
-    </div>
-  );
-}
 
 export default function Layout() {
   const [activeView, setActiveView] = useState('alquileres');

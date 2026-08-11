@@ -257,8 +257,86 @@ function getResumenCaja(fecha) {
   };
 }
 
+/**
+ * Guarda un snapshot del resumen de caja diaria para historial.
+ *
+ * @param {string} fecha - Formato YYYY-MM-DD
+ * @param {number} montoInicial - Monto inicial de caja del día
+ * @returns {object} { success: boolean, id: number }
+ */
+function guardarCajaDiaria(fecha, montoInicial) {
+  if (!fecha) fecha = localDate();
+
+  const resumen = getResumenCaja(fecha);
+
+  const totalNeto = (resumen.totalesPorMetodo.efectivo || 0) +
+    (resumen.totalesPorMetodo.yape || 0) +
+    (resumen.totalesPorMetodo.plin || 0);
+
+  const stmt = db.prepare(`
+    INSERT OR REPLACE INTO CAJA_DIARIA
+      (fecha, monto_inicial, total_ingresos, total_egresos, total_neto, totales_metodo, resumen_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const result = stmt.run(
+    fecha,
+    montoInicial || 0,
+    resumen.totalesPorMetodo.totalIngresos || 0,
+    resumen.totalesPorMetodo.totalEgresos || 0,
+    totalNeto,
+    JSON.stringify(resumen.totalesPorMetodo),
+    JSON.stringify(resumen)
+  );
+
+  return { success: true, id: result.lastInsertRowid };
+}
+
+/**
+ * Obtiene el historial de cajas diarias guardadas.
+ *
+ * @returns {Array} Lista de registros de caja diaria
+ */
+function getHistorialCaja() {
+  return db.prepare(`
+    SELECT id, fecha, monto_inicial, total_ingresos, total_egresos,
+           total_neto, totales_metodo, fecha_cierre
+    FROM CAJA_DIARIA
+    ORDER BY fecha DESC
+  `).all().map(r => ({
+    ...r,
+    totales_metodo: JSON.parse(r.totales_metodo || '{}'),
+  }));
+}
+
+/**
+ * Obtiene una caja diaria específica por fecha.
+ *
+ * @param {string} fecha
+ * @returns {object|null}
+ */
+function getCajaDiariaPorFecha(fecha) {
+  const row = db.prepare(`
+    SELECT id, fecha, monto_inicial, total_ingresos, total_egresos,
+           total_neto, totales_metodo, resumen_json, fecha_cierre
+    FROM CAJA_DIARIA
+    WHERE fecha = ?
+  `).get(fecha);
+
+  if (!row) return null;
+
+  return {
+    ...row,
+    totales_metodo: JSON.parse(row.totales_metodo || '{}'),
+    resumen_json: JSON.parse(row.resumen_json || '{}'),
+  };
+}
+
 module.exports = {
   getResumenCaja,
   registrarEgreso,
   eliminarEgreso,
+  guardarCajaDiaria,
+  getHistorialCaja,
+  getCajaDiariaPorFecha,
 };

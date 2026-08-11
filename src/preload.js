@@ -117,6 +117,15 @@ contextBridge.exposeInMainWorld('api', {
   registrarVentaInventario: (data) => ipcRenderer.invoke('registrar-venta-inventario', data),
   registrarEgresoCaja: (data) => ipcRenderer.invoke('registrar-egreso-caja', data),
   eliminarEgresoCaja: (id) => ipcRenderer.invoke('eliminar-egreso-caja', id),
+  guardarCajaDiaria: (fecha, montoInicial) => ipcRenderer.invoke('guardar-caja-diaria', fecha, montoInicial),
+  getHistorialCaja: () => ipcRenderer.invoke('get-historial-caja'),
+  getCajaDiaria: (fecha) => ipcRenderer.invoke('get-caja-diaria', fecha),
+
+  // Reportes
+  generarReporte: () => ipcRenderer.invoke('reporte:generar'),
+  listarReportes: () => ipcRenderer.invoke('reporte:listar'),
+  obtenerReporte: (id) => ipcRenderer.invoke('reporte:obtener', id),
+  exportarReportePDF: (id) => ipcRenderer.invoke('reporte:exportar-pdf', id),
 
   // Backup
   crearBackup: () => ipcRenderer.invoke('crear-backup'),
