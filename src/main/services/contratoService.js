@@ -2,7 +2,7 @@ const os = require('os');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db/database');
-const { localDate, localDateTime } = require('../utils/date');
+const { localDate, localDateTime, contarHabiles, contarMeses } = require('../utils/date');
 const { adjuntarEtiquetasPorCliente } = require('./clienteService');
 
 const LOG_FILE = path.join(os.tmpdir(), 'sistema-alquiler-debug.log');
@@ -61,6 +61,16 @@ function _autoCrearCliente(idCliente, dniCliente, nombreCliente, telefonoCliente
   if (!idClienteReal || idClienteReal < 1) {
     throw new Error('No se pudo identificar al cliente. Ingrese DNI o nombre.');
   }
+
+  // Si llegó un teléfono distinto al registrado (o el cliente no tenía), guardarlo
+  if (telefonoCliente && String(telefonoCliente).trim()) {
+    const nuevoTelefono = String(telefonoCliente).trim();
+    const cliente = db.prepare('SELECT telefono FROM CLIENTE WHERE id = ?').get(idClienteReal);
+    if (!cliente || cliente.telefono !== nuevoTelefono) {
+      db.prepare('UPDATE CLIENTE SET telefono = ? WHERE id = ?').run(nuevoTelefono, idClienteReal);
+    }
+  }
+
   return idClienteReal;
 }
 
@@ -1080,7 +1090,9 @@ function getContratos(filtros = {}) {
       ) + 1);
       const totalItem = item.total_item_snapshot != null
         ? item.total_item_snapshot
-        : diasItem * item.precio_dia_aplicado * item.cantidad;
+        : item.tarifa_aplicada === 'mes'
+          ? item.precio_dia_aplicado * contarMeses(c.fecha_salida, fechaDevItem) * item.cantidad
+          : item.precio_dia_aplicado * contarHabiles(c.fecha_salida, fechaDevItem) * item.cantidad;
       // Fecha de referencia para atraso
       const fechaPactadaItem = new Date(fechaDevItem + 'T00:00:00');
       const refDate = item.fecha_devolucion_real
@@ -1098,7 +1110,7 @@ function getContratos(filtros = {}) {
       ).get(c.id, item.id)['COALESCE(SUM(monto), 0)'];
       const saldoItem = Math.max(0, totalItem + montoAtrasoItem - pagadoItem);
 
-      return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem, dias_item: diasItem, total_item: totalItem, pagado_item: pagadoItem, saldo_item: saldoItem };
+      return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem, dias_item: diasItem, dias_habiles_item: contarHabiles(c.fecha_salida, fechaDevItem), meses_item: item.tarifa_aplicada === 'mes' ? contarMeses(c.fecha_salida, fechaDevItem) : 0, total_item: totalItem, pagado_item: pagadoItem, saldo_item: saldoItem };
     });
 
     const totalContrato = itemsConAtraso.reduce((a, i) => a + i.total_item, 0) + (c.deposito_monto || 0);

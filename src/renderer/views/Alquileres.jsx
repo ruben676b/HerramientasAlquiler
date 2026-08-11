@@ -15,6 +15,7 @@ import { gruparPagos } from '../lib/gruparPagos';
 import DevolucionInline from '../components/DevolucionInline';
 import CalificarContratoModal from '../components/CalificarContratoModal';
 import TagChip from '../components/TagChip';
+import { contarHabiles, contarMeses } from '../lib/duracion';
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -27,6 +28,14 @@ const fmtFechaCorta = (iso) => {
   if (!iso) return '';
   const d = new Date(iso + 'T00:00:00');
   return d.getDate() + ' ' + MESES[d.getMonth()];
+};
+
+const baseItem = (item, contrato) => {
+  if (item.total_item != null) return item.total_item;
+  const fechaDev = item.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;
+  if (item.tarifa_aplicada === 'mes')
+    return (item.precio_dia_aplicado || 0) * contarMeses(contrato.fecha_salida, fechaDev) * (item.cantidad || 1);
+  return (item.precio_dia_aplicado || 0) * contarHabiles(contrato.fecha_salida, fechaDev) * (item.cantidad || 1);
 };
 
 export default function Alquileres() {
@@ -56,7 +65,7 @@ export default function Alquileres() {
   const [devGarantiaMonto, setDevGarantiaMonto] = useState('');
   const [devGarantiaMetodo, setDevGarantiaMetodo] = useState('efectivo');
   const searchRef = useRef(null);
-  const { openDialog, openEditDialog, sessions } = useSessions();
+  const { openDialog, openEditDialog } = useSessions();
   const toast = useToast();
 
   const cargar = async () => {
@@ -222,8 +231,6 @@ export default function Alquileres() {
     return contratosConPendiente.filter(c => c.estado === estadoFiltro);
   }, [contratosConPendiente, estadoFiltro]);
 
-  const atrasados = contratosConPendiente.filter(c => c.dias_atraso > 0 && !(c.estado === 'devuelto' && c._pendiente <= 0));
-
   const toggleExpand = (id) => setExpandido(prev => prev === id ? null : id);
 
   return (
@@ -236,14 +243,6 @@ export default function Alquileres() {
       .dev-nospin { -moz-appearance: textfield !important; }
     `}</style>
       <div className="p-6 max-w-5xl mx-auto space-y-4">
-        {atrasados.length > 0 && (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm"
-            style={{ backgroundColor: 'oklch(0.95 0.015 25)', color: 'var(--danger)', border: '0.5px solid var(--danger)' }}>
-            <AlertTriangle size={15} />
-            <span>{atrasados.length} alquiler{atrasados.length !== 1 ? 'es' : ''} con devolucion vencida</span>
-          </div>
-        )}
-
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-medium" style={{ color: 'var(--ink)' }}>Alquileres</h1>
           <div className="flex gap-2">
@@ -255,30 +254,6 @@ export default function Alquileres() {
             </Button>
           </div>
         </div>
-
-        {sessions.filter(s => !s.saved).length > 0 && (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm"
-            style={{ backgroundColor: 'oklch(0.93 0.04 240)', color: 'var(--info)', border: '0.5px solid var(--info)' }}>
-            <Clock size={15} />
-            <span>
-              {sessions.filter(s => !s.saved && s.tipo === 'alquiler').length > 0 &&
-                <strong>{sessions.filter(s => !s.saved && s.tipo === 'alquiler').length} alquiler{sessions.filter(s => !s.saved && s.tipo === 'alquiler').length !== 1 ? 'es' : ''}</strong>}
-              {sessions.filter(s => !s.saved && s.tipo === 'alquiler').length > 0 && sessions.filter(s => !s.saved && s.tipo === 'reserva').length > 0 && ' y '}
-              {sessions.filter(s => !s.saved && s.tipo === 'reserva').length > 0 &&
-                <strong>{sessions.filter(s => !s.saved && s.tipo === 'reserva').length} reserva{sessions.filter(s => !s.saved && s.tipo === 'reserva').length !== 1 ? 's' : ''}</strong>}
-              {' pendiente' + (sessions.filter(s => !s.saved).length !== 1 ? 's' : '') + ' sin guardar'}
-            </span>
-            <button
-              onClick={() => {
-                const tipo = sessions.filter(s => !s.saved)[0]?.tipo || 'alquiler';
-                openDialog(tipo);
-              }}
-              className="ml-auto px-2.5 h-7 rounded text-xs font-medium transition-all duration-150"
-              style={{ backgroundColor: 'var(--info)', color: '#fff', border: 'none' }}>
-              Continuar
-            </button>
-          </div>
-        )}
 
         {error && (
           <div className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: 'oklch(0.94 0.02 25)', color: 'var(--danger)' }}>
@@ -504,7 +479,7 @@ export default function Alquileres() {
                                     {(() => {
                                       const renderEquipoFila = (item, idx, filaKey) => {
                                         const esGranel = !!item.item_condicion;
-                                        const sub = (item.total_item || ((item.precio_dia_aplicado || 0) * (item.dias_item || dias) * (item.cantidad || 1))) + (item.monto_atraso_item || 0);
+                                        const sub = baseItem(item, c) + (item.monto_atraso_item || 0);
                                         return (
                                           <div key={filaKey} className="space-y-0.5">
                                             {/* Fila 1: Badge + Nombre + Tarifa + Atraso badge */}
@@ -523,7 +498,7 @@ export default function Alquileres() {
                                               )}
                                               <span className="text-[13px] leading-tight font-semibold" style={{ color: 'var(--ink)' }}>{item.item_nombre}</span>
                                               <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
-                                                S/ {(item.precio_dia_aplicado || 0).toFixed(2)}/d&iacute;a{esGranel ? ' c/u' : ''}
+                                                S/ {(item.precio_dia_aplicado || 0).toFixed(2)}{item.tarifa_aplicada === 'mes' ? '/mes' : '/d&iacute;a'}{esGranel ? ' c/u' : ''}
                                               </span>
                                               {(item.dias_atraso_item || 0) > 0 && (
                                                 <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
@@ -551,7 +526,9 @@ export default function Alquileres() {
                                               <span />
                                               <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
                                                 Salida: {fmtFechaCorta(c.fecha_salida)} &middot; Pactada: {fmtFechaCorta(item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada)}
-                                                &middot; Base: {item.dias_item || 0} d&iacute;a{(item.dias_item || 0) !== 1 ? 's' : ''}
+                                                &middot; Base: {item.tarifa_aplicada === 'mes'
+                                                  ? (item.meses_item || 1) + ' mes' + ((item.meses_item || 1) !== 1 ? 'es' : '')
+                                                  : (item.dias_habiles_item || item.dias_item || 0) + ' d&iacute;a' + ((item.dias_habiles_item || item.dias_item || 0) !== 1 ? 's' : '') + ' sin dom.'}
                                               </span>
                                             </div>
                                             {/* Granel: resumen devolución */}
@@ -573,7 +550,7 @@ export default function Alquileres() {
                                             <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
                                               <span />
                                               <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                                                Base S/ {(item.total_item || (item.precio_dia_aplicado || 0) * (item.dias_item || 1) * (item.cantidad || 1)).toFixed(0)}
+                                                Base S/ {baseItem(item, c).toFixed(0)}
                                                 {(item.dias_atraso_item || 0) > 0 && (
                                                   <span style={{ color: 'var(--danger)' }}> + Mora S/ {(item.monto_atraso_item || 0).toFixed(0)}</span>
                                                 )}
@@ -606,7 +583,7 @@ export default function Alquileres() {
                                         }
                                         const key = c.id + '|' + g.prefix;
                                         const abierto = !!gruposEq[key];
-                                        const totalGrupo = g.items.reduce((a, { item }) => a + ((item.total_item || ((item.precio_dia_aplicado || 0) * (item.dias_item || dias) * (item.cantidad || 1))) + (item.monto_atraso_item || 0)), 0);
+                                        const totalGrupo = g.items.reduce((a, { item }) => a + (baseItem(item, c) + (item.monto_atraso_item || 0)), 0);
                                         const pendientes = g.items.filter(({ item }) => !item.estado_devolucion || item.estado_devolucion === 'pendiente').length;
                                         return (
                                           <div key={gi} className="rounded-xl transition-colors duration-150 overflow-hidden"

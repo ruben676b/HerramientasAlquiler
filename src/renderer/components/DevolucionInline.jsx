@@ -28,6 +28,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [costosRep, setCostosRep] = useState({});
   const [cantidades, setCantidades] = useState({});
   const [morasEditadas, setMoraEditadas] = useState({});
+  const [regla9amActiva, setRegla9amActiva] = useState(false);
   const [editandoCant, setEditandoCant] = useState({});
   const inputCantRefs = useRef({});
   const [mostrarPago, setMostrarPago] = useState(false);
@@ -152,6 +153,11 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
     return sum + (morasEditadas[idx] != null ? morasEditadas[idx] : sugerida);
   }, 0);
 
+  // Regla de las 9 AM: atraso de exactamente 1 día y devolución antes de las 9:00
+  const maxDiasAtraso = items.reduce((m, i) => Math.max(m, i.dias_atraso_item || 0), 0);
+  const regla9amAplica = new Date().getHours() < 9 && maxDiasAtraso === 1;
+  const montoAtrasoEfectivo = regla9amActiva ? 0 : montoAtraso;
+
   const costosDanosBackend = items.reduce((s, i) => {
     if (i.id_item_granel) return s + (i.granel_dev_costo_reparacion || 0);
     if (i.estado_devolucion === 'dañado' && i.danos_devueltos && i.danos_devueltos.length > 0) {
@@ -172,7 +178,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const totalPerdidas = costosPerdBackend + costosPerdLocal;
   const totalCargosExtra = totalDanos + totalPerdidas;
 
-  const total = montoBase + montoAtraso + totalCargosExtra;
+  const total = montoBase + montoAtrasoEfectivo + totalCargosExtra;
   const pendiente = Math.max(0, total - totalPagado);
   const montoCobrar = Math.max(0, pendiente - garantia);
   const montoDevolver = pendiente <= garantia ? Math.abs(pendiente - garantia) : 0;
@@ -1191,12 +1197,31 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
               <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {montoBase.toFixed(2)}</span>
             </div>
             
+            {/* Regla de las 9 AM: aviso de exoneración de mora */}
+            {regla9amAplica && (
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-[10px]"
+                style={{ backgroundColor: 'oklch(0.93 0.05 250)', color: 'oklch(0.40 0.12 250)' }}>
+                <span className="flex-1">
+                  Aún no son las 9:00 AM. Según la regla de las 9, puede no cobrar el recargo por atraso (S/ {montoAtraso.toFixed(2)}).
+                </span>
+                <button onClick={() => setRegla9amActiva(v => !v)}
+                  className="px-2 h-5 rounded text-[9px] font-semibold transition-all duration-150 active:scale-[0.97] whitespace-nowrap"
+                  style={{
+                    backgroundColor: regla9amActiva ? 'var(--success)' : 'var(--surface)',
+                    color: regla9amActiva ? '#fff' : 'oklch(0.40 0.12 250)',
+                    border: regla9amActiva ? 'none' : '0.5px solid var(--border)',
+                  }}>
+                  {regla9amActiva ? 'Cobrar recargo' : 'No cobrar recargo'}
+                </button>
+              </div>
+            )}
+
             {/* Mora total (suma de moras por ítem) */}
-            {montoAtraso > 0 && (
+            {montoAtrasoEfectivo > 0 && (
               <div className="flex justify-between">
                 <span style={{ color: 'var(--danger)' }}>Recargo por atraso</span>
                 <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>
-                  + S/ {montoAtraso.toFixed(2)}
+                  + S/ {montoAtrasoEfectivo.toFixed(2)}
                 </span>
               </div>
             )}

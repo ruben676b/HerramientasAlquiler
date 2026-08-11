@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
 const db = require('../db/database');
-const { localDateTime } = require('../utils/date');
+const { localDateTime, contarHabiles, contarMeses } = require('../utils/date');
 
 const CONTRATOS_DIR = path.join(app.getPath('documents'), 'AlquilerContratos');
 
@@ -35,11 +35,8 @@ function generarPdfDesdeDatos(datos) {
   const totalItems = items.reduce((a, i) => {
     if (i.snapshot != null) return a + i.snapshot;
     const fechaDevItem = i.fecha_devolucion_pactada || fechas.devolucion;
-    const diasItem = Math.max(1, Math.ceil(
-      (new Date(fechaDevItem + 'T00:00:00') - new Date(fechas.salida + 'T00:00:00')) / 86400000
-    ) + 1);
-    if (i.tarifa === 'mes') return a + i.precio_dia * i.cantidad;
-    return a + i.precio_dia * diasItem * i.cantidad;
+    if (i.tarifa === 'mes') return a + i.precio_dia * contarMeses(fechas.salida, fechaDevItem) * i.cantidad;
+    return a + i.precio_dia * contarHabiles(fechas.salida, fechaDevItem) * i.cantidad;
   }, 0);
 
   const nro = numContrato || 'PREVIEW';
@@ -139,12 +136,11 @@ function generarPdfDesdeDatos(datos) {
     if (y > 720) { doc.addPage(); y = 45; }
     const tarifa = item.tarifa || 'dia';
     const fechaDevItem = item.fecha_devolucion_pactada || fechas.devolucion;
-    const diasItem = Math.max(1, Math.ceil(
-      (new Date(fechaDevItem + 'T00:00:00') - new Date(fechas.salida + 'T00:00:00')) / 86400000
-    ) + 1);
     const sub = item.snapshot != null
       ? item.snapshot
-      : (tarifa === 'mes' ? item.precio_dia * item.cantidad : item.precio_dia * diasItem * item.cantidad);
+      : (tarifa === 'mes'
+          ? item.precio_dia * contarMeses(fechas.salida, fechaDevItem) * item.cantidad
+          : item.precio_dia * contarHabiles(fechas.salida, fechaDevItem) * item.cantidad);
     const esGranel = item.codigo && item.codigo.includes('(') && !/^[A-Z]+-\d/.test(item.codigo);
     const codigo = esGranel ? 'Material' : (item.codigo || '—');
     doc.text(codigo, colX[0], y, { width: colWidths[0] });
@@ -297,17 +293,12 @@ function generarPdf(idContrato) {
     telefono: getConfig('arrendadora_telefono'),
   };
 
-  const dias = Math.max(1, Math.ceil(
-    (new Date(contrato.fecha_devolucion_pactada + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
-  ) + 1);
   const totalItems = detalles.reduce((a, d) => {
     if (d.total_item_snapshot != null) return a + d.total_item_snapshot;
     const fechaDevItem = d.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;
-    const diasItem = Math.max(1, Math.ceil(
-      (new Date(fechaDevItem + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
-    ) + 1);
-    if ((d.tarifa_aplicada || 'dia') === 'mes') return a + d.precio_dia_aplicado * d.cantidad;
-    return a + d.precio_dia_aplicado * diasItem * d.cantidad;
+    if ((d.tarifa_aplicada || 'dia') === 'mes')
+      return a + d.precio_dia_aplicado * contarMeses(contrato.fecha_salida, fechaDevItem) * d.cantidad;
+    return a + d.precio_dia_aplicado * contarHabiles(contrato.fecha_salida, fechaDevItem) * d.cantidad;
   }, 0);
   const total = totalItems + (contrato.deposito_monto || 0);
 

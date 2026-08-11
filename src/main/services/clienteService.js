@@ -1,5 +1,5 @@
 const db = require('../db/database');
-const { localDate } = require('../utils/date');
+const { localDate, contarHabiles, contarMeses } = require('../utils/date');
 
 /**
  * Lista todos los clientes activos con promedio de estrellas y total de alquileres.
@@ -283,7 +283,9 @@ function getDetalleContrato(idContrato) {
     ) + 1);
     const totalItem = item.total_item_snapshot != null
       ? item.total_item_snapshot
-      : diasItem * item.precio_dia_aplicado * item.cantidad;
+      : item.tarifa_aplicada === 'mes'
+        ? item.precio_dia_aplicado * contarMeses(contrato.fecha_salida, fechaDevItem) * item.cantidad
+        : item.precio_dia_aplicado * contarHabiles(contrato.fecha_salida, fechaDevItem) * item.cantidad;
     const fechaPactadaItem = new Date(fechaDevItem + 'T00:00:00');
     const refDate = item.fecha_devolucion_real
       ? new Date(item.fecha_devolucion_real + 'T00:00:00')
@@ -297,7 +299,7 @@ function getDetalleContrato(idContrato) {
     ).get(idContrato, item.id)['COALESCE(SUM(monto), 0)'];
     const saldoItem = Math.max(0, totalItem + montoAtrasoItem - pagadoItem);
 
-    return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem, dias_item: diasItem, total_item: totalItem, pagado_item: pagadoItem, saldo_item: saldoItem };
+    return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem, dias_item: diasItem, dias_habiles_item: contarHabiles(contrato.fecha_salida, fechaDevItem), meses_item: item.tarifa_aplicada === 'mes' ? contarMeses(contrato.fecha_salida, fechaDevItem) : 0, total_item: totalItem, pagado_item: pagadoItem, saldo_item: saldoItem };
   });
 
   // Sumar costos de DAÑO_DEVOLUCION para individuales dañados

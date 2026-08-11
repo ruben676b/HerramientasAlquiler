@@ -10,13 +10,60 @@ import StarRating, { CalificacionBadge } from './StarRating';
 import DetalleClienteModal from './DetalleClienteModal';
 import Button from './ui/button';
 import TagChip from './TagChip';
+import { fmtLocalDate, sumarDias, sumarMesCalendario, contarHabiles, contarMeses, contarDiasCalendario as contarDias, contarSemanas } from '../lib/duracion';
 
-const fmtLocalDate = (d) => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+/*
+ * Stepper de duración: tres modos (día, semana, mes) con más/menos vertical.
+ * - El modo activo define la unidad de los botones ▲/▼.
+ * - Al llegar a 4 semanas, ▲ cambia automáticamente a modo mes (tarifa mensual).
+ * - Cambiar de modo solo activa la unidad: la fecha no se altera.
+ */
+function StepperFecha({ salida, fecha, modo, onModo, onFecha, compacto }) {
+  const dias = contarDias(salida, fecha);
+  const sems = contarSemanas(salida, fecha);
+  const meses = contarMeses(salida, fecha);
+  const modos = [
+    { id: 'dia', label: `${dias}d`, title: 'Días' },
+    { id: 'semana', label: `${sems}sem`, title: 'Semanas' },
+    { id: 'mes', label: `${meses}mes`, title: 'Meses' },
+  ];
+  const sumar = () => {
+    if (modo === 'dia') return onFecha(sumarDias(fecha, 1));
+    if (modo === 'semana') {
+      if (sems >= 4) return onModo('mes'); // 4 semanas → mes automático
+      return onFecha(sumarDias(fecha, 7));
+    }
+    return onFecha(sumarMesCalendario(fecha, 1));
+  };
+  const restar = () => {
+    if (modo === 'dia') return onFecha(dias > 1 ? sumarDias(fecha, -1) : fecha);
+    if (modo === 'semana') return onFecha(sems > 1 ? sumarDias(fecha, -7) : fecha);
+    return onFecha(meses > 1 ? sumarMesCalendario(fecha, -1) : fecha);
+  };
+  const w = compacto ? 26 : 30;
+  return (
+    <div className="flex gap-1 shrink-0">
+      {modos.map(m => {
+        const activo = modo === m.id;
+        return (
+          <div key={m.id} className="flex flex-col rounded overflow-hidden border text-center select-none"
+            style={{ borderColor: activo ? 'var(--primary)' : 'var(--border)', width: w }}>
+            <button onClick={activo ? sumar : undefined} disabled={!activo}
+              className="text-[7px] leading-none py-0.5 hover:bg-black/5 disabled:opacity-25 disabled:cursor-default"
+              style={{ color: 'var(--muted)' }} title={'Aumentar ' + m.title.toLowerCase() + ' (4 semanas = 1 mes)'}>&#9650;</button>
+            <button onClick={() => onModo(m.id)}
+              className="font-mono text-[9px] font-bold py-0.5 leading-none"
+              style={{ color: activo ? '#fff' : 'var(--muted)', backgroundColor: activo ? 'var(--primary)' : 'var(--surface)' }}
+              title={m.title}>{m.label}</button>
+            <button onClick={activo ? restar : undefined} disabled={!activo}
+              className="text-[7px] leading-none py-0.5 hover:bg-black/5 disabled:opacity-25 disabled:cursor-default"
+              style={{ color: 'var(--muted)' }} title={'Reducir ' + m.title.toLowerCase()}>&#9660;</button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function MultiSessionModal() {
   const {
@@ -202,9 +249,10 @@ function SessionForm({ session }) {
 
     setFechaSalida(data.fechaSalida || defaultFechaLoad);
     setFechaDevolucionRaw(data.fechaDevolucion || defaultFechaLoad);
+    setModoGlobal(data.modoGlobal || 'dia');
     setFechaReserva(data.fechaReserva || (session.tipo === 'reserva' ? fmtLocalDate(new Date(Date.now() + 86400000)) : ''));
     setClienteSeleccionado(data.clienteSeleccionado || null);
-    setItems((data.items || []).map(it => ({ ...it, descripcion: it.item_descripcion || it.descripcion || null, tarifa: it.tarifa || (it.usar_precio_mes ? 'mes' : 'dia') })));
+    setItems((data.items || []).map(it => ({ ...it, descripcion: it.item_descripcion || it.descripcion || null, tarifa: it.tarifa || (it.usar_precio_mes ? 'mes' : 'dia'), modo: it.modo || (it.tarifa === 'mes' ? 'mes' : 'dia') })));
     setStep(data.step || 0);
     setError('');
     setBusquedaEquipo('');
@@ -241,6 +289,7 @@ function SessionForm({ session }) {
     setFechaDevolucionRaw(f);
     setItems(prev => prev.map(item => ({ ...item, total_editado: undefined })));
   };
+  const [modoGlobal, setModoGlobal] = useState(saved.modoGlobal || 'dia');
   const [fechaReserva, setFechaReserva] = useState(
     saved.fechaReserva || (session.tipo === 'reserva' ? fmtLocalDate(new Date(Date.now() + 86400000)) : '')
   );
@@ -260,11 +309,6 @@ function SessionForm({ session }) {
   const [equipoFoco, setEquipoFoco] = useState(false);
   const [equipoIndex, setEquipoIndex] = useState(-1);
   const [consultandoReniec, setConsultandoReniec] = useState(false);
-  const sumarDias = (fecha, n) => {
-    const d = new Date(fecha + 'T00:00:00');
-    d.setDate(d.getDate() + n);
-    return fmtLocalDate(d);
-  };
 
   const [firmaBase64, setFirmaBase64] = useState(saved.firmaBase64 || null);
   const [clausulas, setClausulas] = useState('');
@@ -349,8 +393,8 @@ function SessionForm({ session }) {
 
   // Auto-guardar items
   useEffect(() => {
-    saveFormData(session.id, { dni, nombre, telefono, fechaSalida, fechaDevolucion, fechaReserva, clienteSeleccionado, items, step, firmaBase64, pagos, depositoMonto, depositoDni, editContratoId });
-  }, [items, dni, nombre, telefono, fechaSalida, fechaDevolucion, clienteSeleccionado, session.id, step, pagos, editContratoId]);
+    saveFormData(session.id, { dni, nombre, telefono, fechaSalida, fechaDevolucion, fechaReserva, clienteSeleccionado, items, step, firmaBase64, pagos, depositoMonto, depositoDni, editContratoId, modoGlobal });
+  }, [items, dni, nombre, telefono, fechaSalida, fechaDevolucion, clienteSeleccionado, session.id, step, pagos, editContratoId, modoGlobal]);
 
   // Sincronizar fechaSalida y fechaDevolucion con fechaReserva en reservas
   useEffect(() => {
@@ -358,11 +402,6 @@ function SessionForm({ session }) {
     setFechaSalida(fechaReserva);
     setFechaDevolucionRaw(fechaReserva);
   }, [fechaReserva]);
-
-  // Sincronizar fecha_devolucion_item de todos los ítems con fechaDevolucion
-  useEffect(() => {
-    setItems(prev => prev.map(item => ({ ...item, fecha_devolucion_item: fechaDevolucion })));
-  }, [fechaDevolucion]);
 
   // Herramientas ya en otras sesiones activas
   const herramientasEnOtrasSesiones = useMemo(() => {
@@ -436,7 +475,7 @@ function SessionForm({ session }) {
     }
     if (h.estado !== 'disponible' && !editContratoId) return;
     if (h.estado !== 'disponible' && editContratoId && !h._enContratoEditado) return;
-    setItems([...items, { tipo: 'individual', id_herramienta: h.id, nombre: h.nombre, descripcion: h.descripcion, precio_dia: h.precio_dia, precio_minimo: h.precio_minimo, precio_mes: h.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: 'dia' }]);
+    setItems([...items, { tipo: 'individual', id_herramienta: h.id, nombre: h.nombre, descripcion: h.descripcion, precio_dia: h.precio_dia, precio_minimo: h.precio_minimo, precio_mes: h.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: modoGlobal === 'mes' ? 'mes' : 'dia', modo: modoGlobal === 'mes' ? 'mes' : 'dia' }]);
     setBusquedaEquipo('');
   };
 
@@ -446,7 +485,7 @@ function SessionForm({ session }) {
     if (existente) {
       setItems(items.map((i) => i.id_item_granel === g.id ? { ...i, cantidad: i.cantidad + 1 } : i));
     } else {
-      setItems([...items, { tipo: 'granel', id_item_granel: g.id, nombre: g.nombre, descripcion: g.descripcion, condicion: g.condicion, precio_dia: g.precio_dia, precio_minimo: g.precio_minimo, precio_mes: g.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: 'dia' }]);
+      setItems([...items, { tipo: 'granel', id_item_granel: g.id, nombre: g.nombre, descripcion: g.descripcion, condicion: g.condicion, precio_dia: g.precio_dia, precio_minimo: g.precio_minimo, precio_mes: g.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: modoGlobal === 'mes' ? 'mes' : 'dia', modo: modoGlobal === 'mes' ? 'mes' : 'dia' }]);
     }
     setBusquedaEquipo('');
   };
@@ -459,7 +498,7 @@ function SessionForm({ session }) {
     if (enLista) {
       setItems(items.map((i) => i.id_kit === k.id ? { ...i, cantidad: i.cantidad + 1 } : i));
     } else {
-      setItems([...items, { tipo: 'kit', id_kit: k.id, nombre: k.nombre, descripcion: k.descripcion, precio_dia: k.precio_dia, precio_minimo: k.precio_minimo, precio_mes: k.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: 'dia', _componentes: k.componentes || [], _disponibilidad: k.disponibilidad || 0 }]);
+      setItems([...items, { tipo: 'kit', id_kit: k.id, nombre: k.nombre, descripcion: k.descripcion, precio_dia: k.precio_dia, precio_minimo: k.precio_minimo, precio_mes: k.precio_mes, cantidad: 1, fecha_devolucion_item: fechaDevolucion, tarifa: modoGlobal === 'mes' ? 'mes' : 'dia', modo: modoGlobal === 'mes' ? 'mes' : 'dia', _componentes: k.componentes || [], _disponibilidad: k.disponibilidad || 0 }]);
     }
     setBusquedaEquipo('');
   };
@@ -615,19 +654,21 @@ function SessionForm({ session }) {
   const itemsConDias = useMemo(() => {
     return itemsConMaximo.map(item => {
       const devDate = item.fecha_devolucion_item || fechaDevolucion;
+      const tarifa = item.tarifa || 'dia';
       const diasItem = Math.max(1, Math.ceil(
         (new Date(devDate + 'T00:00:00') - new Date(fechaSalida + 'T00:00:00')) / 86400000
       ) + 1);
-      const tarifa = item.tarifa || 'dia';
+      const diasHabilesItem = contarHabiles(fechaSalida, devDate);
+      const mesesItem = tarifa === 'mes' ? contarMeses(fechaSalida, devDate) : 0;
       let subCalc;
       if (tarifa === 'mes' && item.precio_mes != null) {
-        subCalc = item.precio_mes * item.cantidad;
+        subCalc = item.precio_mes * mesesItem * item.cantidad;
       } else if (tarifa === 'minimo' && item.precio_minimo != null) {
-        subCalc = item.precio_minimo * diasItem * item.cantidad;
+        subCalc = item.precio_minimo * diasHabilesItem * item.cantidad;
       } else {
-        subCalc = (item.precio_dia || 0) * diasItem * item.cantidad;
+        subCalc = (item.precio_dia || 0) * diasHabilesItem * item.cantidad;
       }
-      return { ...item, dias_item: diasItem, sub_calc: subCalc, tarifa };
+      return { ...item, dias_item: diasItem, dias_habiles_item: diasHabilesItem, meses_item: mesesItem, sub_calc: subCalc, tarifa };
     });
   }, [itemsConMaximo, fechaSalida, fechaDevolucion]);
 
@@ -638,7 +679,16 @@ function SessionForm({ session }) {
   };
 
   const setTarifaItem = (idx, tarifa) => {
-    setItems(items.map((it, i) => i === idx ? { ...it, tarifa, total_editado: undefined } : it));
+    setItems(items.map((it, i) => i === idx ? { ...it, tarifa, modo: tarifa === 'mes' ? 'mes' : 'dia', total_editado: undefined } : it));
+  };
+
+  const setModoItem = (idx, modo) => {
+    setItems(items.map((it, i) => i === idx ? {
+      ...it,
+      modo,
+      tarifa: modo === 'mes' ? 'mes' : (it.tarifa === 'minimo' ? 'minimo' : 'dia'),
+      total_editado: undefined,
+    } : it));
   };
 
   /* --- Agrupación visual de unidades individuales por familia --- */
@@ -678,7 +728,7 @@ function SessionForm({ session }) {
     const refInfo = infoTarifa(item);
     const subCalc = item.sub_calc;
     const sub = item.total_editado != null ? item.total_editado : subCalc;
-    const bajoMinimo = tarifa === 'dia' && item.precio_minimo != null && sub < item.precio_minimo * item.dias_item * item.cantidad;
+    const bajoMinimo = tarifa === 'dia' && item.precio_minimo != null && sub < item.precio_minimo * item.dias_habiles_item * item.cantidad;
     return (
       <div key={cardKey}
         className="px-4 py-3 rounded-xl transition-colors duration-150 group"
@@ -768,27 +818,18 @@ function SessionForm({ session }) {
               className="h-6 px-1 rounded text-[10px] border"
               style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)', width: 120 }} />
           </span>
-          {[
-            { label: '1d', dias: 0 },
-            { label: '1sem', dias: 6 },
-            { label: '1mes', dias: 29 },
-          ].map(b => {
-            const fechaItem = item.fecha_devolucion_item || fechaDevolucion;
-            const activo = fechaItem === sumarDias(fechaSalida, b.dias);
-            return (
-              <button key={b.label} onClick={() => cambiarFechaItem(idx, sumarDias(fechaSalida, b.dias))}
-                className="h-5 px-1.5 rounded text-[9px] font-medium transition-all duration-150"
-                style={{
-                  backgroundColor: activo ? 'oklch(0.53 0.135 55)' : 'var(--surface)',
-                  color: activo ? '#fff' : 'var(--muted)',
-                  border: !activo ? '0.5px solid var(--border)' : 'none',
-                }}>
-                {b.label}
-              </button>
-            );
-          })}
+          <StepperFecha
+            salida={fechaSalida}
+            fecha={item.fecha_devolucion_item || fechaDevolucion}
+            modo={item.modo || (item.tarifa === 'mes' ? 'mes' : 'dia')}
+            onModo={(m) => setModoItem(idx, m)}
+            onFecha={(f) => cambiarFechaItem(idx, f)}
+            compacto
+          />
           <span className="font-medium" style={{ color: 'var(--info)' }}>
-            ({item.dias_item} d&iacute;a{item.dias_item !== 1 ? 's' : ''})
+            {tarifa === 'mes' && item.precio_mes != null
+              ? `(${item.meses_item} mes${item.meses_item !== 1 ? 'es' : ''})`
+              : `(${item.dias_habiles_item} d&iacute;a${item.dias_habiles_item !== 1 ? 's' : ''} sin dom.)`}
           </span>
         </div>
 
@@ -813,7 +854,7 @@ function SessionForm({ session }) {
             )}
             {item.precio_mes != null && (
               <button onClick={() => setTarifaItem(idx, 'mes')}
-                title="Precio mensual (tarifa plana)"
+                title="Precio mensual (de 6 a 6)"
                 className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
                 style={{
                   backgroundColor: tarifa === 'mes' ? 'oklch(0.50 0.11 155)' : 'var(--bg)',
@@ -1210,30 +1251,21 @@ const itemsData = itemsConDias.map(item => ({
                 style={{ backgroundColor: 'var(--info)', color: '#fff' }}>
                 {dias} d
               </span>
-              <div className="flex gap-0.5 shrink-0">
-                {[
-                  { label: '1d', dias: 0 },
-                  { label: '3d', dias: 2 },
-                  { label: '1sem', dias: 6 },
-                  { label: '15d', dias: 14 },
-                  { label: '1mes', dias: 29 },
-                ].map(b => {
-                  const activo = fechaDevolucion === sumarDias(fechaSalida, b.dias);
-                  return (
-                    <button key={b.label} onClick={() => setFechaDevolucion(sumarDias(fechaSalida, b.dias))}
-                      className="px-1.5 h-6 rounded text-[10px] font-medium transition-all duration-150"
-                      style={{
-                        backgroundColor: activo ? 'var(--primary)' : 'transparent',
-                        color: activo ? 'var(--primary-text)' : 'var(--muted)',
-                        border: activo ? 'none' : '0.5px solid var(--border)',
-                      }}>
-                      {b.label}
-                    </button>
-                  );
-                })}
-              </div>
+              <StepperFecha
+                salida={fechaSalida}
+                fecha={fechaDevolucion}
+                modo={modoGlobal}
+                onModo={setModoGlobal}
+                onFecha={setFechaDevolucion}
+              />
               {items.length > 0 && (
-                <button onClick={() => setItems(items.map(i => ({ ...i, fecha_devolucion_item: fechaDevolucion, total_editado: undefined })))}
+                <button onClick={() => setItems(items.map(i => ({
+                  ...i,
+                  fecha_devolucion_item: fechaDevolucion,
+                  tarifa: modoGlobal === 'mes' ? 'mes' : (i.tarifa === 'mes' ? 'dia' : i.tarifa),
+                  modo: modoGlobal === 'mes' ? 'mes' : (i.modo === 'mes' ? 'dia' : (i.modo || 'dia')),
+                  total_editado: undefined,
+                })))}
                   className="px-2 h-6 rounded text-[10px] font-medium transition-all duration-150 shrink-0"
                   style={{ backgroundColor: 'oklch(0.55 0.13 240)', color: '#fff', border: 'none' }}>
                   Aplicar a todo
@@ -1534,7 +1566,9 @@ const itemsData = itemsConDias.map(item => ({
                                 {first.id_herramienta ? (multi ? ' ×' + cant : '') : (' x' + (first.cantidad || 1))}
                                 {!multi && (
                                   <span className="text-[10px] ml-1" style={{ color: 'var(--info)' }}>
-                                    ({first.dias_item} d&iacute;a{first.dias_item !== 1 ? 's' : ''})
+                                    {first.tarifa === 'mes' && first.precio_mes != null
+                                      ? `(${first.meses_item} mes${first.meses_item !== 1 ? 'es' : ''})`
+                                      : `(${first.dias_habiles_item} d&iacute;a${first.dias_habiles_item !== 1 ? 's' : ''} sin dom.)`}
                                   </span>
                                 )}
                               </span>
