@@ -3,11 +3,14 @@ import {
   DollarSign, Banknote, Smartphone, CreditCard,
   Calendar, ChevronLeft, ChevronRight, ArrowUpRight,
   ArrowDownLeft, Receipt, TrendingUp, Hash, Clock,
-  RefreshCw, Wallet,
+  RefreshCw, Wallet, MinusCircle, Trash2, Tag
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { localDate } from '../lib/date';
 import { useCajaInicial } from '../main';
+import NuevoEgresoModal from '../components/NuevoEgresoModal';
+import ConfirmModal from '../components/ConfirmModal';
+import { useToast } from '../components/Toast';
 
 /* ================================================================
    CAJA — Resumen financiero diario
@@ -39,6 +42,7 @@ const TIPO_LABELS = {
   mora: 'Mora',
   deposito: 'Garantía recibida',
   devolucion_deposito: 'Devolución garantía',
+  egreso_caja: 'Egreso de caja',
 };
 
 const TIPO_GRUPO = {
@@ -47,6 +51,7 @@ const TIPO_GRUPO = {
   mora: 'Mora',
   deposito: 'Garantía',
   devolucion_deposito: 'Dev. Garantía',
+  egreso_caja: 'Egreso de Caja',
 };
 
 const METODO_CONFIG = {
@@ -75,12 +80,17 @@ const METODO_CONFIG = {
    ================================================================ */
 
 export default function Caja() {
+  const toast = useToast();
   const hoy = localDate();
   const [fecha, setFecha] = useState(hoy);
   const [resumen, setResumen] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const { cajaInicial } = useCajaInicial();
+
+  // Estados de Modales
+  const [modalEgresoOpen, setModalEgresoOpen] = useState(false);
+  const [egresoAEliminar, setEgresoAEliminar] = useState(null);
 
   const cargarDatos = useCallback(async () => {
     if (!window.api) return;
@@ -107,14 +117,39 @@ export default function Caja() {
     if (nueva <= hoy) setFecha(nueva);
   };
 
+  const confirmEliminarEgreso = async () => {
+    if (!egresoAEliminar) return;
+    try {
+      const res = await window.api.eliminarEgresoCaja(egresoAEliminar.id_egreso);
+      if (res && res.success) {
+        toast('Egreso eliminado de la caja', 'success');
+        cargarDatos();
+      } else {
+        toast('No se pudo eliminar el egreso', 'error');
+      }
+    } catch (err) {
+      toast('Error al eliminar: ' + err.message, 'error');
+    } finally {
+      setEgresoAEliminar(null);
+    }
+  };
+
   // Agrupar resumen por concepto agrupado (adelanto+saldo → "Pago Alquiler")
   const resumenAgrupado = useMemo(() => {
     if (!resumen?.resumenConcepto) return [];
     const grupos = {};
     for (const fila of resumen.resumenConcepto) {
       const grupo = TIPO_GRUPO[fila.tipo] || fila.tipo;
+      const esEgresoConcepto = fila.tipo === 'devolucion_deposito' || fila.tipo === 'egreso_caja';
       if (!grupos[grupo]) {
-        grupos[grupo] = { grupo, efectivo: 0, yape: 0, plin: 0, total: 0, esEgreso: fila.tipo === 'devolucion_deposito' };
+        grupos[grupo] = {
+          grupo,
+          efectivo: 0,
+          yape: 0,
+          plin: 0,
+          total: 0,
+          esEgreso: esEgresoConcepto
+        };
       }
       grupos[grupo].efectivo += fila.efectivo;
       grupos[grupo].yape += fila.yape;
@@ -141,68 +176,80 @@ export default function Caja() {
     <div className="p-5 max-w-[1200px] mx-auto">
 
       {/* ===== HEADER ===== */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>
             Caja del Día
           </h1>
           <p className="text-[13px] mt-0.5" style={{ color: 'var(--muted)' }}>
-            Resumen de ingresos y movimientos
+            Resumen de ingresos, egresos y movimientos
           </p>
         </div>
 
-        {/* Date Picker */}
-        <div className="flex items-center gap-1.5">
+        {/* Date Picker & Action */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Botón Registrar Egreso */}
           <button
-            onClick={() => cambiarFecha(-1)}
-            className="p-2 rounded-lg transition-colors hover:bg-[var(--surface)]"
-            style={{ color: 'var(--muted)', border: '1px solid var(--border)' }}
-            title="Día anterior"
+            onClick={() => setModalEgresoOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-bold text-white transition-all shadow-sm active:scale-95 hover:opacity-90 cursor-pointer"
+            style={{ backgroundColor: 'oklch(0.52 0.20 25)' }}
           >
-            <ChevronLeft size={16} />
+            <MinusCircle size={16} />
+            <span>Registrar Egreso</span>
           </button>
 
-          <div
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-medium min-w-[220px] justify-center"
-            style={{
-              backgroundColor: esHoy ? 'oklch(0.53 0.135 55 / 0.08)' : 'var(--surface)',
-              border: esHoy ? '1.5px solid oklch(0.53 0.135 55 / 0.3)' : '1px solid var(--border)',
-              color: esHoy ? 'oklch(0.53 0.135 55)' : 'var(--ink)',
-            }}
-          >
-            <Calendar size={14} />
-            <span>{fmtFechaLarga(fecha)}</span>
-            {esHoy && (
-              <span
-                className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ml-1"
-                style={{ backgroundColor: 'oklch(0.53 0.135 55 / 0.15)', color: 'oklch(0.53 0.135 55)' }}
-              >
-                Hoy
-              </span>
-            )}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => cambiarFecha(-1)}
+              className="p-2 rounded-lg transition-colors hover:bg-[var(--surface)]"
+              style={{ color: 'var(--muted)', border: '1px solid var(--border)' }}
+              title="Día anterior"
+            >
+              <ChevronLeft size={16} />
+            </button>
+
+            <div
+              className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-medium min-w-[220px] justify-center"
+              style={{
+                backgroundColor: esHoy ? 'oklch(0.53 0.135 55 / 0.08)' : 'var(--surface)',
+                border: esHoy ? '1.5px solid oklch(0.53 0.135 55 / 0.3)' : '1px solid var(--border)',
+                color: esHoy ? 'oklch(0.53 0.135 55)' : 'var(--ink)',
+              }}
+            >
+              <Calendar size={14} />
+              <span>{fmtFechaLarga(fecha)}</span>
+              {esHoy && (
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ml-1"
+                  style={{ backgroundColor: 'oklch(0.53 0.135 55 / 0.15)', color: 'oklch(0.53 0.135 55)' }}
+                >
+                  Hoy
+                </span>
+              )}
+            </div>
+
+            <button
+              onClick={() => cambiarFecha(1)}
+              disabled={esHoy}
+              className={cn(
+                'p-2 rounded-lg transition-colors',
+                esHoy ? 'opacity-30 cursor-not-allowed' : 'hover:bg-[var(--surface)]'
+              )}
+              style={{ color: 'var(--muted)', border: '1px solid var(--border)' }}
+              title="Día siguiente"
+            >
+              <ChevronRight size={16} />
+            </button>
+
+            <button
+              onClick={cargarDatos}
+              className="p-2 rounded-lg transition-colors hover:bg-[var(--surface)] ml-1"
+              style={{ color: 'var(--muted)', border: '1px solid var(--border)' }}
+              title="Actualizar"
+            >
+              <RefreshCw size={14} className={cargando ? 'animate-spin' : ''} />
+            </button>
           </div>
-
-          <button
-            onClick={() => cambiarFecha(1)}
-            disabled={esHoy}
-            className={cn(
-              'p-2 rounded-lg transition-colors',
-              esHoy ? 'opacity-30 cursor-not-allowed' : 'hover:bg-[var(--surface)]'
-            )}
-            style={{ color: 'var(--muted)', border: '1px solid var(--border)' }}
-            title="Día siguiente"
-          >
-            <ChevronRight size={16} />
-          </button>
-
-          <button
-            onClick={cargarDatos}
-            className="p-2 rounded-lg transition-colors hover:bg-[var(--surface)] ml-1"
-            style={{ color: 'var(--muted)', border: '1px solid var(--border)' }}
-            title="Actualizar"
-          >
-            <RefreshCw size={14} className={cargando ? 'animate-spin' : ''} />
-          </button>
         </div>
       </div>
 
@@ -413,14 +460,14 @@ export default function Caja() {
             ) : (
               <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
                 {resumen.movimientos.map((mov) => {
-                  const esEgreso = mov.tipo === 'devolucion_deposito';
+                  const esEgreso = mov.tipo === 'devolucion_deposito' || mov.tipo === 'egreso_caja' || mov.esEgresoDirecto;
                   const metodoCfg = METODO_CONFIG[mov.metodo] || METODO_CONFIG.efectivo;
                   const MetodoIcon = metodoCfg.icon;
 
                   return (
                     <div
                       key={mov.id}
-                      className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                      className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.02] group"
                       style={{ borderBottom: '1px solid var(--border)' }}
                     >
                       {/* Icono tipo */}
@@ -450,21 +497,48 @@ export default function Caja() {
                           </span>
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--muted)' }}>
-                            <Hash size={10} />
-                            Contrato {mov.contrato_num}
-                          </span>
-                          <span className="text-[11px]" style={{ color: 'var(--faint)' }}>·</span>
-                          <span className="text-[11px] truncate" style={{ color: 'var(--muted)' }}>
-                            {mov.cliente_nombre}
-                          </span>
-                          <span className="text-[11px]" style={{ color: 'var(--faint)' }}>·</span>
-                          <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--faint)' }}>
-                            <Clock size={9} />
-                            {fmtHora(mov.fecha_pago)}
-                          </span>
+                          {mov.esEgresoDirecto ? (
+                            <>
+                              <span className="text-[11px] font-medium truncate" style={{ color: 'var(--ink)' }}>
+                                {mov.notas || 'Sin descripción'}
+                              </span>
+                              <span className="text-[11px]" style={{ color: 'var(--faint)' }}>·</span>
+                              <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--faint)' }}>
+                                <Clock size={9} />
+                                {fmtHora(mov.fecha_pago)}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                                <Hash size={10} />
+                                Contrato {mov.contrato_num}
+                              </span>
+                              <span className="text-[11px]" style={{ color: 'var(--faint)' }}>·</span>
+                              <span className="text-[11px] truncate" style={{ color: 'var(--muted)' }}>
+                                {mov.cliente_nombre}
+                              </span>
+                              <span className="text-[11px]" style={{ color: 'var(--faint)' }}>·</span>
+                              <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--faint)' }}>
+                                <Clock size={9} />
+                                {fmtHora(mov.fecha_pago)}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
+
+                      {/* Botón Eliminar para Egresos Directos */}
+                      {mov.esEgresoDirecto && (
+                        <button
+                          onClick={() => setEgresoAEliminar(mov)}
+                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                          style={{ color: 'var(--danger)' }}
+                          title="Eliminar egreso"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
 
                       {/* Monto */}
                       <span
@@ -481,6 +555,24 @@ export default function Caja() {
           </div>
         </>
       )}
+
+      {/* Modal Nuevo Egreso */}
+      <NuevoEgresoModal
+        open={modalEgresoOpen}
+        onClose={() => setModalEgresoOpen(false)}
+        onSuccess={cargarDatos}
+      />
+
+      {/* Modal Confirmar Eliminar Egreso */}
+      <ConfirmModal
+        open={!!egresoAEliminar}
+        title="Eliminar Egreso de Caja"
+        message={`¿Deseas eliminar el egreso de S/ ${egresoAEliminar?.monto?.toFixed(2)} ("${egresoAEliminar?.notas}")?`}
+        confirmLabel="Eliminar"
+        danger
+        onConfirm={confirmEliminarEgreso}
+        onCancel={() => setEgresoAEliminar(null)}
+      />
     </div>
   );
 }

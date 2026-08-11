@@ -74,7 +74,7 @@ const {
   getContratosCliente,
   getDetalleContrato,
 } = require('./services/clienteService');
-const { getResumenCaja } = require('./services/cajaService');
+const { getResumenCaja, registrarEgreso, eliminarEgreso } = require('./services/cajaService');
 const {
   getKits,
   getKitById,
@@ -526,6 +526,14 @@ ipcMain.handle('log', (_e, msg) => {
   // --- Caja ---
   ipcMain.handle('get-resumen-caja', (_e, fecha) => {
     return getResumenCaja(fecha);
+  });
+
+  ipcMain.handle('registrar-egreso-caja', (_e, data) => {
+    return registrarEgreso(data);
+  });
+
+  ipcMain.handle('eliminar-egreso-caja', (_e, id) => {
+    return eliminarEgreso(id);
   });
 
   // --- Backup ---

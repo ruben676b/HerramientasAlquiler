@@ -114,6 +114,8 @@ contextBridge.exposeInMainWorld('api', {
 
   // Caja
   getResumenCaja: (fecha) => ipcRenderer.invoke('get-resumen-caja', fecha),
+  registrarEgresoCaja: (data) => ipcRenderer.invoke('registrar-egreso-caja', data),
+  eliminarEgresoCaja: (id) => ipcRenderer.invoke('eliminar-egreso-caja', id),
 
   // Backup
   crearBackup: () => ipcRenderer.invoke('crear-backup'),

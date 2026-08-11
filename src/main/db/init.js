@@ -257,6 +257,14 @@ function initDatabase() {
       fecha TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       revertido INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS EGRESO_CAJA (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      monto REAL NOT NULL CHECK (monto > 0),
+      descripcion TEXT NOT NULL,
+      metodo TEXT NOT NULL DEFAULT 'efectivo' CHECK (metodo IN ('efectivo', 'yape', 'plin')),
+      fecha TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
   `);
 
   // Trigger: recalcular cantidad_disponible automáticamente en ITEM_GRANEL
