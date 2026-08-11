@@ -15,7 +15,7 @@ import { gruparPagos } from '../lib/gruparPagos';
 import DevolucionInline from '../components/DevolucionInline';
 import CalificarContratoModal from '../components/CalificarContratoModal';
 import TagChip from '../components/TagChip';
-import { contarHabiles, contarMeses } from '../lib/duracion';
+import { contarHabiles, desglosarMensual } from '../lib/duracion';
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -33,8 +33,13 @@ const fmtFechaCorta = (iso) => {
 const baseItem = (item, contrato) => {
   if (item.total_item != null) return item.total_item;
   const fechaDev = item.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;
-  if (item.tarifa_aplicada === 'mes')
-    return (item.precio_dia_aplicado || 0) * contarMeses(contrato.fecha_salida, fechaDev) * (item.cantidad || 1);
+  if (item.tarifa_aplicada === 'mes') {
+    const desg = desglosarMensual(contrato.fecha_salida, fechaDev);
+    const mes = item.precio_dia_aplicado || 0;
+    const diaria = mes / 30;
+    if (desg.meses > 0) return (mes * desg.meses + diaria * desg.diasExtra) * (item.cantidad || 1);
+    return diaria * desg.totalHabiles * (item.cantidad || 1);
+  }
   return (item.precio_dia_aplicado || 0) * contarHabiles(contrato.fecha_salida, fechaDev) * (item.cantidad || 1);
 };
 
@@ -498,7 +503,7 @@ export default function Alquileres() {
                                               )}
                                               <span className="text-[13px] leading-tight font-semibold" style={{ color: 'var(--ink)' }}>{item.item_nombre}</span>
                                               <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
-                                                S/ {(item.precio_dia_aplicado || 0).toFixed(2)}{item.tarifa_aplicada === 'mes' ? '/mes' : '/d&iacute;a'}{esGranel ? ' c/u' : ''}
+                                                S/ {(item.precio_dia_aplicado || 0).toFixed(2)}{item.tarifa_aplicada === 'mes' ? '/mes' : '/día'}{esGranel ? ' c/u' : ''}
                                               </span>
                                               {(item.dias_atraso_item || 0) > 0 && (
                                                 <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
@@ -526,9 +531,9 @@ export default function Alquileres() {
                                               <span />
                                               <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
                                                 Salida: {fmtFechaCorta(c.fecha_salida)} &middot; Pactada: {fmtFechaCorta(item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada)}
-                                                &middot; Base: {item.tarifa_aplicada === 'mes'
-                                                  ? (item.meses_item || 1) + ' mes' + ((item.meses_item || 1) !== 1 ? 'es' : '')
-                                                  : (item.dias_habiles_item || item.dias_item || 0) + ' d&iacute;a' + ((item.dias_habiles_item || item.dias_item || 0) !== 1 ? 's' : '') + ' sin dom.'}
+                                                &middot; Base: {item.tarifa_aplicada === 'mes' && (item.meses_item || 0) > 0
+                                                  ? `${item.meses_item} mes${item.meses_item !== 1 ? 'es' : ''}${(item.dias_extra_item || 0) > 0 ? ` + ${item.dias_extra_item} día${item.dias_extra_item !== 1 ? 's' : ''}` : ''} (${item.dias_habiles_item || item.dias_item || 0} día${(item.dias_habiles_item || item.dias_item || 0) !== 1 ? 's' : ''} sin dom.)`
+                                                  : (item.dias_habiles_item || item.dias_item || 0) + ' día' + ((item.dias_habiles_item || item.dias_item || 0) !== 1 ? 's' : '') + ' sin dom.'}
                                               </span>
                                             </div>
                                             {/* Granel: resumen devolución */}

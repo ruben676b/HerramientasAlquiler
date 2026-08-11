@@ -6,6 +6,7 @@ import Button from '../components/ui/button';
 import StarRating, { CalificacionBadge } from '../components/StarRating';
 import DetalleClienteModal from '../components/DetalleClienteModal';
 import ImagenVisor from '../components/ImagenVisor';
+import DatePicker from '../components/DatePicker';
 
 /* ================================================================
    MOSTRADOR — Emitir Contrato
@@ -469,25 +470,13 @@ export default function Mostrador() {
                 <label className={labelCls} style={{ color: 'var(--muted)' }}>
                   Fecha de salida
                 </label>
-                <input
-                  type="date"
-                  value={fechaSalida}
-                  onChange={(e) => setFechaSalida(e.target.value)}
-                  className={inputCls}
-                  style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
-                />
+                <DatePicker amplio value={fechaSalida} onChange={setFechaSalida} />
               </div>
               <div>
                 <label className={labelCls} style={{ color: 'var(--muted)' }}>
                   Devolución pactada
                 </label>
-                <input
-                  type="date"
-                  value={fechaDevolucion}
-                  onChange={(e) => setFechaDevolucion(e.target.value)}
-                  className={inputCls}
-                  style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
-                />
+                <DatePicker amplio value={fechaDevolucion} onChange={setFechaDevolucion} error={fechaDevolucion && fechaDevolucion < fechaSalida} />
               </div>
               <p className="text-xs" style={{ color: 'var(--muted)' }}>
                 {dias} día{dias !== 1 ? 's' : ''} de alquiler

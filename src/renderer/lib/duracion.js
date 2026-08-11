@@ -37,24 +37,28 @@ export const contarHabiles = (desde, hasta) => {
   return Math.max(1, count);
 };
 
-/* Períodos mensuales "de 6 a 6" cruzados. Mínimo 1 mes (tarifa plana mensual). */
-export const contarMeses = (desde, hasta) => {
-  const start = new Date(desde + 'T00:00:00');
-  const end = new Date(hasta + 'T00:00:00');
-  let meses = 0;
-  let cursor = new Date(start);
-  while (cursor < end) {
-    cursor.setMonth(cursor.getMonth() + 1);
-    meses++;
-  }
-  return Math.max(1, meses);
-};
-
 /* Meses completos "de 6 a 6" (0 es válido): máximo k tal que salida + k meses <= hasta. */
 export const mesesCompletos = (desde, hasta) => {
   let k = 0;
   while (sumarMesCalendario(desde, k + 1) <= hasta) k++;
   return k;
+};
+
+/* Desglose para tarifa mensual: meses completos + días extra (hábiles) + total hábiles.
+ * - meses: aniversarios exactos (mesesCompletos). Ej: 11 ago → 13 sep = 1.
+ * - diasExtra: días hábiles posteriores al último aniversario (0 si el período es exacto).
+ * - totalHabiles: días hábiles de todo el período (para mostrar "X días sin dom.").
+ * Si no hay meses completos, diasExtra = 0 y el ítem se cobra a tarifa diaria. */
+export const desglosarMensual = (desde, hasta) => {
+  const meses = mesesCompletos(desde, hasta);
+  const totalHabiles = contarHabiles(desde, hasta);
+  if (meses === 0) return { meses: 0, diasExtra: 0, totalHabiles };
+  const aniversario = sumarMesCalendario(desde, meses);
+  const diff = Math.max(0, Math.ceil(
+    (new Date(hasta + 'T00:00:00') - new Date(aniversario + 'T00:00:00')) / 86400000
+  ));
+  const diasExtra = diff > 0 ? contarHabiles(sumarDias(aniversario, 1), hasta) : 0;
+  return { meses, diasExtra, totalHabiles };
 };
 
 /* Conteo calendario inclusive entre dos fechas. */

@@ -41,22 +41,6 @@ function contarHabiles(fechaInicio, fechaFin) {
 }
 
 /**
- * Cuenta períodos mensuales "de 6 a 6": cada cruce del día de inicio suma un mes.
- * Ej: 2026-08-06 → 2026-09-06 = 1 mes; → 2026-10-06 = 2 meses. Mínimo 1 mes.
- */
-function contarMeses(fechaInicio, fechaFin) {
-  const start = new Date(fechaInicio + 'T00:00:00');
-  const end = new Date(fechaFin + 'T00:00:00');
-  let meses = 0;
-  let cursor = new Date(start);
-  while (cursor < end) {
-    cursor.setMonth(cursor.getMonth() + 1);
-    meses++;
-  }
-  return Math.max(1, meses);
-}
-
-/**
  * Devuelve la fecha resultante de sumar n días (formato YYYY-MM-DD).
  */
 function sumarDias(fecha, n) {
@@ -76,7 +60,6 @@ function sumarMesCalendario(fecha, n) {
 
 /**
  * Meses completos "de 6 a 6" (0 es válido): máximo k tal que inicio + k meses <= fin.
- * A diferencia de contarMeses, no tiene mínimo de 1 mes.
  */
 function mesesCompletos(fechaInicio, fechaFin) {
   let k = 0;
@@ -84,4 +67,40 @@ function mesesCompletos(fechaInicio, fechaFin) {
   return k;
 }
 
-module.exports = { localDate, localDateTime, contarHabiles, contarMeses, mesesCompletos, sumarDias, sumarMesCalendario };
+/**
+ * Desglose para tarifa mensual: meses completos + días extra (hábiles) + total hábiles.
+ * - meses: aniversarios exactos. Ej: 11 ago → 13 sep = 1.
+ * - diasExtra: días hábiles posteriores al último aniversario (0 si el período es exacto).
+ * - totalHabiles: días hábiles de todo el período.
+ * Sin meses completos, diasExtra = 0 (se cobra a tarifa diaria).
+ */
+function desglosarMensual(fechaInicio, fechaFin) {
+  const meses = mesesCompletos(fechaInicio, fechaFin);
+  const totalHabiles = contarHabiles(fechaInicio, fechaFin);
+  if (meses === 0) return { meses: 0, diasExtra: 0, totalHabiles };
+  const aniversario = sumarMesCalendario(fechaInicio, meses);
+  const diff = Math.max(0, Math.ceil(
+    (new Date(fechaFin + 'T00:00:00') - new Date(aniversario + 'T00:00:00')) / 86400000
+  ));
+  const diasExtra = diff > 0 ? contarHabiles(sumarDias(aniversario, 1), fechaFin) : 0;
+  return { meses, diasExtra, totalHabiles };
+}
+
+/**
+ * Precio de una línea según tarifa y fechas.
+ * - tarifa 'mes': meses completos al precio mensual + días extra a tarifa diaria.
+ *   Sin meses completos cae a tarifa diaria. Para contratos históricos el precio
+ *   diario se aproxima como mensual / 30 (la BD solo guarda el precio mensual).
+ * - resto: tarifa diaria × días hábiles.
+ */
+function calcularTotalItem(tarifa, precioAplicado, fechaSalida, fechaDevolucion, cantidad) {
+  if (tarifa === 'mes') {
+    const desg = desglosarMensual(fechaSalida, fechaDevolucion);
+    const diaria = precioAplicado / 30;
+    if (desg.meses > 0) return (precioAplicado * desg.meses + diaria * desg.diasExtra) * cantidad;
+    return diaria * desg.totalHabiles * cantidad;
+  }
+  return precioAplicado * contarHabiles(fechaSalida, fechaDevolucion) * cantidad;
+}
+
+module.exports = { localDate, localDateTime, contarHabiles, mesesCompletos, desglosarMensual, calcularTotalItem, sumarDias, sumarMesCalendario };

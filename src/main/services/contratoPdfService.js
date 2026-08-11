@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
 const db = require('../db/database');
-const { localDateTime, contarHabiles, contarMeses } = require('../utils/date');
+const { localDateTime, contarHabiles, desglosarMensual } = require('../utils/date');
 
 const CONTRATOS_DIR = path.join(app.getPath('documents'), 'AlquilerContratos');
 
@@ -35,7 +35,12 @@ function generarPdfDesdeDatos(datos) {
   const totalItems = items.reduce((a, i) => {
     if (i.snapshot != null) return a + i.snapshot;
     const fechaDevItem = i.fecha_devolucion_pactada || fechas.devolucion;
-    if (i.tarifa === 'mes') return a + i.precio_dia * contarMeses(fechas.salida, fechaDevItem) * i.cantidad;
+    if (i.tarifa === 'mes') {
+      const desg = desglosarMensual(fechas.salida, fechaDevItem);
+      const diaria = i.precio_dia / 30;
+      if (desg.meses > 0) return a + (i.precio_dia * desg.meses + diaria * desg.diasExtra) * i.cantidad;
+      return a + diaria * desg.totalHabiles * i.cantidad;
+    }
     return a + i.precio_dia * contarHabiles(fechas.salida, fechaDevItem) * i.cantidad;
   }, 0);
 
@@ -139,7 +144,12 @@ function generarPdfDesdeDatos(datos) {
     const sub = item.snapshot != null
       ? item.snapshot
       : (tarifa === 'mes'
-          ? item.precio_dia * contarMeses(fechas.salida, fechaDevItem) * item.cantidad
+          ? (() => {
+              const desg = desglosarMensual(fechas.salida, fechaDevItem);
+              const diaria = item.precio_dia / 30;
+              if (desg.meses > 0) return (item.precio_dia * desg.meses + diaria * desg.diasExtra) * item.cantidad;
+              return diaria * desg.totalHabiles * item.cantidad;
+            })()
           : item.precio_dia * contarHabiles(fechas.salida, fechaDevItem) * item.cantidad);
     const esGranel = item.codigo && item.codigo.includes('(') && !/^[A-Z]+-\d/.test(item.codigo);
     const codigo = esGranel ? 'Material' : (item.codigo || '—');
@@ -296,8 +306,12 @@ function generarPdf(idContrato) {
   const totalItems = detalles.reduce((a, d) => {
     if (d.total_item_snapshot != null) return a + d.total_item_snapshot;
     const fechaDevItem = d.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;
-    if ((d.tarifa_aplicada || 'dia') === 'mes')
-      return a + d.precio_dia_aplicado * contarMeses(contrato.fecha_salida, fechaDevItem) * d.cantidad;
+    if ((d.tarifa_aplicada || 'dia') === 'mes') {
+      const desg = desglosarMensual(contrato.fecha_salida, fechaDevItem);
+      const diaria = d.precio_dia_aplicado / 30;
+      if (desg.meses > 0) return a + (d.precio_dia_aplicado * desg.meses + diaria * desg.diasExtra) * d.cantidad;
+      return a + diaria * desg.totalHabiles * d.cantidad;
+    }
     return a + d.precio_dia_aplicado * contarHabiles(contrato.fecha_salida, fechaDevItem) * d.cantidad;
   }, 0);
   const total = totalItems + (contrato.deposito_monto || 0);
