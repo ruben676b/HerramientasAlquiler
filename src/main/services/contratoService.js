@@ -1047,7 +1047,6 @@ function getContratos(filtros = {}) {
         GROUP BY id_item_granel
       )
     `).all(c.id, c.id);
-    log('[DEBUG getContratos] contratoId: ' + c.id + ' devGranel: ' + JSON.stringify(devGranel) + ' items: ' + JSON.stringify(items.map(i => ({ id: i.id, id_item_granel: i.id_item_granel, cantidad: i.cantidad }))));
     const devGranelMap = Object.fromEntries(devGranel.map(d => [d.group_key, d]));
 
     // Desglose de daños predefinidos registrados en la devolución

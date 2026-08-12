@@ -19,9 +19,15 @@ export const sumarDias = (fecha, n) => {
   return fmtLocalDate(d);
 };
 
+/* Suma n meses calendario con clamp al último día del mes destino:
+ * 31 ene + 1 mes = 28/29 feb (no desborda a marzo). */
 export const sumarMesCalendario = (fecha, n) => {
   const d = new Date(fecha + 'T00:00:00');
+  const dia = d.getDate();
+  d.setDate(1); // evitar desbordes (31 ene + 1 mes no debe saltar a 2 mar)
   d.setMonth(d.getMonth() + n);
+  const ultimoDia = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(dia, ultimoDia));
   return fmtLocalDate(d);
 };
 

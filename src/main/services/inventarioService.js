@@ -446,20 +446,61 @@ function generarPrefijo(nombre) {
     .replace(/[^a-zA-Z0-9]/g, '')
     .toUpperCase();
 
-  if (limpio.length < 3) return limpio.padEnd(3, 'X');
+  if (limpio.length < 1) return 'XXX';
 
-  let prefijo = limpio.substring(0, 3);
+  // Cargar todos los IDs existentes una sola vez
+  const ids = new Set(
+    db.prepare('SELECT id FROM CATEGORIA_HERRAMIENTA').all().map(r => r.id)
+  );
 
-  const existente = db.prepare('SELECT id FROM CATEGORIA_HERRAMIENTA WHERE id = ?').get(prefijo);
-  if (!existente) return prefijo;
+  const candidatos = new Set();
+  const len = limpio.length;
 
-  for (let i = 1; i <= limpio.length - 3; i++) {
-    prefijo = limpio[0] + limpio[1] + limpio[2 + i];
-    const colision = db.prepare('SELECT id FROM CATEGORIA_HERRAMIENTA WHERE id = ?').get(prefijo);
-    if (!colision) return prefijo;
+  // Estrategia 1: ventanas consecutivas de 3 letras (prioridad máxima)
+  for (let i = 0; i <= len - 3; i++) {
+    candidatos.add(limpio.substring(i, i + 3));
   }
 
-  throw new Error('No se pudo generar un prefijo único para: ' + nombre);
+  // Estrategia 2: primera letra + cada par de letras del resto
+  // Preserva la primera letra (la más significativa) y varía las otras dos
+  if (len >= 3) {
+    for (let j = 1; j < len - 1; j++) {
+      for (let k = j + 1; k < len; k++) {
+        candidatos.add(limpio[0] + limpio[j] + limpio[k]);
+      }
+    }
+  }
+
+  // Estrategia 3: todas las combinaciones no consecutivas (solo para nombres manejables)
+  if (len >= 3 && len <= 25) {
+    for (let i = 0; i < len - 2; i++) {
+      for (let j = i + 1; j < len - 1; j++) {
+        for (let k = j + 1; k < len; k++) {
+          candidatos.add(limpio[i] + limpio[j] + limpio[k]);
+        }
+      }
+    }
+  }
+
+  // Evaluar candidatos en orden de inserción (prioridad natural)
+  for (const c of candidatos) {
+    if (!ids.has(c)) return c;
+  }
+
+  // Estrategia 4: primeras 2 letras + número secuencial (CO01, CO02...)
+  const base = len >= 2 ? limpio.substring(0, 2) : limpio.padEnd(2, 'X');
+  for (let n = 1; n <= 99; n++) {
+    const c = base + String(n).padStart(2, '0');
+    if (!ids.has(c)) return c;
+  }
+
+  // Estrategia 5: primera letra + 2 dígitos (último recurso)
+  for (let n = 10; n <= 99; n++) {
+    const c = limpio[0] + String(n);
+    if (!ids.has(c)) return c;
+  }
+
+  throw new Error('Límite de prefijos agotado para: ' + nombre);
 }
 
 function crearCategoria({ nombre, descripcion }) {

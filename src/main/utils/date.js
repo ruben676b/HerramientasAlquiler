@@ -51,10 +51,15 @@ function sumarDias(fecha, n) {
 
 /**
  * Devuelve la fecha resultante de sumar n meses calendario (YYYY-MM-DD).
+ * Con clamp al último día del mes destino: 31 ene + 1 mes = 28/29 feb (no desborda a marzo).
  */
 function sumarMesCalendario(fecha, n) {
   const d = new Date(fecha + 'T00:00:00');
+  const dia = d.getDate();
+  d.setDate(1); // evitar desbordes (31 ene + 1 mes no debe saltar a 2 mar)
   d.setMonth(d.getMonth() + n);
+  const ultimoDia = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(dia, ultimoDia));
   return localDate(d);
 }
 
