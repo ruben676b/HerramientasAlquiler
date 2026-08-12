@@ -25,7 +25,7 @@ function initDatabase() {
       precio_mes REAL CHECK (precio_mes >= 0),
       precio_venta REAL CHECK (precio_venta >= 0),
       valor_reposicion REAL CHECK (valor_reposicion >= 0),
-      estado TEXT NOT NULL CHECK (estado IN ('disponible', 'reservado', 'alquilado', 'mantenimiento', 'malogrado', 'perdida', 'vendida')),
+estado TEXT NOT NULL CHECK (estado IN ('disponible', 'reservado', 'alquilado', 'mantenimiento', 'malogrado', 'perdida', 'vendido')),
       fecha_adquisicion TEXT,
       activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
       FOREIGN KEY (id_categoria) REFERENCES CATEGORIA_HERRAMIENTA(id)
@@ -270,6 +270,52 @@ function initDatabase() {
       id_devolucion_granel INTEGER REFERENCES DEVOLUCION_GRANEL(id),
       fecha TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       revertido INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS VENTA_INVENTARIO (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tipo_item TEXT NOT NULL CHECK (tipo_item IN ('individual', 'granel')),
+      id_herramienta TEXT,
+      id_item_granel INTEGER,
+      nombre_item TEXT NOT NULL,
+      cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+      precio_unitario REAL NOT NULL CHECK (precio_unitario >= 0),
+      total REAL NOT NULL CHECK (total >= 0),
+      metodo TEXT NOT NULL DEFAULT 'efectivo' CHECK (metodo IN ('efectivo', 'yape', 'plin')),
+      fecha TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      cliente_nombre TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS EGRESO_CAJA (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      monto REAL NOT NULL CHECK (monto > 0),
+      descripcion TEXT NOT NULL,
+      metodo TEXT NOT NULL DEFAULT 'efectivo' CHECK (metodo IN ('efectivo', 'yape', 'plin')),
+      fecha TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS REPORTE (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha_generacion TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      fecha_inicio TEXT NOT NULL,
+      fecha_fin TEXT NOT NULL,
+      total_ingresos REAL NOT NULL DEFAULT 0,
+      total_egresos REAL NOT NULL DEFAULT 0,
+      total_neto REAL NOT NULL DEFAULT 0,
+      totales_metodo TEXT NOT NULL DEFAULT '{}',
+      datos_json TEXT NOT NULL DEFAULT '{}'
+    );
+
+    CREATE TABLE IF NOT EXISTS CAJA_DIARIA (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha TEXT NOT NULL UNIQUE,
+      monto_inicial REAL NOT NULL DEFAULT 0,
+      total_ingresos REAL NOT NULL DEFAULT 0,
+      total_egresos REAL NOT NULL DEFAULT 0,
+      total_neto REAL NOT NULL DEFAULT 0,
+      totales_metodo TEXT NOT NULL DEFAULT '{}',
+      resumen_json TEXT NOT NULL DEFAULT '{}',
+      fecha_cierre TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -709,6 +755,41 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     console.error('[DB] Error en migración papelera:', err);
   }
 
+// Migración: agregar 'vendido' al CHECK constraint de HERRAMIENTA
+  try {
+    const herramientas = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='HERRAMIENTA'").get();
+    if (herramientas && !herramientas.sql.includes("'vendido'")) {
+      console.log('[DB] Migración: recreando tabla HERRAMIENTA para agregar estado vendido...');
+      db.pragma('foreign_keys = OFF');
+      db.exec(`
+        CREATE TABLE HERRAMIENTA_new (
+          id TEXT PRIMARY KEY NOT NULL,
+          id_categoria TEXT NOT NULL,
+          nombre TEXT NOT NULL,
+          descripcion TEXT,
+          precio_dia REAL NOT NULL CHECK (precio_dia >= 0),
+          mora_dia REAL NOT NULL DEFAULT 0 CHECK (mora_dia >= 0),
+          precio_minimo REAL CHECK (precio_minimo >= 0),
+          precio_mes REAL CHECK (precio_mes >= 0),
+          precio_venta REAL CHECK (precio_venta >= 0),
+          valor_reposicion REAL CHECK (valor_reposicion >= 0),
+          estado TEXT NOT NULL CHECK (estado IN ('disponible', 'reservado', 'alquilado', 'mantenimiento', 'malogrado', 'perdida', 'vendido')),
+          fecha_adquisicion TEXT,
+          activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
+          FOREIGN KEY (id_categoria) REFERENCES CATEGORIA_HERRAMIENTA(id)
+        );
+        INSERT INTO HERRAMIENTA_new (id, id_categoria, nombre, descripcion, precio_dia, mora_dia, precio_minimo, precio_mes, precio_venta, valor_reposicion, estado, fecha_adquisicion, activo)
+        SELECT id, id_categoria, nombre, descripcion, precio_dia, mora_dia, precio_minimo, precio_mes, precio_venta, valor_reposicion, estado, fecha_adquisicion, activo FROM HERRAMIENTA;
+        DROP TABLE HERRAMIENTA;
+        ALTER TABLE HERRAMIENTA_new RENAME TO HERRAMIENTA;
+      `);
+      db.pragma('foreign_keys = ON');
+      console.log('[DB] Migración: tabla HERRAMIENTA recreada con CHECK actualizado para "vendido".');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración vendido:', err.message);
+  }
+
   // Migración: descuento_mora en DETALLE_CONTRATO (descuentos por ajuste manual de mora)
   try {
     const hasDescuentoMora = db.prepare("PRAGMA table_info('DETALLE_CONTRATO')").all().some(c => c.name === 'descuento_mora');
@@ -718,6 +799,7 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     }
   } catch (err) {
     console.error('[DB] Error en migración descuento_mora:', err);
+  }
   }
 
   // --- Datos semilla (solo primera vez) ---

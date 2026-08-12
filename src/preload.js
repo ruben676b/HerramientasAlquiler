@@ -41,7 +41,12 @@ contextBridge.exposeInMainWorld('api', {
   restaurarContrato: (id) => ipcRenderer.invoke('restaurar-contrato', id),
 
   // Sistema
-  closeApp: () => ipcRenderer.invoke('close-app'),
+  closeApp: () => ipcRenderer.send('force-quit'),
+  onCloseRequested: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('close-requested', handler);
+    return () => ipcRenderer.removeListener('close-requested', handler);
+  },
   checkDbStatus: () => ipcRenderer.invoke('check-db-status'),
 
   // Inventario
@@ -117,6 +122,18 @@ contextBridge.exposeInMainWorld('api', {
 
   // Caja
   getResumenCaja: (fecha) => ipcRenderer.invoke('get-resumen-caja', fecha),
+  registrarVentaInventario: (data) => ipcRenderer.invoke('registrar-venta-inventario', data),
+  registrarEgresoCaja: (data) => ipcRenderer.invoke('registrar-egreso-caja', data),
+  eliminarEgresoCaja: (id) => ipcRenderer.invoke('eliminar-egreso-caja', id),
+  guardarCajaDiaria: (fecha, montoInicial) => ipcRenderer.invoke('guardar-caja-diaria', fecha, montoInicial),
+  getHistorialCaja: () => ipcRenderer.invoke('get-historial-caja'),
+  getCajaDiaria: (fecha) => ipcRenderer.invoke('get-caja-diaria', fecha),
+
+  // Reportes
+  generarReporte: () => ipcRenderer.invoke('reporte:generar'),
+  listarReportes: () => ipcRenderer.invoke('reporte:listar'),
+  obtenerReporte: (id) => ipcRenderer.invoke('reporte:obtener', id),
+  exportarReportePDF: (id) => ipcRenderer.invoke('reporte:exportar-pdf', id),
 
   // Backup
   crearBackup: () => ipcRenderer.invoke('crear-backup'),

@@ -22,6 +22,7 @@ const {
   autoEliminarPapelera,
 } = require('./services/contratoService');
 const { checkActivation, activateLicense, getMachineId } = require('./services/licenseService');
+const { registrarVentaInventario } = require('./services/ventaService');
 const {
   getHerramientas,
   crearHerramienta,
@@ -80,7 +81,9 @@ const {
   getContratosCliente,
   getDetalleContrato,
 } = require('./services/clienteService');
-const { getResumenCaja } = require('./services/cajaService');
+const { getResumenCaja, registrarEgreso, eliminarEgreso, guardarCajaDiaria, getHistorialCaja, getCajaDiariaPorFecha } = require('./services/cajaService');
+const { generarReporte, getReportes, getReporteById } = require('./services/reporteService');
+const { exportarReportePDF } = require('./services/reportePdfService');
 const {
   getKits,
   getKitById,
@@ -553,8 +556,49 @@ ipcMain.handle('log', (_e, msg) => {
   });
 
   // --- Caja ---
-  ipcMain.handle('get-resumen-caja', (_e, fecha) => {
+  ipcMain.handle('get-resumen-caja', (event, fecha) => {
     return getResumenCaja(fecha);
+  });
+
+  ipcMain.handle('registrar-venta-inventario', (event, data) => {
+    return registrarVentaInventario(data);
+  });
+
+  ipcMain.handle('registrar-egreso-caja', (_e, data) => {
+    return registrarEgreso(data);
+  });
+
+  ipcMain.handle('eliminar-egreso-caja', (_e, id) => {
+    return eliminarEgreso(id);
+  });
+
+  ipcMain.handle('guardar-caja-diaria', (_e, fecha, montoInicial) => {
+    return guardarCajaDiaria(fecha, montoInicial);
+  });
+
+  ipcMain.handle('get-historial-caja', () => {
+    return getHistorialCaja();
+  });
+
+  ipcMain.handle('get-caja-diaria', (_e, fecha) => {
+    return getCajaDiariaPorFecha(fecha);
+  });
+
+  // --- Reportes ---
+  ipcMain.handle('reporte:generar', () => {
+    return generarReporte();
+  });
+
+  ipcMain.handle('reporte:listar', () => {
+    return getReportes();
+  });
+
+  ipcMain.handle('reporte:obtener', (_e, id) => {
+    return getReporteById(id);
+  });
+
+  ipcMain.handle('reporte:exportar-pdf', async (_e, id) => {
+    return await exportarReportePDF(id);
   });
 
   // --- Backup ---

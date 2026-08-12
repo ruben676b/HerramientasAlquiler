@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Search, Plus, Pencil, Trash2, Wrench, Package, X, History,
   ChevronDown, ChevronRight, CheckCircle, AlertTriangle, MinusCircle, Layers,
-  ImagePlus,
+  ImagePlus, Calendar, Clock, ShoppingCart, Tag,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { SEMANTIC, ESTADOS_HERRAMIENTA } from '../lib/constants';
@@ -10,13 +10,22 @@ import Button from '../components/ui/button';
 import ConfirmModal from '../components/ConfirmModal';
 import KitEditorModal from '../components/KitEditorModal';
 import DescripcionPopover from '../components/DescripcionPopover';
+import VentaModal from '../components/VentaModal';
 import { useToast } from '../components/Toast';
 
 /* ================================================================
    INVENTARIO — Vista por familias
    ================================================================ */
 
-const ESTADO_ICON = { disponible: CheckCircle, alquilado: Package, mantenimiento: AlertTriangle, malogrado: MinusCircle, perdida: MinusCircle, vendida: X };
+const ESTADO_ICON = {
+  disponible: CheckCircle,
+  reservado: Calendar,
+  alquilado: Package,
+  mantenimiento: AlertTriangle,
+  malogrado: MinusCircle,
+  perdida: MinusCircle,
+  vendido: ShoppingCart,
+};
 
 export default function Inventario() {
   const [tab, setTab] = useState('herramientas');
@@ -31,6 +40,7 @@ export default function Inventario() {
   const [confirm, setConfirm] = useState(null);
   const [confirmUnidad, setConfirmUnidad] = useState(null);
   const [confirmKit, setConfirmKit] = useState(null);
+  const [ventaData, setVentaData] = useState(null);
   const [historial, setHistorial] = useState({});
   const [expanded, setExpanded] = useState({});
   const searchRef = useRef(null);
@@ -393,16 +403,16 @@ export default function Inventario() {
                     <div style={{ borderTop: '1px solid var(--border)' }}>
                       {f.herramientas.map((h) => {
                         const s = sem[h.estado];
-                        const Icon = ESTADO_ICON[h.estado];
+                        const Icon = ESTADO_ICON[h.estado] || CheckCircle;
                         return (
                           <div key={h.id}>
                             <div className="group/row flex items-center gap-3 px-4 py-2 text-sm transition-colors duration-150 hover:bg-[var(--surface)]" style={{ borderBottom: '1px solid var(--border)' }}>
                               <span className="font-mono text-xs font-medium w-16 shrink-0" style={{ color: 'var(--primary)' }}>{h.id}</span>
-                              <span className="flex-1 flex items-center gap-1.5 min-w-0" style={{ color: 'var(--ink)' }}>
+<span className="flex-1 flex items-center gap-1.5 min-w-0" style={{ color: 'var(--ink)' }}>
                                 <span className="truncate">{h.nombre}</span>
                                 <DescripcionPopover text={h.descripcion} />
                               </span>
-                            {h.estado === 'alquilado' ? (
+                            {h.estado === 'alquilado' || h.estado === 'reservado' || h.estado === 'vendido' ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0"
                                 style={{ backgroundColor: s?.soft, color: s?.variable }}>
                                 <Icon size={10} /> {h.estado}
@@ -421,6 +431,16 @@ export default function Inventario() {
                                 title="Ver historial">
                                 <AlertTriangle size={13} />
                               </button>
+                            )}
+                            {h.estado !== 'vendido' && h.estado !== 'alquilado' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setVentaData({ ...h, nombre: h.nombre || f.nombre, precio_venta: h.precio_venta || f.precio_venta });
+                                }}
+                                className="p-1.5 rounded-md transition-colors duration-150 hover:bg-green-50 dark:hover:bg-green-950 shrink-0"
+                                style={{ color: 'var(--success)' }} title="Vender unidad"
+                              ><ShoppingCart size={13} /></button>
                             )}
                             <button
                               onClick={(e) => {
@@ -493,7 +513,7 @@ export default function Inventario() {
                         <span className="text-right w-9 shrink-0">Baja</span>
                         <span className="text-right w-10 shrink-0">Total</span>
                         <span className="flex-1" />
-                        <span className="w-[68px] shrink-0" />
+                        <span className="w-24 shrink-0" />
                       </div>
                       {g.variantes.map((v) => {
                         const cb = SEMANTIC[v.condicion];
@@ -510,7 +530,7 @@ export default function Inventario() {
                             <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_baja || 0) > 0 ? 'var(--muted)' : 'var(--faint)' }}>{v.cantidad_baja || 0}</span>
                             <span className="w-10 text-right font-mono font-semibold" style={{ color: 'var(--ink)' }}>{v.cantidad_total}</span>
                             <span className="flex-1 text-[10px] text-right" style={{ color: 'var(--muted)' }}>S/ {v.precio_dia.toFixed(2)}/día</span>
-                            <div className="flex items-center gap-0.5 shrink-0 w-[68px] justify-end">
+                            <div className="flex items-center gap-0.5 shrink-0 w-24 justify-end">
                               <button
                                 onClick={(e) => { e.stopPropagation(); setModal({ tipo: 'historial-granel', data: v }); }}
                                 className="w-5 h-5 rounded flex items-center justify-center transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5 active:scale-90"
@@ -518,15 +538,24 @@ export default function Inventario() {
                                 title="Historial de modificaciones"
                               ><History size={12} /></button>
                               <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setVentaData({ ...v, nombre: v.nombre || (g.nombre + ' (' + v.condicion + ')') });
+                                }}
+                                className="w-5 h-5 rounded flex items-center justify-center transition-colors duration-150 hover:bg-green-50 dark:hover:bg-green-950 active:scale-90"
+                                style={{ color: 'var(--success)' }}
+                                title="Vender material"
+                              ><ShoppingCart size={12} /></button>
+                              <button
                                 onClick={(e) => { e.stopPropagation(); setModal({ tipo: 'baja-granel', data: v }); }}
                                 className="w-5 h-5 rounded flex items-center justify-center text-[13px] font-bold transition-colors duration-150 hover:bg-red-50 dark:hover:bg-red-950 active:scale-90"
                                 style={{ color: 'var(--danger)' }}
-                                title="Dar de baja / Perder / Dañar / Vender"
+                                title="Dar de baja / Perder / Dañar"
                               >−</button>
                               <button
                                 onClick={(e) => { e.stopPropagation(); setModal({ tipo: 'sumar-stock', data: v }); }}
                                 className="w-5 h-5 rounded flex items-center justify-center text-[13px] font-bold transition-colors duration-150 hover:bg-green-50 dark:hover:bg-green-950 active:scale-90"
-                                style={{ color: 'var(--success)' }}
+                                style={{ color: 'oklch(0.55 0.15 160)' }}
                                 title="Comprar stock"
                               >+</button>
                             </div>
@@ -678,6 +707,13 @@ export default function Inventario() {
         onConfirm={handleDesactivarKit}
         onCancel={() => setConfirmKit(null)}
       />
+
+      <VentaModal
+        open={!!ventaData}
+        item={ventaData}
+        onClose={() => setVentaData(null)}
+        onSuccess={cargar}
+      />
     </div>
   );
 }
@@ -692,6 +728,7 @@ function EstadoDropdown({ h, s, Icon, onChange }) {
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef(null);
   const estados = ['disponible', 'mantenimiento', 'malogrado'];
+  const IconComp = Icon || CheckCircle;
 
   const abrir = (e) => {
     e.stopPropagation();
@@ -720,14 +757,14 @@ function EstadoDropdown({ h, s, Icon, onChange }) {
         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors duration-150"
         style={{ backgroundColor: s?.soft, color: s?.variable }}
       >
-        <Icon size={10} /> {h.estado} ▾
+        <IconComp size={10} /> {h.estado} ▾
       </button>
       {abierto && (
         <div className="fixed z-50 bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-lg py-0.5 min-w-[130px]"
           style={{ top: pos.top, left: pos.left }}>
           {estados.filter(e => e !== h.estado).map((e) => {
             const sem = SEMANTIC[e];
-            const EIcon = ESTADO_ICON[e];
+            const EIcon = ESTADO_ICON[e] || CheckCircle;
             return (
               <button
                 key={e}
@@ -884,7 +921,6 @@ function BajaGranelModal({ data, onSave, onClose }) {
     { id: 'baja', label: 'Dar de baja (sin motivo específico)', color: 'var(--muted)' },
     { id: 'perdido', label: 'Perdido', color: 'var(--danger)' },
     { id: 'dañado', label: 'Dañado', color: 'oklch(0.55 0.13 70)' },
-    { id: 'vendido', label: 'Vendido', color: 'var(--info)' },
   ];
 
   return (
