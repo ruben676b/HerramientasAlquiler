@@ -689,7 +689,7 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
 
           const nuevoEstado = item.estado_devolucion === 'dañado' ? 'malogrado'
             : item.estado_devolucion === 'perdido' ? 'perdida'
-            : item.estado_devolucion === 'vendido' ? 'vendida'
+            : item.estado_devolucion === 'vendido' ? 'vendido'
             : 'disponible';
           db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(nuevoEstado, detalle.id_herramienta);
 
@@ -713,6 +713,27 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
             // El costo (reposición o precio de venta) queda en DETALLE_CONTRATO.costo_perdida
             // y se suma al total del contrato vía getContratos/getDetalleContrato
             totalDanos += item.costo_perdida || 0;
+
+            // Si es vendido, registrar en VENTA_INVENTARIO para que la Caja lo vea
+            if (item.estado_devolucion === 'vendido') {
+              try {
+                const h = db.prepare('SELECT nombre FROM HERRAMIENTA WHERE id = ?').get(detalle.id_herramienta);
+                db.prepare(`
+                  INSERT INTO VENTA_INVENTARIO (tipo_item, id_herramienta, nombre_item, cantidad, precio_unitario, total, metodo, cliente_nombre)
+                  VALUES ('individual', ?, ?, 1, ?, ?, ?, ?)
+                `).run(
+                  detalle.id_herramienta,
+                  h?.nombre || detalle.id_herramienta || 'Herramienta',
+                  item.costo_perdida || 0,
+                  item.costo_perdida || 0,
+                  item.metodo || 'efectivo',
+                  item.clienteNombre || null
+                );
+              } catch (e) {
+                console.error('[VentaInventario] Error al insertar venta:', e.message);
+                // No lanzar el error para no romper la transacción de devolución
+              }
+            }
           }
 
           // Mora individual
@@ -866,7 +887,7 @@ function procesarKitLinea(idContrato, detalle, item, fechaDevolucionReal) {
       if (ci.estado_devolucion === 'pendiente') {
         db.prepare('UPDATE DETALLE_CONTRATO SET estado_devolucion = ?, fecha_devolucion_real = ? WHERE id = ?')
           .run(estadoKit, fechaDevolucionReal, ci.id);
-        const estadoHerramienta = estadoKit === 'perdido' ? 'perdida' : estadoKit === 'vendido' ? 'vendida' : 'disponible';
+        const estadoHerramienta = estadoKit === 'perdido' ? 'perdida' : estadoKit === 'vendido' ? 'vendido' : 'disponible';
         db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?')
           .run(estadoHerramienta, ci.id_herramienta);
       }

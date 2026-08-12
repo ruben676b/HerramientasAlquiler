@@ -800,7 +800,6 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
   } catch (err) {
     console.error('[DB] Error en migración descuento_mora:', err);
   }
-  }
 
   // --- Datos semilla (solo primera vez) ---
 

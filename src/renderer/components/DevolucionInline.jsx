@@ -6,6 +6,7 @@ import AnularPagoModal from './AnularPagoModal';
 import CalificarContratoModal from './CalificarContratoModal';
 import ImagenVisor from './ImagenVisor';
 import ConfirmModal from './ConfirmModal';
+import VentaDevolucionModal from './VentaDevolucionModal';
 import { gruparPagos } from '../lib/gruparPagos';
 import { localDate } from '../lib/date';
 
@@ -53,6 +54,7 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [costoPerdManual, setCostoPerdManual] = useState({});
   // Estado para pérdida/venta de herramientas individuales (desplegable "No devuelto")
   const [noDevueltoAbierto, setNoDevueltoAbierto] = useState({});
+  const noDevueltoRefs = useRef({});
   const [costosNoDevueltos, setCostosNoDevueltos] = useState({});
   const savingRef = useRef({});
   const guardadosRef = useRef({});
@@ -315,13 +317,14 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
       } catch (err) {
         guardadosRef.current[idx] = false;
         fallos++;
+        console.error('[Devolucion] Error procesando item idx=' + idx + ' id=' + item.id + ' estado=' + estado + ':', err.message || err);
       }
     }
 
     if (mountedRef.current) {
       setCobrando(false);
       if (exitos > 0) toast(exitos + ' herramienta' + (exitos !== 1 ? 's' : '') + ' devuelta' + (exitos !== 1 ? 's' : ''));
-      if (fallos > 0) toast(fallos + ' error' + (fallos !== 1 ? 'es' : '') + ' al procesar.', 'error');
+      if (fallos > 0) toast(fallos + ' error' + (fallos !== 1 ? 'es' : '') + ' al procesar', 'error');
       onRecargar();
     }
   };
@@ -718,34 +721,39 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                             </button>
                           );
                         })}
-                        <div className="relative">
-                          <button onClick={() => setNoDevueltoAbierto(p => ({ ...p, [idx]: !p[idx] }))}
+                        <div className="relative inline-flex">
+                          <button ref={el => noDevueltoRefs.current[idx] = el} onClick={() => setNoDevueltoAbierto(p => ({ ...p, [idx]: !p[idx] }))}
                             className="flex items-center gap-0.5 px-1.5 h-5 rounded text-[9px] font-medium transition-all duration-150"
                             style={{
-                              backgroundColor: est === 'perdido' ? 'oklch(0.55 0.19 30)' : est === 'vendido' ? 'oklch(0.45 0.15 250)' : noDevueltoAbierto[idx] ? 'oklch(0.92 0.03 250)' : 'var(--bg)',
+                              backgroundColor: est === 'perdido' ? 'oklch(0.55 0.19 30)' : est === 'vendido' ? 'oklch(0.45 0.15 250)' : 'var(--bg)',
                               color: est === 'perdido' || est === 'vendido' ? '#fff' : 'var(--muted)',
-                              border: est === 'perdido' || est === 'vendido' || noDevueltoAbierto[idx] ? 'none' : '0.5px solid var(--border)',
+                              border: est === 'perdido' || est === 'vendido' ? 'none' : '0.5px solid var(--border)',
                             }}>
                             {est === 'perdido' ? (
                               <><X size={10} /> Perdido</>
                             ) : est === 'vendido' ? (
                               <><CheckCircle size={10} /> Vendido</>
                             ) : (
-                              <><ChevronRight size={10} style={{ transform: noDevueltoAbierto[idx] ? 'rotate(90deg)' : 'rotate(0deg)' }} /> No devuelto</>
+                              <><ChevronRight size={10} /> No devuelto</>
                             )}
                           </button>
-                          {noDevueltoAbierto[idx] && (
-                            <div className="absolute z-20 top-full right-0 mt-1 rounded border shadow-lg p-1 flex flex-col gap-0.5"
-                              style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+                          {noDevueltoAbierto[idx] && est !== 'perdido' && est !== 'vendido' && (
+                            <div className="fixed z-50 flex flex-col gap-0.5 p-1 rounded border shadow-lg"
+                              style={{
+                                backgroundColor: 'var(--surface)',
+                                borderColor: 'var(--border)',
+                                left: (noDevueltoRefs.current[idx]?.getBoundingClientRect().left ?? 0) + 'px',
+                                top: ((noDevueltoRefs.current[idx]?.getBoundingClientRect().bottom ?? 0) + 4) + 'px',
+                              }}>
                               <button onClick={() => { seleccionarEstado(idx, 'perdido'); setNoDevueltoAbierto(p => ({ ...p, [idx]: false })); }}
-                                className="flex items-center gap-1 px-2 h-6 rounded text-[10px] font-medium text-left whitespace-nowrap"
-                                style={{ backgroundColor: 'var(--bg)', color: 'var(--danger)' }}>
-                                <X size={11} /> Perdido
+                                className="flex items-center gap-1.5 px-2.5 h-7 rounded text-[11px] font-medium text-left whitespace-nowrap hover:opacity-80"
+                                style={{ backgroundColor: 'oklch(0.55 0.19 30 / 0.1)', color: 'oklch(0.55 0.19 30)' }}>
+                                <X size={12} /> Perdido
                               </button>
                               <button onClick={() => { seleccionarEstado(idx, 'vendido'); setNoDevueltoAbierto(p => ({ ...p, [idx]: false })); }}
-                                className="flex items-center gap-1 px-2 h-6 rounded text-[10px] font-medium text-left whitespace-nowrap"
-                                style={{ backgroundColor: 'var(--bg)', color: 'oklch(0.45 0.15 250)' }}>
-                                <CheckCircle size={11} /> Vendido
+                                className="flex items-center gap-1.5 px-2.5 h-7 rounded text-[11px] font-medium text-left whitespace-nowrap hover:opacity-80"
+                                style={{ backgroundColor: 'oklch(0.45 0.15 250 / 0.1)', color: 'oklch(0.45 0.15 250)' }}>
+                                <CheckCircle size={12} /> Vendido
                               </button>
                             </div>
                           )}
@@ -1145,7 +1153,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                   return !it.estado_devolucion || it.estado_devolucion === 'pendiente';
                 }).length;
                 return (
-                  <div key={'g-' + g.prefix} className="rounded-xl transition-all duration-150 overflow-hidden mb-1.5"
+                  <div key={'g-' + g.prefix} className="rounded-xl transition-all duration-150 mb-1.5"
                     style={{ border: '1px solid var(--border)', backgroundColor: 'var(--surface)' }}>
                     <div className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none"
                       onClick={() => setGruposAbiertos(p => ({ ...p, [g.prefix]: !p[g.prefix] }))}>
@@ -1455,26 +1463,37 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
       />
     )}
     {confirmarVenta && (
-      <ConfirmModal
-        open={true}
-        title={'Confirmar venta' + (confirmarVenta.length > 1 ? ' de ' + confirmarVenta.length + ' herramientas' : ' de herramienta')}
-        message={'Se cobrará el monto indicado y la herramienta quedará marcada como VENDIDA en el inventario, sin posibilidad de alquilarse.'}
-        confirmLabel={'Sí, vender'}
-        danger={true}
-        onConfirm={() => { const v = confirmarVenta; setConfirmarVenta(null); procesarDevoluciones(v); }}
-        onCancel={() => setConfirmarVenta(null)}
-      >
-        <ul className="mt-2 space-y-1 text-left text-xs" style={{ color: 'var(--ink)' }}>
-          {confirmarVenta.map(({ item, idx }) => (
-            <li key={item.id} className="flex items-center justify-between gap-2">
-              <span className="truncate">{item.item_codigo} · {item.item_nombre}</span>
-              <span className="font-mono shrink-0">
-                S/ {parseFloat(costosNoDevueltos[idx + '_vendido']) || (item.item_precio_venta ?? item.item_valor_reposicion ?? 0)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </ConfirmModal>
+      <VentaDevolucionModal
+        ventas={confirmarVenta.map(({ item, idx }) => ({
+          item,
+          monto: parseFloat(costosNoDevueltos[idx + '_vendido']) || (item.item_precio_venta ?? item.item_valor_reposicion ?? 0),
+        }))}
+        contrato={c}
+        garantia={c.garantia_retenida || 0}
+        onClose={() => setConfirmarVenta(null)}
+        onConfirm={async (pagos) => {
+          const v = confirmarVenta;
+          setConfirmarVenta(null);
+          console.log('[DIAG] VentaDevolucion datos:', JSON.stringify({ idContrato: c.id, items: v.map(x => ({ id: x.item?.id, estado: estados[x.idx] })), pagos }));
+          try {
+            for (const p of pagos) {
+              if (!p.monto || p.monto <= 0) continue;
+              const esGarantia = p.metodo === 'garantia';
+              await window.api.registrarPago({
+                idContrato: c.id,
+                monto: p.monto,
+                metodo: esGarantia ? 'efectivo' : p.metodo,
+                tipo: esGarantia ? 'devolucion_deposito' : 'saldo',
+                idDetalle: v[0]?.item?.id || undefined,
+              });
+            }
+            await procesarDevoluciones(v);
+          } catch (e) {
+            console.error('[DIAG] Error en venta:', e.message || e);
+            toast('Error: ' + (e.message || 'desconocido'), 'error');
+          }
+        }}
+      />
     )}
     {visor && (
       <ImagenVisor
