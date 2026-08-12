@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Search, Plus, ChevronDown, ChevronRight, Calendar, Clock,
   XCircle, X, CheckCircle, AlertTriangle, FileText, ArrowRight, Star,
@@ -69,34 +69,44 @@ export default function Alquileres() {
   const [restaurandoContrato, setRestaurandoContrato] = useState(null);
   const [devGarantiaMonto, setDevGarantiaMonto] = useState('');
   const [devGarantiaMetodo, setDevGarantiaMetodo] = useState('efectivo');
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(0);
+  const [cargandoMas, setCargandoMas] = useState(false);
+  const limite = 20;
   const searchRef = useRef(null);
   const { openDialog, openEditDialog } = useSessions();
   const toast = useToast();
 
-  const cargar = async () => {
+  const cargar = async (paginaNueva, acumular) => {
     if (!window.api) return;
-    setCargando(true);
+    if (!acumular) setCargando(true);
+    else setCargandoMas(true);
     try {
-      const filtros = { busqueda };
+      const p = paginaNueva || pagina;
+      const filtros = { busqueda, limite, pagina: p };
       if (estadoFiltro === 'papelera') filtros.papelera = 1;
-      const c = await window.api.getContratos(filtros);
-      setTodosContratos(c);
+      const res = await window.api.getContratos(filtros);
+      if (res && res.contratos) {
+        setTodosContratos(prev => acumular ? [...prev, ...res.contratos] : res.contratos);
+        setTotalPaginas(Math.ceil(res.total / limite));
+      } else {
+        setTodosContratos(acumular ? prev => prev : (res || []));
+        setTotalPaginas(0);
+      }
     } catch (e) { setError(e.message); }
-    finally { setCargando(false); }
+    finally { setCargando(false); setCargandoMas(false); }
   };
 
   const recargar = async () => {
-    if (!window.api) return;
-    try {
-      const filtros = { busqueda };
-      if (estadoFiltro === 'papelera') filtros.papelera = 1;
-      const c = await window.api.getContratos(filtros);
-      if (window.api.log) {
-        const granelItems = c[0]?.items?.filter(i => i.id_item_granel).map(i => ({ id: i.id, id_item_granel: i.id_item_granel, cantidad: i.cantidad, granel_pendiente: i.granel_pendiente, granel_dev_bien: i.granel_dev_bien, granel_dev_danada: i.granel_dev_danada, granel_dev_perdida: i.granel_dev_perdida }));
-        window.api.log('[DEBUG recargar] contratos: ' + c.length + ' granelItems: ' + JSON.stringify(granelItems));
-      }
-      setTodosContratos(c);
-    } catch (e) { setError(e.message); }
+    setPagina(1);
+    setTodosContratos([]);
+    await cargar(1, false);
+  };
+
+  const cargarMas = async () => {
+    const nextPage = pagina + 1;
+    setPagina(nextPage);
+    await cargar(nextPage, true);
   };
 
   const handleAddGarantia = async () => {
@@ -186,7 +196,7 @@ export default function Alquileres() {
     }
   };
 
-  useEffect(() => { cargar(); }, [busqueda, estadoFiltro, refreshTrigger]);
+  useEffect(() => { setPagina(1); setTodosContratos([]); cargar(1, false); }, [busqueda, estadoFiltro, refreshTrigger]);
 
   useEffect(() => {
     const onContratoCreado = () => setRefreshTrigger(prev => prev + 1);
@@ -481,11 +491,15 @@ export default function Alquileres() {
                                     <p className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>
                                       Tarifa diaria total: S/ {(c.subtotal_diario || 0).toFixed(2)}
                                     </p>
-                                    {(() => {
-                                      const renderEquipoFila = (item, idx, filaKey) => {
-                                        const esGranel = !!item.item_condicion;
-                                        const sub = baseItem(item, c) + (item.monto_atraso_item || 0);
-                                        return (
+{(() => {
+                                          const baseCache = {};
+                                          const getBase = (item) => {
+                                            if (!baseCache[item.id]) baseCache[item.id] = baseItem(item, c);
+                                            return baseCache[item.id];
+                                          };
+                                          const renderEquipoFila = (item, idx, filaKey, sub) => {
+                                            const esGranel = !!item.item_condicion;
+                                            return (
                                           <div key={filaKey} className="space-y-0.5">
                                             {/* Fila 1: Badge + Nombre + Tarifa + Atraso badge */}
                                             <div className="flex items-center gap-1 flex-wrap">
@@ -555,7 +569,7 @@ export default function Alquileres() {
                                             <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
                                               <span />
                                               <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                                                Base S/ {baseItem(item, c).toFixed(0)}
+                                                Base S/ {getBase(item).toFixed(0)}
                                                 {(item.dias_atraso_item || 0) > 0 && (
                                                   <span style={{ color: 'var(--danger)' }}> + Mora S/ {(item.monto_atraso_item || 0).toFixed(0)}</span>
                                                 )}
@@ -581,14 +595,15 @@ export default function Alquileres() {
                                           filas.push({ prefix: null, items: [{ item, idx }] });
                                         }
                                       });
-                                      return filas.map((g, gi) => {
-                                        if (g.prefix === null) {
-                                          const { item, idx } = g.items[0];
-                                          return renderEquipoFila(item, idx, 'u-' + idx);
-                                        }
-                                        const key = c.id + '|' + g.prefix;
-                                        const abierto = !!gruposEq[key];
-                                        const totalGrupo = g.items.reduce((a, { item }) => a + (baseItem(item, c) + (item.monto_atraso_item || 0)), 0);
+return filas.map((g, gi) => {
+        if (g.prefix === null) {
+          const { item, idx } = g.items[0];
+          const sub = getBase(item) + (item.monto_atraso_item || 0);
+          return renderEquipoFila(item, idx, 'u-' + idx, sub);
+        }
+        const key = c.id + '|' + g.prefix;
+        const abierto = !!gruposEq[key];
+        const totalGrupo = g.items.reduce((a, { item }) => a + (getBase(item) + (item.monto_atraso_item || 0)), 0);
                                         const pendientes = g.items.filter(({ item }) => !item.estado_devolucion || item.estado_devolucion === 'pendiente').length;
                                         return (
                                           <div key={gi} className="rounded-xl transition-colors duration-150 overflow-hidden"
@@ -612,7 +627,10 @@ export default function Alquileres() {
                                             </div>
                                             {abierto && (
                                               <div className="px-2 pb-2 space-y-1.5">
-                                                {g.items.map(({ item, idx }) => renderEquipoFila(item, idx, g.prefix + '-' + idx))}
+                                                {g.items.map(({ item, idx }) => {
+                    const sub = getBase(item) + (item.monto_atraso_item || 0);
+                    return renderEquipoFila(item, idx, g.prefix + '-' + idx, sub);
+                  })}
                                               </div>
                                             )}
                                           </div>
@@ -753,7 +771,7 @@ export default function Alquileres() {
                                     </div>
                                   )}
                                 </div>
-                                {pendiente > 0 && c.estado !== 'devuelto' && c.estado !== 'cancelado' && c.estado !== 'reservado' && (
+                                {pendiente > 0 && (
                                   <div className="mb-3">
                                     <button
                                       onClick={() => setPagoModalContrato(c)}
@@ -893,53 +911,47 @@ export default function Alquileres() {
                                      <Ban size={12} /> Cancelar Reserva
                                    </button>
                                  </>
-                               ) : c.estado === 'cancelado' ? null : (
-                                 <>
-                                   {(c.estado === 'alquilado' || c.estado === 'atrasado') && (
-                                     <>
-                                       <button
-                                         onClick={() => openEditDialog(c)}
-                                         className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
-                                         style={{ backgroundColor: 'var(--surface)', color: 'var(--info)', border: '0.5px solid var(--info)' }}
-                                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.93 0.04 240)'; }}
-                                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
-                                       >
-                                         <Edit size={12} /> Editar
-                                       </button>
-                                       <button
-                                         onClick={() => setEliminandoContrato(c)}
-                                         className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
-                                         style={{ backgroundColor: 'var(--surface)', color: 'var(--danger)', border: '0.5px solid var(--danger)' }}
-                                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.95 0.02 25)'; }}
-                                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
-                                       >
-                                         <Trash2 size={12} /> Eliminar
-                                       </button>
-                                     </>
-                                   )}
-                                   <button
-                                     onClick={() => setCalificarContrato(c)}
-                                     className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
-                                     style={{ backgroundColor: 'oklch(0.62 0.17 80 / 0.12)', color: 'oklch(0.52 0.17 80)', border: '0.5px solid oklch(0.62 0.17 80 / 0.3)' }}
-                                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.2)'; }}
-                                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.12)'; }}
-                                   >
-                                     <Star size={12} /> Calificar
-                                   </button>
-                                   {c.estado !== 'devuelto' && (
-                                     <button
-                                       onClick={() => setDevolucionActiva(devolucionActiva === c.id ? null : c.id)}
-                                       className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
-                                       style={{ backgroundColor: devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)', color: '#fff', border: 'none' }}
-                                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = devolucionActiva === c.id ? 'oklch(0.40 0.14 25)' : 'oklch(0.43 0.14 55)'; }}
-                                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)'; }}
-                                     >
-                                       {devolucionActiva === c.id ? <X size={12} /> : (pendiente > 0 && <AlertTriangle size={12} />)}
-                                       {devolucionActiva === c.id ? 'Cancelar devolución' : 'Devolución' + (pendiente > 0 ? ' (con deuda)' : '')} <ArrowRight size={12} />
-                                     </button>
-                                   )}
-                                 </>
-                               )}
+) : (
+                                  <>
+                                    <button
+                                      onClick={() => openEditDialog(c)}
+                                      className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
+                                      style={{ backgroundColor: 'var(--surface)', color: 'var(--info)', border: '0.5px solid var(--info)' }}
+                                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.93 0.04 240)'; }}
+                                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
+                                    >
+                                      <Edit size={12} /> Editar
+                                    </button>
+                                    <button
+                                      onClick={() => setEliminandoContrato(c)}
+                                      className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
+                                      style={{ backgroundColor: 'var(--surface)', color: 'var(--danger)', border: '0.5px solid var(--danger)' }}
+                                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.95 0.02 25)'; }}
+                                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
+                                    >
+                                      <Trash2 size={12} /> Eliminar
+                                    </button>
+                                    <button
+                                      onClick={() => setCalificarContrato(c)}
+                                      className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
+                                      style={{ backgroundColor: 'oklch(0.62 0.17 80 / 0.12)', color: 'oklch(0.52 0.17 80)', border: '0.5px solid oklch(0.62 0.17 80 / 0.3)' }}
+                                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.2)'; }}
+                                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.12)'; }}
+                                    >
+                                      <Star size={12} /> Calificar
+                                    </button>
+                                    <button
+                                      onClick={() => setDevolucionActiva(devolucionActiva === c.id ? null : c.id)}
+                                      className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
+                                      style={{ backgroundColor: devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)', color: '#fff', border: 'none' }}
+                                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = devolucionActiva === c.id ? 'oklch(0.40 0.14 25)' : 'oklch(0.43 0.14 55)'; }}
+                                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)'; }}
+                                    >
+                                      {devolucionActiva === c.id ? <X size={12} /> : (pendiente > 0 && <AlertTriangle size={12} />)}
+                                      {devolucionActiva === c.id ? 'Cancelar devolución' : 'Devolución' + (pendiente > 0 ? ' (con deuda)' : '')} <ArrowRight size={12} />
+                                    </button>
+                                  </>
+                                )}
                              </div>
                           </>)}
                       </div>
@@ -949,6 +961,25 @@ export default function Alquileres() {
               );
             })}
           </div>
+        )}
+
+        {/* Botón Cargar más */}
+        {pagina < totalPaginas && !cargando && (
+          <div className="flex justify-center py-4">
+            <button
+              onClick={cargarMas}
+              disabled={cargandoMas}
+              className="px-6 py-2 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-[0.97] disabled:opacity-50"
+              style={{ backgroundColor: 'var(--info)', color: '#fff', border: 'none' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.45 0.13 240)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--info)'; }}
+            >
+              {cargandoMas ? 'Cargando...' : 'Cargar más contratos'}
+            </button>
+          </div>
+        )}
+        {pagina >= totalPaginas && totalPaginas > 0 && !cargando && (
+          <p className="text-center text-xs py-3" style={{ color: 'var(--faint)' }}>Mostrando todos los contratos</p>
         )}
 
         {pagoModalContrato && (

@@ -289,7 +289,7 @@ function getDetalleContrato(idContrato) {
       ? new Date(item.fecha_devolucion_real + 'T00:00:00')
       : new Date(hoy + 'T00:00:00');
     const diasAtrasoItem = Math.max(0, Math.ceil((refDate - fechaPactadaItem) / 86400000));
-    const montoAtrasoItem = diasAtrasoItem * item.precio_dia_aplicado * item.cantidad;
+    const montoAtrasoItem = Math.max(0, diasAtrasoItem * item.precio_dia_aplicado * item.cantidad - (item.descuento_mora || 0));
     total_atraso += montoAtrasoItem;
 
     const pagadoItem = db.prepare(

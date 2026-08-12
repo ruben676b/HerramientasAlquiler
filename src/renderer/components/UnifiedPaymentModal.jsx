@@ -11,16 +11,26 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
   const [metodo, setMetodo] = useState('efectivo');
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
-  const [moraEditada, setMoraEditada] = useState(itemMora || 0);
-  const [atrasoEditado, setAtrasoEditado] = useState(contrato.total_atraso || 0);
+  // Usar strings para los inputs editables (evita el problema del 0 fantasma)
+  const [moraStr, setMoraStr] = useState(String(itemMora || 0));
+  const [atrasoStr, setAtrasoStr] = useState(String(contrato.total_atraso || 0));
+  const [baseStr, setBaseStr] = useState(String(
+    isItem ? (itemBase || 0) : ((contrato.total_contrato ? contrato.total_contrato : ((contrato.subtotal_diario || 0) * diasTotal)) || 0)
+  ));
+
+  const parseNum = (s) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
+  const baseEditada = parseNum(baseStr);
+  const moraEditada = parseNum(moraStr);
+  const atrasoEditado = parseNum(atrasoStr);
 
   const diasTotal = !isItem ? Math.max(1, Math.ceil(
     (new Date(contrato.fecha_devolucion_pactada + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
   ) + 1) : 0;
 
-  const [baseEditada, setBaseEditada] = useState(
-    isItem ? (itemBase || 0) : ((contrato.total_contrato ? contrato.total_contrato : ((contrato.subtotal_diario || 0) * diasTotal)) || 0)
-  );
+  // Valores originales al abrir el modal (para detectar ediciones)
+  const baseOriginal = parseFloat(isItem ? (itemBase || 0) : ((contrato.total_contrato ? contrato.total_contrato : ((contrato.subtotal_diario || 0) * diasTotal)) || 0));
+  const moraOriginal = isItem ? (itemMora || 0) : (contrato.total_atraso || 0);
+  const userEdito = !isItem && (Math.abs(baseEditada - baseOriginal) > 0.005 || Math.abs(atrasoEditado - moraOriginal) > 0.005);
 
   const pagadoItem = isItem ? (item?.pagado_item || 0) : 0;
   const pendienteItem = Math.max(0, baseEditada + moraEditada - pagadoItem);
@@ -32,7 +42,8 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
   if (!isItem) {
     pagado = contrato.total_pagado || 0;
     total = baseEditada + atrasoEditado + danosTotal + perdidasTotal;
-    saldoPendiente = pendienteExterno != null ? pendienteExterno : Math.max(0, total - pagado);
+    // Usar pendiente externo solo si el usuario NO editó base ni mora
+    saldoPendiente = (!userEdito && pendienteExterno != null) ? pendienteExterno : Math.max(0, total - pagado);
   }
 
   const montoMaximo = isItem ? pendienteItem : saldoPendiente;
@@ -55,12 +66,22 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
     setError('');
     try {
       const esGarantia = metodo === 'garantia';
+      // Enviar ajustes si el usuario modificó base o mora
+      const ajustes = {};
+      if (!isItem && userEdito) {
+        if (Math.abs(baseEditada - baseOriginal) > 0.005) ajustes.baseNuevo = baseEditada;
+        if (Math.abs(atrasoEditado - moraOriginal) > 0.005) {
+          ajustes.moraNuevo = atrasoEditado;
+          ajustes.moraOriginal = moraOriginal;
+        }
+      }
       await window.api.registrarPago({
         idContrato: contrato.id,
         monto: m,
         metodo: esGarantia ? 'efectivo' : metodo,
         tipo: esGarantia ? 'devolucion_deposito' : undefined,
         idDetalle: idDetalle || undefined,
+        ajustes: Object.keys(ajustes).length > 0 ? ajustes : undefined,
       });
       toast('Pago registrado: S/ ' + m.toFixed(2) + (esGarantia ? ' (descontado de garantía)' : ' por ' + metodo));
       onConfirm();
@@ -104,8 +125,8 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
                   <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                     <span className="text-[10px]" style={{ color: 'var(--muted)' }}>S/</span>
                     <input type="number" step="0.01" min="0"
-                      value={baseEditada}
-                      onChange={e => setBaseEditada(Math.max(0, parseFloat(e.target.value) || 0))}
+                      value={baseStr}
+                      onChange={e => setBaseStr(e.target.value)}
                       className="w-20 h-6 px-1 rounded text-xs border font-mono text-right dev-nospin"
                       style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
                     />
@@ -117,8 +138,8 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
                     <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                       <span className="text-[10px]" style={{ color: 'var(--muted)' }}>S/</span>
                       <input type="number" step="0.01" min="0"
-                        value={moraEditada}
-                        onChange={e => setMoraEditada(Math.max(0, parseFloat(e.target.value) || 0))}
+                        value={moraStr}
+                        onChange={e => setMoraStr(e.target.value)}
                         className="w-20 h-6 px-1 rounded text-xs border font-mono text-right dev-nospin"
                         style={{ backgroundColor: 'var(--bg)', color: 'var(--danger)', borderColor: 'var(--danger)' }}
                       />
@@ -147,8 +168,8 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
                   <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                     <span className="text-[10px]" style={{ color: 'var(--muted)' }}>S/</span>
                     <input type="number" step="0.01" min="0"
-                      value={baseEditada}
-                      onChange={e => setBaseEditada(Math.max(0, parseFloat(e.target.value) || 0))}
+                      value={baseStr}
+                      onChange={e => setBaseStr(e.target.value)}
                       className="w-20 h-6 px-1 rounded text-xs border font-mono text-right dev-nospin"
                       style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
                     />
@@ -160,8 +181,8 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
                     <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                       <span className="text-[10px]" style={{ color: 'var(--muted)' }}>+ S/</span>
                       <input type="number" step="0.01" min="0"
-                        value={atrasoEditado}
-                        onChange={e => setAtrasoEditado(Math.max(0, parseFloat(e.target.value) || 0))}
+                        value={atrasoStr}
+                        onChange={e => setAtrasoStr(e.target.value)}
                         className="w-20 h-6 px-1 rounded text-xs border font-mono text-right dev-nospin"
                         style={{ backgroundColor: 'var(--bg)', color: 'var(--danger)', borderColor: 'var(--danger)' }}
                       />

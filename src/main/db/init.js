@@ -303,6 +303,31 @@ function initDatabase() {
     console.error('[DB] Error creando trigger trg_granel_disponible_insert:', err);
   }
 
+  // Índices para rendimiento (evitan escaneos completos de tabla)
+  try {
+    const indices = [
+      'CREATE INDEX IF NOT EXISTS idx_contrato_cliente ON CONTRATO(id_cliente)',
+      'CREATE INDEX IF NOT EXISTS idx_contrato_estado ON CONTRATO(estado)',
+      'CREATE INDEX IF NOT EXISTS idx_contrato_fecha_mod ON CONTRATO(fecha_modificacion)',
+      'CREATE INDEX IF NOT EXISTS idx_detalle_contrato ON DETALLE_CONTRATO(id_contrato)',
+      'CREATE INDEX IF NOT EXISTS idx_detalle_herramienta ON DETALLE_CONTRATO(id_herramienta)',
+      'CREATE INDEX IF NOT EXISTS idx_detalle_granel ON DETALLE_CONTRATO(id_item_granel)',
+      'CREATE INDEX IF NOT EXISTS idx_pago_contrato ON PAGO(id_contrato)',
+      'CREATE INDEX IF NOT EXISTS idx_pago_fecha ON PAGO(fecha_pago)',
+      'CREATE INDEX IF NOT EXISTS idx_herramienta_categoria ON HERRAMIENTA(id_categoria)',
+      'CREATE INDEX IF NOT EXISTS idx_herramienta_estado ON HERRAMIENTA(estado)',
+      'CREATE INDEX IF NOT EXISTS idx_devolucion_granel_contrato ON DEVOLUCION_GRANEL(id_contrato)',
+      'CREATE INDEX IF NOT EXISTS idx_dano_devolucion_contrato ON DAÑO_DEVOLUCION(id_contrato)',
+      'CREATE INDEX IF NOT EXISTS idx_cliente_etiqueta_cliente ON CLIENTE_ETIQUETA(id_cliente)',
+    ];
+    for (const sql of indices) {
+      try { db.exec(sql); } catch (e) { /* ignorar si ya existe */ }
+    }
+    console.log('[DB] Índices creados correctamente.');
+  } catch (err) {
+    console.error('[DB] Error creando índices:', err);
+  }
+
   // Migración: columna mora_dia en HERRAMIENTA e ITEM_GRANEL (bases de datos existentes)
   try {
     const hasCol = (tabla) => db.prepare(`PRAGMA table_info(${tabla})`).all().some(c => c.name === 'mora_dia');
@@ -682,6 +707,17 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     }
   } catch (err) {
     console.error('[DB] Error en migración papelera:', err);
+  }
+
+  // Migración: descuento_mora en DETALLE_CONTRATO (descuentos por ajuste manual de mora)
+  try {
+    const hasDescuentoMora = db.prepare("PRAGMA table_info('DETALLE_CONTRATO')").all().some(c => c.name === 'descuento_mora');
+    if (!hasDescuentoMora) {
+      db.exec("ALTER TABLE DETALLE_CONTRATO ADD COLUMN descuento_mora REAL NOT NULL DEFAULT 0");
+      console.log('[DB] Migración: columna descuento_mora agregada a DETALLE_CONTRATO.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración descuento_mora:', err);
   }
 
   // --- Datos semilla (solo primera vez) ---

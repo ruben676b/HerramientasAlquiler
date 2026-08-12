@@ -305,18 +305,54 @@ const CAT = {
     'Yeso':[['Bolsa rota',1],['Endurecido',1.5],['Derrame',0.5]],
   },
   kit: {
-    'K-RMP':{nombre:'Kit Rotomartillo Pro',pd:40,pmin:25,pmes:600,desc:'Kit profesional de rotomartillo',comps:[{tipo:'ind',ref:'RTO-01'},{tipo:'gran',ref:'G-TAB',cant:5}]},
-    'K-AND':{nombre:'Andamio',pd:15,pmin:8,pmes:300,desc:'Andamio completo',comps:[{tipo:'gran',ref:'G-PAT',cant:4},{tipo:'gran',ref:'G-PLA',cant:1},{tipo:'gran',ref:'G-CRU',cant:2}]},
+    'K-RMP':{nombre:'Kit Rotomartillo Pro',pd:40,pmin:25,pmes:600,pventa:900,desc:'Kit profesional de rotomartillo',comps:[{tipo:'ind',ref:'RTO-01'},{tipo:'gran',ref:'G-TAB',cant:5}]},
+    'K-AND':{nombre:'Andamio',pd:15,pmin:8,pmes:300,pventa:350,desc:'Andamio completo',comps:[{tipo:'gran',ref:'G-PAT',cant:4},{tipo:'gran',ref:'G-PLA',cant:1},{tipo:'gran',ref:'G-CRU',cant:2}]},
+    'K-SOL':{nombre:'Soldadura',pd:65,pmin:38,pmes:980,pventa:2000,desc:'Soldadora eléctrica + oxiacetilénico',comps:[{tipo:'ind',ref:'SOL-01'},{tipo:'ind',ref:'SOG-01'}]},
+    'K-TAL':{nombre:'Taladro Completo',pd:42,pmin:25,pmes:630,pventa:1200,desc:'Taladro percutor + angular + prolongador',comps:[{tipo:'ind',ref:'TAL-01'},{tipo:'ind',ref:'ATL-01'},{tipo:'ind',ref:'PRO-01'}]},
+    'K-CMP':{nombre:'Compresor Completo',pd:72,pmin:42,pmes:1080,pventa:2200,desc:'Compresor + pistola clavos + pistola pintura',comps:[{tipo:'ind',ref:'CMP-01'},{tipo:'ind',ref:'PIS-01'},{tipo:'ind',ref:'PIN-01'}]},
+    'K-LIM':{nombre:'Limpieza',pd:28,pmin:16,pmes:420,pventa:700,desc:'Hidrolavadora + prolongador',comps:[{tipo:'ind',ref:'HID-01'},{tipo:'ind',ref:'PRO-02'}]},
+    'K-ILU':{nombre:'Iluminación',pd:75,pmin:45,pmes:1125,pventa:2500,desc:'Generador + prolongador + 2 reflectores',comps:[{tipo:'ind',ref:'GEN-01'},{tipo:'ind',ref:'PRO-01'},{tipo:'ind',ref:'LAM-01'},{tipo:'ind',ref:'LAM-02'}]},
+    'K-DEM':{nombre:'Demolición',pd:65,pmin:40,pmes:980,pventa:2000,desc:'Martillo demoledor + rotomartillo',comps:[{tipo:'ind',ref:'MAR-01'},{tipo:'ind',ref:'RTO-01'}]},
+    'K-ENC':{nombre:'Encofrado',pd:28,pmin:17,pmes:420,pventa:600,desc:'10 puntales + carretilla + madera',comps:[{tipo:'ind',ref:'PUN-01'},{tipo:'ind',ref:'PUN-02'},{tipo:'ind',ref:'PUN-03'},{tipo:'ind',ref:'PUN-04'},{tipo:'ind',ref:'PUN-05'},{tipo:'ind',ref:'PUN-06'},{tipo:'ind',ref:'PUN-07'},{tipo:'ind',ref:'PUN-08'},{tipo:'ind',ref:'PUN-09'},{tipo:'ind',ref:'PUN-10'},{tipo:'ind',ref:'CAR-01'},{tipo:'gran',ref:'G-MAD',cant:5}]},
+    'K-NIV':{nombre:'Nivelación',pd:110,pmin:65,pmes:1650,pventa:4500,desc:'Nivel láser + teodolito + estación total',comps:[{tipo:'ind',ref:'NIL-01'},{tipo:'ind',ref:'TEO-01'},{tipo:'ind',ref:'ETT-01'}]},
+    'K-COR':{nombre:'Corte',pd:48,pmin:28,pmes:720,pventa:1200,desc:'Amoladora + sierra circular + discos',comps:[{tipo:'ind',ref:'AML-01'},{tipo:'ind',ref:'SIE-01'},{tipo:'gran',ref:'G-DC7',cant:10}]},
+    'K-CPC':{nombre:'Compactación',pd:60,pmin:36,pmes:900,pventa:2500,desc:'Compactadora + apisonador',comps:[{tipo:'ind',ref:'COM-01'},{tipo:'ind',ref:'API-01'}]},
+    'K-CON':{nombre:'Construcción Básica',pd:18,pmin:11,pmes:270,pventa:400,desc:'Carretilla + 5 puntales + madera',comps:[{tipo:'ind',ref:'CAR-01'},{tipo:'ind',ref:'PUN-01'},{tipo:'ind',ref:'PUN-02'},{tipo:'ind',ref:'PUN-03'},{tipo:'ind',ref:'PUN-04'},{tipo:'ind',ref:'PUN-05'},{tipo:'gran',ref:'G-MAD',cant:5}]},
+    'K-APR':{nombre:'Andamio Pro',pd:30,pmin:18,pmes:450,pventa:800,desc:'2 andamios + 6 tablas',comps:[{tipo:'gran',ref:'G-PAT',cant:8},{tipo:'gran',ref:'G-PLA',cant:2},{tipo:'gran',ref:'G-CRU',cant:4},{tipo:'gran',ref:'G-TAB',cant:6}]},
+    'K-PIN':{nombre:'Pintura Completo',pd:50,pmin:30,pmes:750,pventa:1400,desc:'Compresor pintura + pistola + thinner',comps:[{tipo:'ind',ref:'CPI-01'},{tipo:'ind',ref:'PIN-01'},{tipo:'gran',ref:'G-THI',cant:3}]},
+    'K-INS':{nombre:'Instalación Eléctrica',pd:42,pmin:25,pmes:630,pventa:1100,desc:'Taladro + prolongador + lámpara + ventilador',comps:[{tipo:'ind',ref:'TAL-01'},{tipo:'ind',ref:'PRO-01'},{tipo:'ind',ref:'LAM-01'},{tipo:'ind',ref:'VEN-01'}]},
+    'K-JAR':{nombre:'Jardinería',pd:25,pmin:15,pmes:375,pventa:650,desc:'Motoguadaña + guantes + casco + soga',comps:[{tipo:'ind',ref:'MOG-01'},{tipo:'gran',ref:'G-GUA',cant:1},{tipo:'gran',ref:'G-CAS',cant:1},{tipo:'gran',ref:'G-SOG',cant:10}]},
+    'K-VIB':{nombre:'Vibrado',pd:38,pmin:22,pmes:570,pventa:1200,desc:'Vibrador + regla vibratoria',comps:[{tipo:'ind',ref:'VIB-01'},{tipo:'ind',ref:'REV-01'}]},
+    'K-MEZ':{nombre:'Mezclado',pd:100,pmin:60,pmes:1500,pventa:4000,desc:'Trompo + hormigonera',comps:[{tipo:'ind',ref:'TRO-01'},{tipo:'ind',ref:'HOR-01'}]},
+    'K-ABJ':{nombre:'Andamio Básico',pd:16,pmin:10,pmes:240,pventa:400,desc:'Andamio + 4 tablas',comps:[{tipo:'gran',ref:'G-PAT',cant:4},{tipo:'gran',ref:'G-PLA',cant:1},{tipo:'gran',ref:'G-CRU',cant:2},{tipo:'gran',ref:'G-TAB',cant:4}]},
+    'K-CCN':{nombre:'Corte Concreto',pd:72,pmin:42,pmes:1080,pventa:2500,desc:'Fresadora + pulidora + cortadora cerámico',comps:[{tipo:'ind',ref:'FRE-01'},{tipo:'ind',ref:'PUL-01'},{tipo:'ind',ref:'CRC-01'}]},
+    'K-SLM':{nombre:'Soldadura Móvil',pd:80,pmin:48,pmes:1200,pventa:3500,desc:'Motosoldadora + oxiacetilénico',comps:[{tipo:'ind',ref:'MOS-01'},{tipo:'ind',ref:'SOG-01'}]},
+    'K-FRE':{nombre:'Fresado',pd:60,pmin:35,pmes:900,pventa:2200,desc:'Fresadora + pulidora de concreto',comps:[{tipo:'ind',ref:'FRE-01'},{tipo:'ind',ref:'PUL-01'}]},
+    'K-LIJ':{nombre:'Lijado',pd:30,pmin:18,pmes:450,pventa:600,desc:'Lijadora orbital + banda + lijas',comps:[{tipo:'ind',ref:'LIJ-01'},{tipo:'ind',ref:'LJB-01'},{tipo:'gran',ref:'G-LIJ',cant:10}]},
+    'K-BAN':{nombre:'Baño',pd:76,pmin:44,pmes:1140,pventa:2500,desc:'Bomba + motobomba + hidrolavadora',comps:[{tipo:'ind',ref:'BOM-01'},{tipo:'ind',ref:'MBO-01'},{tipo:'ind',ref:'HID-01'}]},
+    'K-TEO':{nombre:'Topografía',pd:88,pmin:52,pmes:1320,pventa:4000,desc:'Teodolito + estación total',comps:[{tipo:'ind',ref:'TEO-01'},{tipo:'ind',ref:'ETT-01'}]},
+    'K-TPR':{nombre:'Taladro Percutor Pesado',pd:45,pmin:27,pmes:675,pventa:1300,desc:'Taladro + rotomartillo',comps:[{tipo:'ind',ref:'TAL-01'},{tipo:'ind',ref:'RTO-01'}]},
+    'K-AMO':{nombre:'Amolado',pd:35,pmin:20,pmes:525,pventa:600,desc:'Dos amoladoras angulares',comps:[{tipo:'ind',ref:'AML-01'},{tipo:'ind',ref:'AML-03'}]},
+    'K-SIE':{nombre:'Juego Sierras',pd:48,pmin:28,pmes:720,pventa:1400,desc:'Sierra circular + banco + caladora',comps:[{tipo:'ind',ref:'SIE-01'},{tipo:'ind',ref:'SIB-01'},{tipo:'ind',ref:'CAL-01'}]},
+    'K-ELE':{nombre:'Elevación',pd:35,pmin:20,pmes:525,pventa:600,desc:'Escalera + 5 puntales + prolongador',comps:[{tipo:'ind',ref:'ESC-01'},{tipo:'ind',ref:'PUN-01'},{tipo:'ind',ref:'PUN-02'},{tipo:'ind',ref:'PUN-03'},{tipo:'ind',ref:'PUN-04'},{tipo:'ind',ref:'PUN-05'},{tipo:'ind',ref:'PRO-01'}]},
   },
   clientes: [
     {nombre:'RUBEN DARIO LLASACCE AROHUILLCA',dni:'74527361',telefono:'987654322'},
     {nombre:'Juan Pérez',dni:'12345678',telefono:'999111333'},
     {nombre:'María García',dni:'87654321',telefono:'999444555'},
+    {nombre:'Carlos Mendoza',dni:'45678901',telefono:'999777888'},
+    {nombre:'Ana Torres',dni:'56789012',telefono:'999222333'},
+    {nombre:'Pedro Sánchez',dni:'67890123',telefono:'999555666'},
+    {nombre:'Luisa Fernández',dni:'78901234',telefono:'999888999'},
+    {nombre:'Miguel Huamán',dni:'89012345',telefono:'999333444'},
+    {nombre:'Rosa Quispe',dni:'90123456',telefono:'999666777'},
+    {nombre:'José Ramírez',dni:'01234567',telefono:'999000111'},
   ],
 };
 
 const granelIds = {};   // codigo -> id numerico
-let clienteId = null;
+let clienteId = null;   // primer cliente (para compatibilidad)
+const cliIds = [];      // todos los IDs de clientes
 const stockEsperado = {}; // idGranel -> {alquilada, danada, perdida}
 
 function seed() {
@@ -325,7 +361,9 @@ function seed() {
   // Clientes
   for (const c of CAT.clientes) {
     const r = db.prepare(`INSERT INTO CLIENTE (tipo, nombre, dni, telefono) VALUES ('persona', ?, ?, ?)`).run(c.nombre, c.dni, c.telefono);
-    if (c === CAT.clientes[0]) clienteId = Number(r.lastInsertRowid);
+    const id = Number(r.lastInsertRowid);
+    cliIds.push(id);
+    if (c === CAT.clientes[0]) clienteId = id;
   }
   // Categorías + herramientas generadas automáticamente
   for (const [id, nombre, desc, unid, pd, mora, pmin, pmes, pventa] of CAT.categorias) {
@@ -347,8 +385,8 @@ function seed() {
   // Kits
   let kid = 1;
   for (const [cod, k] of Object.entries(CAT.kit)) {
-    db.prepare(`INSERT INTO KIT (id, nombre, descripcion, precio_dia, precio_minimo, precio_mes, activo) VALUES (?, ?, ?, ?, ?, ?, 1)`)
-      .run(kid, k.nombre, k.desc, k.pd, k.pmin, k.pmes);
+    db.prepare(`INSERT INTO KIT (id, nombre, descripcion, precio_dia, precio_minimo, precio_mes, precio_venta, activo) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`)
+      .run(kid, k.nombre, k.desc, k.pd, k.pmin, k.pmes, k.pventa);
     for (const c of k.comps) {
       if (c.tipo === 'ind') {
         db.prepare(`INSERT INTO KIT_COMPONENTE (id_kit, tipo_item, id_herramienta, id_item_granel, cantidad) VALUES (?, 'individual', ?, NULL, 1)`).run(kid, c.ref);
@@ -373,6 +411,9 @@ function seed() {
 }
 
 seed();
+
+// Evitar que init.js ejecute su seed automático (crearía Tabla 3m duplicada)
+db.prepare(`INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion) VALUES ('db_seeded', 'true', 'Indica que los datos semilla ya fueron insertados')`).run();
 
 /* ================================================================
    ORÁCULO — espejo del estado de negocio de cada contrato
@@ -771,10 +812,19 @@ function itemGranel(cod, cantidad, tarifa = 'dia') {
   return { tipo_item: 'granel', id_item_granel: granelIds[cod], cantidad, tarifa };
 }
 
+const clientesPorEsc = {
+  'ESC 01':0,'ESC 02':1,'ESC 03':2,'ESC 04':0,'ESC 05':3,'ESC 06':4,'ESC 07':0,'ESC 08':1,
+  'ESC 09':2,'ESC 10':0,'ESC 10b':5,'ESC 11':3,'ESC 12':0,'ESC 13':1,'ESC 14':2,'ESC 15':0,
+  'ESC 16':3,'ESC 17':4,'ESC 18':5,'ESC 19':6,'ESC 20':0,'ESC 21':3,
+};
 function crear(esc, nombre, data) {
+  const idx = clientesPorEsc[esc] != null ? clientesPorEsc[esc] : 0;
+  return crearConCliente(esc, nombre, data, cliIds[idx]);
+}
+function crearConCliente(esc, nombre, data, cliId) {
   let ctId = null;
   const res = accion(esc, null, nombre + ' (crear)', () => {
-    const r = contratoService.crearContrato(clienteId, 1, data.salida, data.devPactada,
+    const r = contratoService.crearContrato(cliId, 1, data.salida, data.devPactada,
       data.depositoMonto || 0, data.depositoDni || 0, data.items, data.pagos || [], null, null, null);
     ctId = r.idContrato;
     return r;
@@ -1121,6 +1171,131 @@ registrarEsc('ESC 21');
 {
   const ct = crear('ESC 21', 'mora larga', { salida: D(0), devPactada: D(6), items: itemsIndividual(['AML-02']) });
   if (ct) devolver('ESC 21', ct, 'devolver 4 días tarde', [{ id_detalle: oraculo.contratos[ct].items[0].detalleId, estado_devolucion: 'bien' }], D(10));
+}
+
+/* ================================================================
+   ESCENARIOS MASIVOS — combinaciones mixtas para estresar el sistema
+   ================================================================ */
+
+// Generador que cicla por todas las instancias (CATS-01 a CATS-10)
+const CATS = ['RTO','TAL','AML','SIE','SIB','CAL','LIJ','LJB','ROZ','PUL','FRE','ATL','TRO','HOR','COM','API','REV','VIB','MAR','CRC','CRL','CRV','GEN','GRE','BOM','MBO','HID','CMP','CPI','SOL','SOG','CIZ','DOB','MOS','NIL','TEO','ETT','ESC','LAM','PRO','VEN','ASP','PUN','CAR','PIS','PIN','TER','MOG','DOT','BUG'];
+function toolRef(idx) { const c = CATS[idx % CATS.length]; return c + '-' + String((idx % 10) + 1).padStart(2, '0'); }
+
+const GRANS = ['G-TAB','G-CEM','G-ARE','G-MAD','G-F12','G-LKK','G-PCH','G-ARG','G-CLV','G-ALM','G-CAL','G-HSE','G-F38','G-TR6','G-TR1','G-PV2','G-PV3','G-PV1','G-MBO','G-SOG','G-PAT','G-PLA','G-CRU','G-CAS','G-GUA','G-DC7','G-DD7','G-THI','G-PEG','G-YES'];
+const KITS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30];
+
+function armarItems(esp) {
+  const r = [];
+  for (const e of esp) {
+    if (e.t === 'i') r.push({ tipo_item:'individual', id_herramienta: toolRef(e.x), tarifa:'dia' });
+    else if (e.t === 'g') r.push(itemGranel(e.ref, e.c || 10));
+    else if (e.t === 'k') r.push({ tipo_item:'kit', id_kit: e.id, cantidad:1, tarifa:'dia' });
+  }
+  return r;
+}
+
+function crearYDev(esc, nom, esp, pg, dd, ests, cliIdx) {
+  const items = armarItems(esp);
+  const ct = crearConCliente(esc, nom, { salida:D(0), devPactada:D(4), items }, cliIdx != null ? cliIds[cliIdx % cliIds.length] : clienteId);
+  if (!ct) return null;
+  if (pg) pagar(esc, ct, 'pago', pg, 'efectivo', 'saldo');
+  const di = [];
+  for (let i = 0; i < items.length; i++) {
+    const did = oraculo.contratos[ct].items[i].detalleId;
+    const es = ests && ests[i] ? ests[i] : { s:'b' };
+    if (items[i].tipo_item === 'granel') {
+      if (es.s === 'm') {
+        di.push({ id_detalle:did, estado_devolucion:'bien', cantidad_devuelta:es.b||Math.floor(es.c/2) });
+        di.push({ id_detalle:did, estado_devolucion:'dañado', cantidad_devuelta:es.d||Math.floor(es.c/4), costo_reparacion:es.cr||5 });
+        di.push({ id_detalle:did, estado_devolucion:'perdido', cantidad_devuelta:es.p||Math.ceil(es.c/4), costo_perdida:es.cp||10 });
+      } else di.push({ id_detalle:did, estado_devolucion:es.s==='b'?'bien':es.s==='d'?'dañado':'perdido' });
+    } else {
+      const o = { id_detalle:did, estado_devolucion:es.s==='b'?'bien':es.s==='d'?'dañado':'perdido' };
+      if (es.s === 'd') { o.costo_reparacion = es.cr||10; o.danos = [{nombre:'golpe',costo:es.cr||10}]; }
+      if (es.s === 'p') o.costo_perdida = es.cp||100;
+      di.push(o);
+    }
+  }
+  devolver(esc, ct, 'dev', di, D(dd));
+  return ct;
+}
+
+// ESC 22: 25 contratos individuales (cada herramienta única gracias a toolRef)
+registrarEsc('ESC 22');
+{ for (let i = 0; i < 25; i++) {
+    crearYDev('ESC 22','loteI'+(i+1),
+      [{t:'i',x:100+i},{t:'i',x:113+i},{t:'i',x:127+i}],
+      30+i*5, 4+(i%5),
+      [{s:i%7===0?'d':'b',cr:15},{s:i%5===0?'p':'b',cp:200},{s:'b'}], i);
+}}
+
+// ESC 23: 25 contratos granel
+registrarEsc('ESC 23');
+{ for (let i = 0; i < 25; i++) {
+    const g1 = GRANS[i%GRANS.length], g2 = i%2===0 ? GRANS[(i+5)%GRANS.length] : null;
+    if (!granelIds[g1]) continue; // skip si el granel no se resolvió
+    const c1 = 5+i*3;
+    const esp = [{t:'g',ref:g1,c:c1}];
+    if (g2) { if (!granelIds[g2]) continue; esp.push({t:'g',ref:g2,c:3+i*2}); }
+    if (i%4===0) {
+      crearYDev('ESC 23','loteG'+(i+1), esp, 10+i*3, 4+(i%6),
+        [{s:'m',c:c1,b:Math.floor(c1/2),d:Math.floor(c1/3),p:Math.ceil(c1/6),cr:8,cp:20},g2?{s:'b'}:null].filter(Boolean), i);
+    } else {
+      crearYDev('ESC 23','loteG'+(i+1), esp, 10+i*3, 4+(i%6), [{s:'b'},g2?{s:'b'}:null].filter(Boolean), i);
+    }
+}}
+
+// ESC 24: 25 contratos kits
+registrarEsc('ESC 24');
+{ for (let i = 0; i < 25; i++) {
+    const k1 = KITS[i%KITS.length], k2 = i%3===0 ? KITS[(i+7)%KITS.length] : null;
+    const esp = [{t:'k',id:k1}];
+    if (k2) esp.push({t:'k',id:k2});
+    const ests = [{s:i%6===0?'d':'b',cr:25}];
+    if (k2) ests.push({s:i%8===0?'p':'b',cp:500});
+    crearYDev('ESC 24','loteK'+(i+1), esp, 40+i*8, 4+(i%5), ests, i);
+}}
+
+// ESC 25: 15 contratos mixtos (herramienta + granel + kit)
+registrarEsc('ESC 25');
+{ for (let i = 0; i < 15; i++) {
+    crearYDev('ESC 25','loteM'+(i+1),
+      [{t:'i',x:100+i},{t:'i',x:130+i},{t:'g',ref:GRANS[(i+2)%GRANS.length],c:8+i*2},{t:'k',id:KITS[(i+5)%KITS.length]}],
+      50+i*10, 4+(i%5),
+      [{s:i%5===0?'d':'b',cr:12},{s:i%7===0?'p':'b',cp:150},
+       {s:i%4===0?'m':'b',c:8+i*2,b:Math.floor((8+i*2)/2),d:Math.floor((8+i*2)/4),p:Math.ceil((8+i*2)/4),cr:6,cp:15},
+       {s:i%6===0?'d':'b',cr:20}], i);
+}}
+
+// ESC 26: 10 contratos con pagos por item
+registrarEsc('ESC 26');
+{ for (let i = 0; i < 10; i++) {
+    const esp = [{t:'i',x:100+i},{t:'i',x:120+i},{t:'g',ref:GRANS[(i+3)%GRANS.length],c:10+i}];
+    if (!granelIds[esp[2].ref]) continue; // skip si el granel no se resolvió
+    const ct = crearConCliente('ESC 26','pagoX'+(i+1), { salida:D(0), devPactada:D(4), items:armarItems(esp) }, cliIds[i % cliIds.length]);
+    if (ct) {
+      pagar('ESC 26',ct,'p0',20+i*2,'yape','saldo',oraculo.contratos[ct].items[0].detalleId);
+      pagar('ESC 26',ct,'p1',15+i*3,'plin','saldo',oraculo.contratos[ct].items[1].detalleId);
+      pagar('ESC 26',ct,'pg',30+i*2,'efectivo','saldo');
+      const dd = 4+(i%4);
+      const di = [
+        { id_detalle:oraculo.contratos[ct].items[0].detalleId, estado_devolucion:'bien' },
+        { id_detalle:oraculo.contratos[ct].items[1].detalleId, estado_devolucion:i%3===0?'dañado':'bien', ...(i%3===0?{costo_reparacion:10}:{}) },
+        { id_detalle:oraculo.contratos[ct].items[2].detalleId, estado_devolucion:'bien' },
+      ];
+      devolver('ESC 26',ct,'dev',di,D(dd));
+    }
+}}
+
+// ESC 27: Mega 30 herramientas en un solo contrato
+registrarEsc('ESC 27');
+{ const esp = []; for (let i = 0; i < 30; i++) esp.push({t:'i',x:100+i});
+  const ct = crear('ESC 27','mega30', { salida:D(0), devPactada:D(5), items:armarItems(esp) });
+  if (ct) {
+    pagar('ESC 27',ct,'adelanto',500,'efectivo','adelanto');
+    const di = []; for (let i = 0; i < 30; i++) di.push({ id_detalle:oraculo.contratos[ct].items[i].detalleId, estado_devolucion:'bien' });
+    devolver('ESC 27',ct,'dev30',di,D(8));
+  }
 }
 
 /* ================================================================

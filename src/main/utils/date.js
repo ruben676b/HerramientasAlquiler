@@ -32,12 +32,16 @@ function localDateTime(d = new Date()) {
 function contarHabiles(fechaInicio, fechaFin) {
   const start = new Date(fechaInicio + 'T00:00:00');
   const end = new Date(fechaFin + 'T00:00:00');
-  let count = 0;
-  while (start <= end) {
-    if (start.getDay() !== 0) count++;
-    start.setDate(start.getDate() + 1);
+  const totalDays = Math.round((end - start) / 86400000) + 1; // inclusivo
+  if (totalDays <= 0) return 1;
+  const firstDow = start.getDay(); // 0=domingo
+  const fullWeeks = Math.floor(totalDays / 7);
+  const remainder = totalDays % 7;
+  let sundays = fullWeeks; // 1 domingo por semana completa
+  for (let i = 0; i < remainder; i++) {
+    if ((firstDow + i) % 7 === 0) sundays++;
   }
-  return Math.max(1, count);
+  return Math.max(1, totalDays - sundays);
 }
 
 /**

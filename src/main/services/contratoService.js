@@ -635,9 +635,6 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
   const ejecutar = db.transaction(() => {
     const contrato = db.prepare('SELECT * FROM CONTRATO WHERE id = ?').get(idContrato);
     if (!contrato) throw new Error('Contrato no encontrado.');
-    if (contrato.estado === 'devuelto' || contrato.estado === 'cancelado') {
-      throw new Error('El contrato ya fue ' + contrato.estado + ' y no puede ser procesado nuevamente.');
-    }
 
     const fechaPactada = new Date(contrato.fecha_devolucion_pactada + 'T00:00:00');
     const fechaReal = new Date(fechaDevolucionReal + 'T00:00:00');
@@ -1001,78 +998,121 @@ function getContratos(filtros = {}) {
 
   sql += ` ORDER BY c.fecha_modificacion DESC`;
 
-  const contratos = db.prepare(sql).all(...params);
-
-  // Enriquecer con items y días de atraso
-  const contratosEnriquecidos = contratos.map(c => {
-    const items = db.prepare(`
-      SELECT d.*,
-             CASE WHEN d.tipo_item = 'kit' THEN 'KIT-' || d.id_kit
-                  ELSE COALESCE(h.id, 'MAT') END AS item_codigo,
-             COALESCE(h.nombre, i.nombre, k.nombre) AS item_nombre,
-             COALESCE(h.descripcion, i.descripcion, k.descripcion) AS item_descripcion,
-             k.nombre AS kit_nombre,
-             i.condicion AS item_condicion,
-             COALESCE(i.precio_venta, h.precio_venta, cat.precio_venta) AS item_precio_venta,
-             COALESCE(h.valor_reposicion, h.precio_venta, i.precio_venta, cat.precio_venta) AS item_valor_reposicion
-      FROM DETALLE_CONTRATO d
-      LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id
-      LEFT JOIN CATEGORIA_HERRAMIENTA cat ON h.id_categoria = cat.id
-      LEFT JOIN ITEM_GRANEL i ON d.id_item_granel = i.id
-      LEFT JOIN KIT k ON d.id_kit = k.id
-      WHERE d.id_contrato = ?
-    `).all(c.id);
-
-    // Devolución granel: resumen por id_detalle (nuevos) y por id_item_granel (legacy sin id_detalle)
-    const devGranel = db.prepare(`
-      SELECT group_key, total_bien, total_danada, total_perdida, total_costo_reparacion, total_costo_perdida FROM (
-        SELECT 'detalle_' || id_detalle AS group_key,
-               COALESCE(SUM(cantidad_bien), 0) AS total_bien,
-               COALESCE(SUM(cantidad_danada), 0) AS total_danada,
-               COALESCE(SUM(cantidad_perdida), 0) AS total_perdida,
-               COALESCE(SUM(costo_reparacion), 0) AS total_costo_reparacion,
-               COALESCE(SUM(costo_perdida), 0) AS total_costo_perdida
-        FROM DEVOLUCION_GRANEL
-        WHERE id_contrato = ? AND revertido = 0 AND id_detalle IS NOT NULL
-        GROUP BY id_detalle
-        UNION ALL
-        SELECT 'granel_' || id_item_granel AS group_key,
-               COALESCE(SUM(cantidad_bien), 0) AS total_bien,
-               COALESCE(SUM(cantidad_danada), 0) AS total_danada,
-               COALESCE(SUM(cantidad_perdida), 0) AS total_perdida,
-               COALESCE(SUM(costo_reparacion), 0) AS total_costo_reparacion,
-               COALESCE(SUM(costo_perdida), 0) AS total_costo_perdida
-        FROM DEVOLUCION_GRANEL
-        WHERE id_contrato = ? AND revertido = 0 AND id_detalle IS NULL
-        GROUP BY id_item_granel
-      )
-    `).all(c.id, c.id);
-    const devGranelMap = Object.fromEntries(devGranel.map(d => [d.group_key, d]));
-
-    // Desglose de daños predefinidos registrados en la devolución
-    const danosDevueltos = db.prepare(`
-      SELECT id_detalle, nombre, costo FROM DAÑO_DEVOLUCION
-      WHERE id_contrato = ? AND revertido = 0
-    `).all(c.id);
-    const danosMap = {};
-    for (const d of danosDevueltos) {
-      if (!danosMap[d.id_detalle]) danosMap[d.id_detalle] = [];
-      danosMap[d.id_detalle].push({ nombre: d.nombre, costo: d.costo });
+  // Paginación opcional: limite > 0 aplica LIMIT. Sin filtros, trae todos (batch optimizado).
+  if (filtros.limite && filtros.limite > 0) {
+    sql += ' LIMIT ?';
+    params.push(filtros.limite);
+    if (filtros.pagina && filtros.pagina > 0) {
+      sql += ' OFFSET ?';
+      params.push((filtros.pagina - 1) * filtros.limite);
     }
+  }
 
-    const pagos = db.prepare(`
-      SELECT id, monto, metodo, tipo, fecha_pago, anulado, fecha_anulacion, motivo_anulacion, id_detalle, grupo_pago
-      FROM PAGO WHERE id_contrato = ?
-      ORDER BY fecha_pago DESC
-    `).all(c.id);
+  const contratos = db.prepare(sql).all(...params);
+  if (contratos.length === 0) return [];
+
+  const ids = contratos.map(c => c.id);
+  const placeholders = ids.map(() => '?').join(',');
+
+  // Batch: todos los items de todos los contratos en UNA consulta
+  const todosItems = db.prepare(`
+    SELECT d.*, d.id_contrato AS _ct,
+           CASE WHEN d.tipo_item = 'kit' THEN 'KIT-' || d.id_kit
+                ELSE COALESCE(h.id, 'MAT') END AS item_codigo,
+           COALESCE(h.nombre, i.nombre, k.nombre) AS item_nombre,
+           COALESCE(h.descripcion, i.descripcion, k.descripcion) AS item_descripcion,
+           k.nombre AS kit_nombre,
+           i.condicion AS item_condicion,
+           COALESCE(i.precio_venta, h.precio_venta, cat.precio_venta) AS item_precio_venta,
+           COALESCE(h.valor_reposicion, h.precio_venta, i.precio_venta, cat.precio_venta) AS item_valor_reposicion
+    FROM DETALLE_CONTRATO d
+    LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id
+    LEFT JOIN CATEGORIA_HERRAMIENTA cat ON h.id_categoria = cat.id
+    LEFT JOIN ITEM_GRANEL i ON d.id_item_granel = i.id
+    LEFT JOIN KIT k ON d.id_kit = k.id
+    WHERE d.id_contrato IN (${placeholders})
+  `).all(...ids);
+
+  // Batch: todos los pagos de todos los contratos en UNA consulta
+  const todosPagos = db.prepare(`
+    SELECT id, id_contrato, monto, metodo, tipo, fecha_pago, anulado, fecha_anulacion, motivo_anulacion, id_detalle, grupo_pago
+    FROM PAGO WHERE id_contrato IN (${placeholders}) AND (anulado IS NULL OR anulado = 0)
+    ORDER BY fecha_pago DESC
+  `).all(...ids);
+
+  // Batch: granel devolutions
+  const todosDevGranel = db.prepare(`
+    SELECT id_contrato, id_detalle, id_item_granel, cantidad_bien, cantidad_danada, cantidad_perdida, costo_reparacion, costo_perdida, revertido FROM DEVOLUCION_GRANEL
+    WHERE id_contrato IN (${placeholders}) AND revertido = 0
+  `).all(...ids);
+
+  // Batch: daños devueltos
+  const todosDanos = db.prepare(`
+    SELECT id_contrato, id_detalle, nombre, costo, tipo_item FROM DAÑO_DEVOLUCION
+    WHERE id_contrato IN (${placeholders}) AND revertido = 0
+  `).all(...ids);
+
+  // Indexar pagos por contrato
+  const pagosPorContrato = {};
+  for (const p of todosPagos) {
+    if (!pagosPorContrato[p.id_contrato]) pagosPorContrato[p.id_contrato] = [];
+    pagosPorContrato[p.id_contrato].push(p);
+  }
+
+  // Indexar pagos por id_detalle para batch
+  const pagosPorDetalle = {};
+  for (const p of todosPagos) {
+    if (p.id_detalle) {
+      pagosPorDetalle[p.id_detalle] = (pagosPorDetalle[p.id_detalle] || 0) + p.monto;
+    }
+  }
+
+  // Indexar items por contrato
+  const itemsPorContrato = {};
+  for (const it of todosItems) {
+    if (!itemsPorContrato[it._ct]) itemsPorContrato[it._ct] = [];
+    itemsPorContrato[it._ct].push(it);
+  }
+
+  // Indexar devoluciones granel por id_detalle
+  const devGranelPorDetalle = {};
+  for (const dg of todosDevGranel) {
+    const key = dg.id_detalle ? 'detalle_' + dg.id_detalle : 'granel_' + dg.id_item_granel;
+    if (!devGranelPorDetalle[key]) devGranelPorDetalle[key] = { total_bien: 0, total_danada: 0, total_perdida: 0, total_costo_reparacion: 0, total_costo_perdida: 0 };
+    devGranelPorDetalle[key].total_bien += dg.cantidad_bien || 0;
+    devGranelPorDetalle[key].total_danada += dg.cantidad_danada || 0;
+    devGranelPorDetalle[key].total_perdida += dg.cantidad_perdida || 0;
+    devGranelPorDetalle[key].total_costo_reparacion += dg.costo_reparacion || 0;
+    devGranelPorDetalle[key].total_costo_perdida += dg.costo_perdida || 0;
+  }
+
+  // Indexar daños por id_detalle
+  const danosPorDetalle = {};
+  for (const d of todosDanos) {
+    if (!danosPorDetalle[d.id_detalle]) danosPorDetalle[d.id_detalle] = [];
+    danosPorDetalle[d.id_detalle].push({ nombre: d.nombre, costo: d.costo });
+  }
+
+  // Batch: total daños individuales por contrato
+  const danosTotalPorContrato = {};
+  for (const d of todosDanos) {
+    if (d.tipo_item === 'individual') {
+      danosTotalPorContrato[d.id_contrato] = (danosTotalPorContrato[d.id_contrato] || 0) + d.costo;
+    }
+  }
+
+  // Enriquecer cada contrato con los datos ya cargados
+  const contratosEnriquecidos = contratos.map(c => {
+    const items = itemsPorContrato[c.id] || [];
+    const pagos = pagosPorContrato[c.id] || [];
 
     let total_atraso = 0;
     let max_dias_atraso = 0;
 
     const itemsConAtraso = items.map(item => {
-      // Enriquecer granel con resumen de DEVOLUCION_GRANEL
+      // Granel summary
       if (item.id_item_granel) {
-        const dev = devGranelMap['detalle_' + item.id] || devGranelMap['granel_' + item.id_item_granel] || { total_bien: 0, total_danada: 0, total_perdida: 0, total_costo_reparacion: 0, total_costo_perdida: 0 };
+        const dev = devGranelPorDetalle['detalle_' + item.id] || devGranelPorDetalle['granel_' + item.id_item_granel] || { total_bien: 0, total_danada: 0, total_perdida: 0, total_costo_reparacion: 0, total_costo_perdida: 0 };
         item.granel_dev_bien = dev.total_bien;
         item.granel_dev_danada = dev.total_danada;
         item.granel_dev_perdida = dev.total_perdida;
@@ -1080,9 +1120,8 @@ function getContratos(filtros = {}) {
         item.granel_dev_costo_reparacion = dev.total_costo_reparacion || 0;
         item.granel_dev_costo_perdida = dev.total_costo_perdida || 0;
       }
-      // Desglose de daños predefinidos registrados
-      item.danos_devueltos = danosMap[item.id] || [];
-      // Fecha pactada por ítem: si tiene fecha propia, usar esa; si no, la del contrato
+      item.danos_devueltos = danosPorDetalle[item.id] || [];
+
       const fechaDevItem = item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada;
       const diasItem = Math.max(1, Math.ceil(
         (new Date(fechaDevItem + 'T00:00:00') - new Date(c.fecha_salida + 'T00:00:00')) / 86400000
@@ -1090,21 +1129,19 @@ function getContratos(filtros = {}) {
       const totalItem = item.total_item_snapshot != null
         ? item.total_item_snapshot
         : calcularTotalItem(item.tarifa_aplicada || 'dia', item.precio_dia_aplicado, c.fecha_salida, fechaDevItem, item.cantidad);
-      // Fecha de referencia para atraso
+
       const fechaPactadaItem = new Date(fechaDevItem + 'T00:00:00');
       const refDate = item.fecha_devolucion_real
         ? new Date(item.fecha_devolucion_real + 'T00:00:00')
         : new Date(hoy + 'T00:00:00');
       const diasAtrasoItem = Math.max(0, Math.ceil((refDate - fechaPactadaItem) / 86400000));
-    const montoAtrasoItem = diasAtrasoItem * item.precio_dia_aplicado * item.cantidad;
+      const montoAtrasoItem = Math.max(0, diasAtrasoItem * item.precio_dia_aplicado * item.cantidad - (item.descuento_mora || 0));
 
       if (diasAtrasoItem > max_dias_atraso) max_dias_atraso = diasAtrasoItem;
       total_atraso += montoAtrasoItem;
 
-      // Pagos aplicados a este ítem específico (excluyendo anulados)
-      const pagadoItem = db.prepare(
-        "SELECT COALESCE(SUM(monto), 0) FROM PAGO WHERE id_contrato = ? AND id_detalle = ? AND (anulado IS NULL OR anulado = 0)"
-      ).get(c.id, item.id)['COALESCE(SUM(monto), 0)'];
+      // Pago por ítem desde el batch indexado
+      const pagadoItem = pagosPorDetalle[item.id] || 0;
       const saldoItem = Math.max(0, totalItem + montoAtrasoItem - pagadoItem);
 
       const desgMes = item.tarifa_aplicada === 'mes' ? desglosarMensual(c.fecha_salida, fechaDevItem) : null;
@@ -1112,19 +1149,38 @@ function getContratos(filtros = {}) {
     });
 
     const totalContrato = itemsConAtraso.reduce((a, i) => a + i.total_item, 0) + (c.deposito_monto || 0);
-
-    const total_danos = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_reparacion || 0), 0)
-      + (db.prepare(`
-        SELECT COALESCE(SUM(costo), 0) AS total
-        FROM DAÑO_DEVOLUCION
-        WHERE id_contrato = ? AND revertido = 0 AND tipo_item = 'individual'
-      `).get(c.id)?.total || 0);
+    const total_danos = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_reparacion || 0), 0) + (danosTotalPorContrato[c.id] || 0);
     const total_perdidas = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_perdida || 0) + ((i.tipo_item === 'kit' || i.estado_devolucion === 'perdido' || i.estado_devolucion === 'vendido') ? (i.costo_perdida || 0) : 0), 0);
 
     return { ...c, items: itemsConAtraso, pagos, dias_atraso: max_dias_atraso, total_atraso, total_contrato: totalContrato, total_danos, total_perdidas };
   });
 
-  return adjuntarEtiquetasPorCliente(contratosEnriquecidos);
+  // Contar total (solo cuando se usa paginación)
+  let total = 0;
+  if (filtros.limite && filtros.limite > 0) {
+    // Construir COUNT aparte (sin regex que se rompe con subconsultas)
+    let countSql = `SELECT COUNT(DISTINCT c.id) AS cnt FROM CONTRATO c JOIN CLIENTE cl ON c.id_cliente = cl.id LEFT JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id WHERE 1=1`;
+    const countParams = [];
+    if (filtros.papelera === 1) {
+      countSql += ' AND c.papelera = 1';
+    } else {
+      countSql += ' AND (c.papelera IS NULL OR c.papelera = 0)';
+    }
+    if (filtros.estado) {
+      countSql += ' AND c.estado = ?';
+      countParams.push(filtros.estado);
+    }
+    if (filtros.busqueda) {
+      const p = '%' + filtros.busqueda + '%';
+      const pSinGuion = '%' + filtros.busqueda.replace('-', '') + '%';
+      countSql += ` AND (cl.nombre LIKE ? OR cl.dni LIKE ? OR CAST(c.id AS TEXT) LIKE ? OR d.id_herramienta LIKE ? OR REPLACE(d.id_herramienta, '-', '') LIKE ?)`;
+      countParams.push(p, p, p, p, pSinGuion);
+    }
+    total = (db.prepare(countSql).get(...countParams) || {}).cnt || 0;
+  }
+
+  const result = adjuntarEtiquetasPorCliente(contratosEnriquecidos);
+  return total > 0 ? { contratos: result, total } : result;
 }
 
 /**
@@ -1132,7 +1188,7 @@ function getContratos(filtros = {}) {
  * Si se proporciona idDetalle, el pago se aplica directamente a ese ítem.
  * Si no, se registra como pago general del contrato.
  */
-function registrarPagoAdicional(idContrato, monto, metodo, tipo, idDetalle) {
+function registrarPagoAdicional(idContrato, monto, metodo, tipo, idDetalle, ajustes) {
   if (!idContrato || !monto || monto <= 0) {
     throw new Error('Datos de pago inválidos.');
   }
@@ -1140,15 +1196,55 @@ function registrarPagoAdicional(idContrato, monto, metodo, tipo, idDetalle) {
   const contrato = db.prepare('SELECT estado FROM CONTRATO WHERE id = ?').get(idContrato);
   if (!contrato) throw new Error('Contrato no encontrado.');
 
+  // Si hay ajustes de base o mora, aplicar descuento a los items del contrato
+  let notas = null;
+  if (ajustes) {
+    const items = db.prepare('SELECT id, id_herramienta, total_item_snapshot, descuento_mora FROM DETALLE_CONTRATO WHERE id_contrato = ?').all(idContrato);
+    const itemsConPrecio = items.filter(i => i.total_item_snapshot != null && i.total_item_snapshot > 0);
+    const sumaSnapshots = itemsConPrecio.reduce((a, i) => a + i.total_item_snapshot, 0);
+
+    const ajustesArr = [];
+
+    // Ajuste de base: reducir total_item_snapshot proporcionalmente
+    if (ajustes.baseNuevo != null && sumaSnapshots > 0) {
+      const descuentoBase = sumaSnapshots - ajustes.baseNuevo;
+      if (descuentoBase > 0.005) {
+        for (const item of itemsConPrecio) {
+          const proporcion = item.total_item_snapshot / sumaSnapshots;
+          const descItem = Math.round(descuentoBase * proporcion * 100) / 100;
+          const nuevoSnapshot = Math.max(0, Math.round((item.total_item_snapshot - descItem) * 100) / 100);
+          db.prepare('UPDATE DETALLE_CONTRATO SET total_item_snapshot = ? WHERE id = ?').run(nuevoSnapshot, item.id);
+        }
+        ajustesArr.push('base: ' + ajustes.baseNuevo.toFixed(2));
+      }
+    }
+
+    // Ajuste de mora: guardar descuento en descuento_mora del detalle
+    if (ajustes.moraNuevo != null) {
+      const descuentoMora = ajustes.moraOriginal - ajustes.moraNuevo;
+      if (descuentoMora > 0.005 && sumaSnapshots > 0) {
+        for (const item of itemsConPrecio) {
+          const proporcion = item.total_item_snapshot / sumaSnapshots;
+          const descItem = Math.round(descuentoMora * proporcion * 100) / 100;
+          const descActual = item.descuento_mora || 0;
+          db.prepare('UPDATE DETALLE_CONTRATO SET descuento_mora = ? WHERE id = ?').run(descActual + descItem, item.id);
+        }
+        ajustesArr.push('mora: ' + ajustes.moraNuevo.toFixed(2));
+      }
+    }
+
+    if (ajustesArr.length > 0) notas = 'Ajuste: ' + ajustesArr.join(', ');
+  }
+
   const result = db.prepare(`
-    INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle, fecha_pago)
-    VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))
-  `).run(idContrato, monto, metodo, tipo || 'saldo', idDetalle || null);
+    INSERT INTO PAGO (id_contrato, monto, metodo, tipo, id_detalle, notas, fecha_pago)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+  `).run(idContrato, monto, metodo, tipo || 'saldo', idDetalle || null, notas);
 
   db.prepare("UPDATE CONTRATO SET fecha_modificacion = ? WHERE id = ?")
     .run(localDateTime(), idContrato);
 
-  return { id: result.lastInsertRowid, monto, metodo };
+  return { id: result.lastInsertRowid, monto, metodo, notas };
 }
 
 /**
@@ -1449,9 +1545,6 @@ function editarContrato(idContrato, data) {
 
   const contrato = db.prepare('SELECT * FROM CONTRATO WHERE id = ?').get(idContrato);
   if (!contrato) throw new Error('Contrato no encontrado.');
-  if (contrato.estado !== 'alquilado' && contrato.estado !== 'atrasado') {
-    throw new Error('Solo se pueden editar contratos en estado alquilado o atrasado.');
-  }
 
   const idClienteReal = _autoCrearCliente(idCliente, dniCliente, nombreCliente, telefonoCliente);
 
@@ -1750,9 +1843,6 @@ function editarReserva(idContrato, data) {
 function eliminarContrato(idContrato, motivo) {
   const contrato = db.prepare('SELECT * FROM CONTRATO WHERE id = ?').get(idContrato);
   if (!contrato) throw new Error('Contrato no encontrado.');
-  if (contrato.estado === 'devuelto' || contrato.estado === 'cancelado') {
-    throw new Error('No se puede eliminar un contrato en estado ' + contrato.estado + '.');
-  }
   if (contrato.papelera === 1) {
     throw new Error('El contrato ya se encuentra en la papelera.');
   }

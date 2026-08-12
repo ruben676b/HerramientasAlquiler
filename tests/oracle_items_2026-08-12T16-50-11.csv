@@ -1,0 +1,371 @@
+﻿id,accion_id,escenario,contrato_id,item_id,codigo,nombre,tipo,cantidad,tarifa,precio_dia_aplicado,mora_dia_aplicada,dias_habiles,dias_atraso_mostrado,dias_atraso_negocio,total_sistema,total_esperado,mora_sistema,mora_mostrada,mora_negocio,pagado_item,saldo_sistema,saldo_esperado,estado_sistema,estado_esperado,granel_pendiente_sistema,granel_pendiente_esperado,fecha_dev_sistema,fecha_dev_esperada,resultado,num_discrepancias,discrepancias
+1,2,ESC 01,1,1,RTO-01,Rotomartillo,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,pendiente,pendiente,,1,,,ok,0,
+2,3,ESC 01,1,1,RTO-01,Rotomartillo,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+3,4,ESC 01,1,1,RTO-01,Rotomartillo,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+4,6,ESC 02,2,2,AML-02,Amoladora Angular,individual,1,dia,22.00,25.00,4,3,3,88.00,88.00,66.00,75.00,75.00,0.00,154.00,163.00,bien,bien,,1,2026-08-19,2026-08-19,ok,2,monto_atraso: sistema=66 esperado=75 | saldo_item: sistema=154 esperado=163
+5,8,ESC 03,3,3,GEN-03,Generador Eléctrico,individual,1,dia,65.00,70.00,6,0,0,390.00,390.00,0.00,0.00,0.00,0.00,390.00,390.00,pendiente,pendiente,,1,,,ok,0,
+6,9,ESC 03,3,3,GEN-03,Generador Eléctrico,individual,1,dia,65.00,70.00,6,0,0,390.00,390.00,0.00,0.00,0.00,0.00,390.00,390.00,bien,bien,,1,2026-08-18,2026-08-18,ok,0,
+7,11,ESC 04,4,4,MAT,Tabla 3m,granel,10,dia,1.00,1.00,28,0,0,280.00,280.00,0.00,0.00,0.00,0.00,280.00,280.00,pendiente,completo,0,0,,,ok,0,
+8,13,ESC 05,5,5,RTO-04,Rotomartillo,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+9,13,ESC 05,5,6,AML-05,Amoladora Angular,individual,1,dia,22.00,25.00,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,pendiente,pendiente,,1,,,ok,0,
+10,14,ESC 05,5,7,RTO-04,Rotomartillo,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,pendiente,pendiente,,1,,,ok,0,
+11,15,ESC 05,5,7,RTO-04,Rotomartillo,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,pendiente,pendiente,,1,,,rechazado,0,
+12,17,ESC 06,6,8,MAT,Cemento 42.5kg,granel,10,dia,1.50,2.00,4,0,3,60.00,60.00,0.00,0.00,60.00,0.00,60.00,60.00,pendiente,completo,0,0,,,ok,0,
+13,19,ESC 07,7,9,MAT,K1,kit,1,dia,40.00,0.00,4,0,0,160.00,160.00,0.00,0.00,0.00,0.00,160.00,160.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+14,21,ESC 08,8,13,AML-02,Amoladora Angular,individual,1,dia,22.00,25.00,9,0,0,198.00,198.00,0.00,0.00,0.00,0.00,198.00,198.00,pendiente,pendiente,,1,,,ok,0,
+15,22,ESC 08,8,13,AML-02,Amoladora Angular,individual,1,dia,22.00,25.00,9,0,0,198.00,198.00,0.00,0.00,0.00,0.00,198.00,198.00,bien,bien,,1,2026-08-21,2026-08-21,ok,0,
+16,24,ESC 09,9,15,RTO-01,Rotomartillo,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,pendiente,pendiente,,1,,,ok,0,
+17,25,ESC 09,9,15,RTO-01,Rotomartillo,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+18,27,ESC 10,10,16,AML-05,Amoladora Angular,individual,1,dia,22.00,25.00,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,dañado,dañado,,1,2026-08-16,2026-08-16,ok,0,
+19,30,ESC 11,11,17,GEN-03,Generador Eléctrico,individual,1,dia,65.00,70.00,4,3,3,260.00,260.00,195.00,210.00,210.00,0.00,455.00,470.00,perdido,perdido,,1,2026-08-19,2026-08-19,ok,2,monto_atraso: sistema=195 esperado=210 | saldo_item: sistema=455 esperado=470
+20,32,ESC 12,12,18,AML-02,Amoladora Angular,individual,1,dia,22.00,25.00,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,pendiente,pendiente,,1,,,ok,0,
+21,33,ESC 12,12,18,AML-02,Amoladora Angular,individual,1,dia,22.00,25.00,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+22,35,ESC 13,13,19,AML-02,Amoladora Angular,individual,1,dia,22.00,25.00,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+23,36,ESC 13,13,19,AML-02,Amoladora Angular,individual,1,dia,22.00,25.00,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+24,37,ESC 13,13,20,AML-02,Amoladora Angular,individual,1,dia,22.00,25.00,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,pendiente,pendiente,,1,,,ok,0,
+25,39,ESC 14,14,21,RTO-01,Rotomartillo,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,200.00,0.00,0.00,pendiente,pendiente,,1,,,ok,0,
+26,40,ESC 14,14,21,RTO-01,Rotomartillo,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,200.00,0.00,0.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+27,42,ESC 15,15,22,MAT,Tabla 3m,granel,5,dia,1.00,1.00,26,895,0,130.00,130.00,4475.00,4475.00,0.00,0.00,4605.00,4605.00,pendiente,completo,0,0,,,ok,0,
+28,46,ESC 18,16,23,MAT,Cemento 42.5kg,granel,10,dia,1.50,2.00,4,0,0,60.00,60.00,0.00,0.00,0.00,0.00,60.00,60.00,pendiente,completo,0,0,,,ok,0,
+29,46,ESC 18,16,24,MAT,Cemento 42.5kg,granel,5,dia,1.50,2.00,4,0,0,30.00,30.00,0.00,0.00,0.00,0.00,30.00,30.00,pendiente,pendiente,5,5,,,ok,0,
+30,47,ESC 18,16,23,MAT,Cemento 42.5kg,granel,10,dia,1.50,2.00,4,0,0,60.00,60.00,0.00,0.00,0.00,0.00,60.00,60.00,pendiente,completo,0,0,,,ok,0,
+31,47,ESC 18,16,24,MAT,Cemento 42.5kg,granel,5,dia,1.50,2.00,4,0,0,30.00,30.00,0.00,0.00,0.00,0.00,30.00,30.00,pendiente,completo,0,0,,,ok,0,
+32,49,ESC 19,17,25,MAT,Arena fina,granel,6,dia,2.00,2.50,4,0,0,48.00,48.00,0.00,0.00,0.00,0.00,48.00,48.00,pendiente,completo,0,0,,,ok,0,
+33,50,ESC 19,17,25,MAT,Arena fina,granel,6,dia,2.00,2.50,4,0,0,48.00,48.00,0.00,0.00,0.00,0.00,48.00,48.00,pendiente,pendiente,6,6,,,ok,0,
+34,51,ESC 19,17,25,MAT,Arena fina,granel,6,dia,2.00,2.50,4,0,1,48.00,48.00,0.00,0.00,15.00,0.00,48.00,48.00,pendiente,completo,0,0,,,ok,0,
+35,53,ESC 20,18,26,RTO-01,Rotomartillo,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,pendiente,pendiente,,1,,,ok,0,
+36,54,ESC 20,18,26,RTO-01,Rotomartillo,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,pendiente,pendiente,,1,,,ok,0,
+37,58,ESC 22,19,27,TAL-02,Taladro Percutor,individual,1,dia,20.00,25.00,4,0,0,80.00,80.00,0.00,0.00,0.00,0.00,80.00,80.00,pendiente,pendiente,,1,,,ok,0,
+38,58,ESC 22,19,28,COM-05,Compactadora,individual,1,dia,45.00,50.00,4,0,0,180.00,180.00,0.00,0.00,0.00,0.00,180.00,180.00,pendiente,pendiente,,1,,,ok,0,
+39,58,ESC 22,19,29,CPI-09,Compresor de Pintura,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+40,59,ESC 22,19,27,TAL-02,Taladro Percutor,individual,1,dia,20.00,25.00,4,1,1,80.00,80.00,20.00,25.00,25.00,0.00,100.00,105.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=20 esperado=25 | saldo_item: sistema=100 esperado=105
+41,59,ESC 22,19,28,COM-05,Compactadora,individual,1,dia,45.00,50.00,4,1,1,180.00,180.00,45.00,50.00,50.00,0.00,225.00,230.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=45 esperado=50 | saldo_item: sistema=225 esperado=230
+42,59,ESC 22,19,29,CPI-09,Compresor de Pintura,individual,1,dia,30.00,35.00,4,1,1,120.00,120.00,30.00,35.00,35.00,0.00,150.00,155.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=30 esperado=35 | saldo_item: sistema=150 esperado=155
+43,61,ESC 22,20,30,AML-03,Amoladora Angular,individual,1,dia,22.00,25.00,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,pendiente,pendiente,,1,,,ok,0,
+44,61,ESC 22,20,31,API-06,Apisonador Manual,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+45,61,ESC 22,20,32,SOL-10,Soldadora Eléctrica,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,pendiente,pendiente,,1,,,ok,0,
+46,62,ESC 22,20,30,AML-03,Amoladora Angular,individual,1,dia,22.00,25.00,4,2,2,88.00,88.00,44.00,50.00,50.00,0.00,132.00,138.00,bien,bien,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=44 esperado=50 | saldo_item: sistema=132 esperado=138
+47,62,ESC 22,20,31,API-06,Apisonador Manual,individual,1,dia,30.00,35.00,4,2,2,120.00,120.00,60.00,70.00,70.00,0.00,180.00,190.00,bien,bien,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=60 esperado=70 | saldo_item: sistema=180 esperado=190
+48,62,ESC 22,20,32,SOL-10,Soldadora Eléctrica,individual,1,dia,35.00,40.00,4,2,2,140.00,140.00,70.00,80.00,80.00,0.00,210.00,220.00,bien,bien,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=70 esperado=80 | saldo_item: sistema=210 esperado=220
+49,64,ESC 22,21,33,SIE-04,Sierra Circular,individual,1,dia,18.00,20.00,4,0,0,72.00,72.00,0.00,0.00,0.00,0.00,72.00,72.00,pendiente,pendiente,,1,,,ok,0,
+50,64,ESC 22,21,34,REV-07,Regla Vibratoria,individual,1,dia,25.00,30.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+51,64,ESC 22,21,35,SOG-01,Soldadora Gas,individual,1,dia,40.00,45.00,4,0,0,160.00,160.00,0.00,0.00,0.00,0.00,160.00,160.00,pendiente,pendiente,,1,,,ok,0,
+52,65,ESC 22,21,33,SIE-04,Sierra Circular,individual,1,dia,18.00,20.00,4,3,3,72.00,72.00,54.00,60.00,60.00,0.00,126.00,132.00,bien,bien,,1,2026-08-19,2026-08-19,ok,2,monto_atraso: sistema=54 esperado=60 | saldo_item: sistema=126 esperado=132
+53,65,ESC 22,21,34,REV-07,Regla Vibratoria,individual,1,dia,25.00,30.00,4,3,3,100.00,100.00,75.00,90.00,90.00,0.00,175.00,190.00,bien,bien,,1,2026-08-19,2026-08-19,ok,2,monto_atraso: sistema=75 esperado=90 | saldo_item: sistema=175 esperado=190
+54,65,ESC 22,21,35,SOG-01,Soldadora Gas,individual,1,dia,40.00,45.00,4,3,3,160.00,160.00,120.00,135.00,135.00,0.00,280.00,295.00,bien,bien,,1,2026-08-19,2026-08-19,ok,2,monto_atraso: sistema=120 esperado=135 | saldo_item: sistema=280 esperado=295
+55,67,ESC 22,22,36,SIB-05,Sierra de Banco,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+56,67,ESC 22,22,37,VIB-08,Vibrador de Concreto,individual,1,dia,22.00,25.00,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,pendiente,pendiente,,1,,,ok,0,
+57,67,ESC 22,22,38,CIZ-02,Cizalla,individual,1,dia,20.00,22.00,4,0,0,80.00,80.00,0.00,0.00,0.00,0.00,80.00,80.00,pendiente,pendiente,,1,,,ok,0,
+58,68,ESC 22,22,36,SIB-05,Sierra de Banco,individual,1,dia,30.00,35.00,4,4,4,120.00,120.00,120.00,140.00,140.00,0.00,240.00,260.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=120 esperado=140 | saldo_item: sistema=240 esperado=260
+59,68,ESC 22,22,37,VIB-08,Vibrador de Concreto,individual,1,dia,22.00,25.00,4,4,4,88.00,88.00,88.00,100.00,100.00,0.00,176.00,188.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=88 esperado=100 | saldo_item: sistema=176 esperado=188
+60,68,ESC 22,22,38,CIZ-02,Cizalla,individual,1,dia,20.00,22.00,4,4,4,80.00,80.00,80.00,88.00,88.00,0.00,160.00,168.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=80 esperado=88 | saldo_item: sistema=160 esperado=168
+61,70,ESC 22,23,39,CAL-06,Caladora,individual,1,dia,12.00,15.00,4,0,0,48.00,48.00,0.00,0.00,0.00,0.00,48.00,48.00,pendiente,pendiente,,1,,,ok,0,
+62,70,ESC 22,23,40,MAR-09,Martillo Demoledor,individual,1,dia,45.00,50.00,4,0,0,180.00,180.00,0.00,0.00,0.00,0.00,180.00,180.00,pendiente,pendiente,,1,,,ok,0,
+63,70,ESC 22,23,41,DOB-03,Dobladora de Hierro,individual,1,dia,15.00,18.00,4,0,0,60.00,60.00,0.00,0.00,0.00,0.00,60.00,60.00,pendiente,pendiente,,1,,,ok,0,
+64,71,ESC 22,23,39,CAL-06,Caladora,individual,1,dia,12.00,15.00,4,0,0,48.00,48.00,0.00,0.00,0.00,0.00,48.00,48.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+65,71,ESC 22,23,40,MAR-09,Martillo Demoledor,individual,1,dia,45.00,50.00,4,0,0,180.00,180.00,0.00,0.00,0.00,0.00,180.00,180.00,perdido,perdido,,1,2026-08-16,2026-08-16,ok,0,
+66,71,ESC 22,23,41,DOB-03,Dobladora de Hierro,individual,1,dia,15.00,18.00,4,0,0,60.00,60.00,0.00,0.00,0.00,0.00,60.00,60.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+67,73,ESC 22,24,42,LIJ-07,Lijadora Orbital,individual,1,dia,15.00,18.00,4,0,0,60.00,60.00,0.00,0.00,0.00,0.00,60.00,60.00,pendiente,pendiente,,1,,,ok,0,
+68,73,ESC 22,24,43,CRC-10,Cortadora de Cerámico,individual,1,dia,15.00,18.00,4,0,0,60.00,60.00,0.00,0.00,0.00,0.00,60.00,60.00,pendiente,pendiente,,1,,,ok,0,
+69,73,ESC 22,24,44,MOS-04,Motosoldadora,individual,1,dia,60.00,65.00,4,0,0,240.00,240.00,0.00,0.00,0.00,0.00,240.00,240.00,pendiente,pendiente,,1,,,ok,0,
+70,74,ESC 22,24,42,LIJ-07,Lijadora Orbital,individual,1,dia,15.00,18.00,4,1,1,60.00,60.00,15.00,18.00,18.00,0.00,75.00,78.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=15 esperado=18 | saldo_item: sistema=75 esperado=78
+71,74,ESC 22,24,43,CRC-10,Cortadora de Cerámico,individual,1,dia,15.00,18.00,4,1,1,60.00,60.00,15.00,18.00,18.00,0.00,75.00,78.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=15 esperado=18 | saldo_item: sistema=75 esperado=78
+72,74,ESC 22,24,44,MOS-04,Motosoldadora,individual,1,dia,60.00,65.00,4,1,1,240.00,240.00,60.00,65.00,65.00,0.00,300.00,305.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=60 esperado=65 | saldo_item: sistema=300 esperado=305
+73,76,ESC 22,25,45,LJB-08,Lijadora de Banda,individual,1,dia,18.00,20.00,4,0,0,72.00,72.00,0.00,0.00,0.00,0.00,72.00,72.00,pendiente,pendiente,,1,,,ok,0,
+74,76,ESC 22,25,46,CRL-01,Cortadora de Ladrillos,individual,1,dia,20.00,22.00,4,0,0,80.00,80.00,0.00,0.00,0.00,0.00,80.00,80.00,pendiente,pendiente,,1,,,ok,0,
+75,76,ESC 22,25,47,NIL-05,Nivel Láser,individual,1,dia,25.00,28.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+76,77,ESC 22,25,45,LJB-08,Lijadora de Banda,individual,1,dia,18.00,20.00,4,2,2,72.00,72.00,36.00,40.00,40.00,0.00,108.00,112.00,dañado,dañado,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=36 esperado=40 | saldo_item: sistema=108 esperado=112
+77,77,ESC 22,25,46,CRL-01,Cortadora de Ladrillos,individual,1,dia,20.00,22.00,4,2,2,80.00,80.00,40.00,44.00,44.00,0.00,120.00,124.00,bien,bien,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=40 esperado=44 | saldo_item: sistema=120 esperado=124
+78,77,ESC 22,25,47,NIL-05,Nivel Láser,individual,1,dia,25.00,28.00,4,2,2,100.00,100.00,50.00,56.00,56.00,0.00,150.00,156.00,bien,bien,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=50 esperado=56 | saldo_item: sistema=150 esperado=156
+79,79,ESC 22,26,48,ROZ-09,Rozadora,individual,1,dia,25.00,30.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+80,79,ESC 22,26,49,CRV-02,Cortadora de Varilla,individual,1,dia,18.00,20.00,4,0,0,72.00,72.00,0.00,0.00,0.00,0.00,72.00,72.00,pendiente,pendiente,,1,,,ok,0,
+81,79,ESC 22,26,50,TEO-06,Teodolito,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+82,80,ESC 22,26,48,ROZ-09,Rozadora,individual,1,dia,25.00,30.00,4,3,3,100.00,100.00,75.00,90.00,90.00,0.00,175.00,190.00,bien,bien,,1,2026-08-19,2026-08-19,ok,2,monto_atraso: sistema=75 esperado=90 | saldo_item: sistema=175 esperado=190
+83,80,ESC 22,26,49,CRV-02,Cortadora de Varilla,individual,1,dia,18.00,20.00,4,3,3,72.00,72.00,54.00,60.00,60.00,0.00,126.00,132.00,bien,bien,,1,2026-08-19,2026-08-19,ok,2,monto_atraso: sistema=54 esperado=60 | saldo_item: sistema=126 esperado=132
+84,80,ESC 22,26,50,TEO-06,Teodolito,individual,1,dia,30.00,35.00,4,3,3,120.00,120.00,90.00,105.00,105.00,0.00,210.00,225.00,bien,bien,,1,2026-08-19,2026-08-19,ok,2,monto_atraso: sistema=90 esperado=105 | saldo_item: sistema=210 esperado=225
+85,83,ESC 22,27,51,FRE-01,Fresadora de Concreto,individual,1,dia,40.00,45.00,4,0,0,160.00,160.00,0.00,0.00,0.00,0.00,160.00,160.00,pendiente,pendiente,,1,,,ok,0,
+86,83,ESC 22,27,52,GRE-04,Grupo Electrógeno,individual,1,dia,100.00,110.00,4,0,0,400.00,400.00,0.00,0.00,0.00,0.00,400.00,400.00,pendiente,pendiente,,1,,,ok,0,
+87,83,ESC 22,27,53,ESC-08,Escalera,individual,1,dia,22.00,25.00,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,pendiente,pendiente,,1,,,ok,0,
+88,84,ESC 22,27,51,FRE-01,Fresadora de Concreto,individual,1,dia,40.00,45.00,4,0,0,160.00,160.00,0.00,0.00,0.00,0.00,160.00,160.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+89,84,ESC 22,27,52,GRE-04,Grupo Electrógeno,individual,1,dia,100.00,110.00,4,0,0,400.00,400.00,0.00,0.00,0.00,0.00,400.00,400.00,perdido,perdido,,1,2026-08-16,2026-08-16,ok,0,
+90,84,ESC 22,27,53,ESC-08,Escalera,individual,1,dia,22.00,25.00,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+91,86,ESC 22,28,54,ATL-02,Taladro Angular,individual,1,dia,25.00,30.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+92,86,ESC 22,28,55,BOM-05,Bomba de Agua,individual,1,dia,25.00,28.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+93,86,ESC 22,28,56,LAM-09,Lámpara de Obra,individual,1,dia,10.00,12.00,4,0,0,40.00,40.00,0.00,0.00,0.00,0.00,40.00,40.00,pendiente,pendiente,,1,,,ok,0,
+94,87,ESC 22,28,54,ATL-02,Taladro Angular,individual,1,dia,25.00,30.00,4,1,1,100.00,100.00,25.00,30.00,30.00,0.00,125.00,130.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=25 esperado=30 | saldo_item: sistema=125 esperado=130
+95,87,ESC 22,28,55,BOM-05,Bomba de Agua,individual,1,dia,25.00,28.00,4,1,1,100.00,100.00,25.00,28.00,28.00,0.00,125.00,128.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=25 esperado=28 | saldo_item: sistema=125 esperado=128
+96,87,ESC 22,28,56,LAM-09,Lámpara de Obra,individual,1,dia,10.00,12.00,4,1,1,40.00,40.00,10.00,12.00,12.00,0.00,50.00,52.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=10 esperado=12 | saldo_item: sistema=50 esperado=52
+97,89,ESC 22,29,57,TRO-03,Trompo Mezcladora,individual,1,dia,55.00,60.00,4,0,0,220.00,220.00,0.00,0.00,0.00,0.00,220.00,220.00,pendiente,pendiente,,1,,,ok,0,
+98,89,ESC 22,29,58,MBO-06,Motobomba,individual,1,dia,40.00,45.00,4,0,0,160.00,160.00,0.00,0.00,0.00,0.00,160.00,160.00,pendiente,pendiente,,1,,,ok,0,
+99,89,ESC 22,29,59,PRO-10,Prolongador Eléctrico,individual,1,dia,5.00,6.00,4,0,0,20.00,20.00,0.00,0.00,0.00,0.00,20.00,20.00,pendiente,pendiente,,1,,,ok,0,
+100,90,ESC 22,29,57,TRO-03,Trompo Mezcladora,individual,1,dia,55.00,60.00,4,2,2,220.00,220.00,110.00,120.00,120.00,0.00,330.00,340.00,bien,bien,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=110 esperado=120 | saldo_item: sistema=330 esperado=340
+101,90,ESC 22,29,58,MBO-06,Motobomba,individual,1,dia,40.00,45.00,4,2,2,160.00,160.00,80.00,90.00,90.00,0.00,240.00,250.00,bien,bien,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=80 esperado=90 | saldo_item: sistema=240 esperado=250
+102,90,ESC 22,29,59,PRO-10,Prolongador Eléctrico,individual,1,dia,5.00,6.00,4,2,2,20.00,20.00,10.00,12.00,12.00,0.00,30.00,32.00,bien,bien,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=10 esperado=12 | saldo_item: sistema=30 esperado=32
+103,92,ESC 22,30,60,HOR-04,Hormigonera Grande,individual,1,dia,70.00,75.00,4,0,0,280.00,280.00,0.00,0.00,0.00,0.00,280.00,280.00,pendiente,pendiente,,1,,,ok,0,
+104,92,ESC 22,30,61,HID-07,Hidrolavadora,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+105,92,ESC 22,30,62,VEN-01,Ventilador Industrial,individual,1,dia,15.00,18.00,4,0,0,60.00,60.00,0.00,0.00,0.00,0.00,60.00,60.00,pendiente,pendiente,,1,,,ok,0,
+106,93,ESC 22,30,60,HOR-04,Hormigonera Grande,individual,1,dia,70.00,75.00,4,3,3,280.00,280.00,210.00,225.00,225.00,0.00,490.00,505.00,bien,bien,,1,2026-08-19,2026-08-19,ok,2,monto_atraso: sistema=210 esperado=225 | saldo_item: sistema=490 esperado=505
+107,93,ESC 22,30,61,HID-07,Hidrolavadora,individual,1,dia,30.00,35.00,4,3,3,120.00,120.00,90.00,105.00,105.00,0.00,210.00,225.00,bien,bien,,1,2026-08-19,2026-08-19,ok,2,monto_atraso: sistema=90 esperado=105 | saldo_item: sistema=210 esperado=225
+108,93,ESC 22,30,62,VEN-01,Ventilador Industrial,individual,1,dia,15.00,18.00,4,3,3,60.00,60.00,45.00,54.00,54.00,0.00,105.00,114.00,bien,bien,,1,2026-08-19,2026-08-19,ok,2,monto_atraso: sistema=45 esperado=54 | saldo_item: sistema=105 esperado=114
+109,95,ESC 22,31,63,COM-05,Compactadora,individual,1,dia,45.00,50.00,4,0,0,180.00,180.00,0.00,0.00,0.00,0.00,180.00,180.00,pendiente,pendiente,,1,,,ok,0,
+110,95,ESC 22,31,64,CMP-08,Compresor de Aire,individual,1,dia,40.00,45.00,4,0,0,160.00,160.00,0.00,0.00,0.00,0.00,160.00,160.00,pendiente,pendiente,,1,,,ok,0,
+111,95,ESC 22,31,65,ASP-02,Aspiradora Industrial,individual,1,dia,20.00,22.00,4,0,0,80.00,80.00,0.00,0.00,0.00,0.00,80.00,80.00,pendiente,pendiente,,1,,,ok,0,
+112,96,ESC 22,31,63,COM-05,Compactadora,individual,1,dia,45.00,50.00,4,4,4,180.00,180.00,180.00,200.00,200.00,0.00,360.00,380.00,dañado,dañado,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=180 esperado=200 | saldo_item: sistema=360 esperado=380
+113,96,ESC 22,31,64,CMP-08,Compresor de Aire,individual,1,dia,40.00,45.00,4,4,4,160.00,160.00,160.00,180.00,180.00,0.00,320.00,340.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=160 esperado=180 | saldo_item: sistema=320 esperado=340
+114,96,ESC 22,31,65,ASP-02,Aspiradora Industrial,individual,1,dia,20.00,22.00,4,4,4,80.00,80.00,80.00,88.00,88.00,0.00,160.00,168.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=80 esperado=88 | saldo_item: sistema=160 esperado=168
+115,98,ESC 22,32,66,API-06,Apisonador Manual,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+116,98,ESC 22,32,67,CPI-09,Compresor de Pintura,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+117,98,ESC 22,32,68,PUN-03,Puntal de Construcción,individual,1,dia,3.00,4.00,4,0,0,12.00,12.00,0.00,0.00,0.00,0.00,12.00,12.00,pendiente,pendiente,,1,,,ok,0,
+118,99,ESC 22,32,66,API-06,Apisonador Manual,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+119,99,ESC 22,32,67,CPI-09,Compresor de Pintura,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,perdido,perdido,,1,2026-08-16,2026-08-16,ok,0,
+120,99,ESC 22,32,68,PUN-03,Puntal de Construcción,individual,1,dia,3.00,4.00,4,0,0,12.00,12.00,0.00,0.00,0.00,0.00,12.00,12.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+121,101,ESC 22,33,69,REV-07,Regla Vibratoria,individual,1,dia,25.00,30.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+122,101,ESC 22,33,70,SOL-10,Soldadora Eléctrica,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,pendiente,pendiente,,1,,,ok,0,
+123,101,ESC 22,33,71,CAR-04,Carretilla,individual,1,dia,5.00,6.00,4,0,0,20.00,20.00,0.00,0.00,0.00,0.00,20.00,20.00,pendiente,pendiente,,1,,,ok,0,
+124,102,ESC 22,33,69,REV-07,Regla Vibratoria,individual,1,dia,25.00,30.00,4,1,1,100.00,100.00,25.00,30.00,30.00,0.00,125.00,130.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=25 esperado=30 | saldo_item: sistema=125 esperado=130
+125,102,ESC 22,33,70,SOL-10,Soldadora Eléctrica,individual,1,dia,35.00,40.00,4,1,1,140.00,140.00,35.00,40.00,40.00,0.00,175.00,180.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=35 esperado=40 | saldo_item: sistema=175 esperado=180
+126,102,ESC 22,33,71,CAR-04,Carretilla,individual,1,dia,5.00,6.00,4,1,1,20.00,20.00,5.00,6.00,6.00,0.00,25.00,26.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=5 esperado=6 | saldo_item: sistema=25 esperado=26
+127,104,ESC 22,34,72,VIB-08,Vibrador de Concreto,individual,1,dia,22.00,25.00,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,pendiente,pendiente,,1,,,ok,0,
+128,104,ESC 22,34,73,SOG-01,Soldadora Gas,individual,1,dia,40.00,45.00,4,0,0,160.00,160.00,0.00,0.00,0.00,0.00,160.00,160.00,pendiente,pendiente,,1,,,ok,0,
+129,104,ESC 22,34,74,PIS-05,Pistola de Clavos,individual,1,dia,20.00,22.00,4,0,0,80.00,80.00,0.00,0.00,0.00,0.00,80.00,80.00,pendiente,pendiente,,1,,,ok,0,
+130,105,ESC 22,34,72,VIB-08,Vibrador de Concreto,individual,1,dia,22.00,25.00,4,2,2,88.00,88.00,44.00,50.00,50.00,0.00,132.00,138.00,bien,bien,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=44 esperado=50 | saldo_item: sistema=132 esperado=138
+131,105,ESC 22,34,73,SOG-01,Soldadora Gas,individual,1,dia,40.00,45.00,4,2,2,160.00,160.00,80.00,90.00,90.00,0.00,240.00,250.00,bien,bien,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=80 esperado=90 | saldo_item: sistema=240 esperado=250
+132,105,ESC 22,34,74,PIS-05,Pistola de Clavos,individual,1,dia,20.00,22.00,4,2,2,80.00,80.00,40.00,44.00,44.00,0.00,120.00,124.00,bien,bien,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=40 esperado=44 | saldo_item: sistema=120 esperado=124
+133,108,ESC 22,35,75,CRC-10,Cortadora de Cerámico,individual,1,dia,15.00,18.00,4,0,0,60.00,60.00,0.00,0.00,0.00,0.00,60.00,60.00,pendiente,pendiente,,1,,,ok,0,
+134,108,ESC 22,35,76,DOB-03,Dobladora de Hierro,individual,1,dia,15.00,18.00,4,0,0,60.00,60.00,0.00,0.00,0.00,0.00,60.00,60.00,pendiente,pendiente,,1,,,ok,0,
+135,108,ESC 22,35,77,TER-07,Termofusionadora,individual,1,dia,15.00,18.00,4,0,0,60.00,60.00,0.00,0.00,0.00,0.00,60.00,60.00,pendiente,pendiente,,1,,,ok,0,
+136,109,ESC 22,35,75,CRC-10,Cortadora de Cerámico,individual,1,dia,15.00,18.00,4,4,4,60.00,60.00,60.00,72.00,72.00,0.00,120.00,132.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=60 esperado=72 | saldo_item: sistema=120 esperado=132
+137,109,ESC 22,35,76,DOB-03,Dobladora de Hierro,individual,1,dia,15.00,18.00,4,4,4,60.00,60.00,60.00,72.00,72.00,0.00,120.00,132.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=60 esperado=72 | saldo_item: sistema=120 esperado=132
+138,109,ESC 22,35,77,TER-07,Termofusionadora,individual,1,dia,15.00,18.00,4,4,4,60.00,60.00,60.00,72.00,72.00,0.00,120.00,132.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=60 esperado=72 | saldo_item: sistema=120 esperado=132
+139,111,ESC 22,36,78,CRL-01,Cortadora de Ladrillos,individual,1,dia,20.00,22.00,4,0,0,80.00,80.00,0.00,0.00,0.00,0.00,80.00,80.00,pendiente,pendiente,,1,,,ok,0,
+140,111,ESC 22,36,79,MOS-04,Motosoldadora,individual,1,dia,60.00,65.00,4,0,0,240.00,240.00,0.00,0.00,0.00,0.00,240.00,240.00,pendiente,pendiente,,1,,,ok,0,
+141,111,ESC 22,36,80,MOG-08,Motoguadaña,individual,1,dia,25.00,28.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+142,112,ESC 22,36,78,CRL-01,Cortadora de Ladrillos,individual,1,dia,20.00,22.00,4,0,0,80.00,80.00,0.00,0.00,0.00,0.00,80.00,80.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+143,112,ESC 22,36,79,MOS-04,Motosoldadora,individual,1,dia,60.00,65.00,4,0,0,240.00,240.00,0.00,0.00,0.00,0.00,240.00,240.00,perdido,perdido,,1,2026-08-16,2026-08-16,ok,0,
+144,112,ESC 22,36,80,MOG-08,Motoguadaña,individual,1,dia,25.00,28.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+145,114,ESC 22,37,81,CRV-02,Cortadora de Varilla,individual,1,dia,18.00,20.00,4,0,0,72.00,72.00,0.00,0.00,0.00,0.00,72.00,72.00,pendiente,pendiente,,1,,,ok,0,
+146,114,ESC 22,37,82,NIL-05,Nivel Láser,individual,1,dia,25.00,28.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+147,114,ESC 22,37,83,DOT-09,Doblador de Tubo,individual,1,dia,12.00,15.00,4,0,0,48.00,48.00,0.00,0.00,0.00,0.00,48.00,48.00,pendiente,pendiente,,1,,,ok,0,
+148,115,ESC 22,37,81,CRV-02,Cortadora de Varilla,individual,1,dia,18.00,20.00,4,1,1,72.00,72.00,18.00,20.00,20.00,0.00,90.00,92.00,dañado,dañado,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=18 esperado=20 | saldo_item: sistema=90 esperado=92
+149,115,ESC 22,37,82,NIL-05,Nivel Láser,individual,1,dia,25.00,28.00,4,1,1,100.00,100.00,25.00,28.00,28.00,0.00,125.00,128.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=25 esperado=28 | saldo_item: sistema=125 esperado=128
+150,115,ESC 22,37,83,DOT-09,Doblador de Tubo,individual,1,dia,12.00,15.00,4,1,1,48.00,48.00,12.00,15.00,15.00,0.00,60.00,63.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=12 esperado=15 | saldo_item: sistema=60 esperado=63
+151,119,ESC 22,38,84,BOM-05,Bomba de Agua,individual,1,dia,25.00,28.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+152,119,ESC 22,38,85,ESC-08,Escalera,individual,1,dia,22.00,25.00,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,pendiente,pendiente,,1,,,ok,0,
+153,119,ESC 22,38,86,TAL-02,Taladro Percutor,individual,1,dia,20.00,25.00,4,0,0,80.00,80.00,0.00,0.00,0.00,0.00,80.00,80.00,pendiente,pendiente,,1,,,ok,0,
+154,120,ESC 22,38,84,BOM-05,Bomba de Agua,individual,1,dia,25.00,28.00,4,4,4,100.00,100.00,100.00,112.00,112.00,0.00,200.00,212.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=100 esperado=112 | saldo_item: sistema=200 esperado=212
+155,120,ESC 22,38,85,ESC-08,Escalera,individual,1,dia,22.00,25.00,4,4,4,88.00,88.00,88.00,100.00,100.00,0.00,176.00,188.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=88 esperado=100 | saldo_item: sistema=176 esperado=188
+156,120,ESC 22,38,86,TAL-02,Taladro Percutor,individual,1,dia,20.00,25.00,4,4,4,80.00,80.00,80.00,100.00,100.00,0.00,160.00,180.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=80 esperado=100 | saldo_item: sistema=160 esperado=180
+157,122,ESC 23,39,87,MAT,Tabla 3m,granel,5,dia,1.00,1.00,4,0,0,20.00,20.00,0.00,0.00,0.00,0.00,20.00,20.00,pendiente,pendiente,5,5,,,ok,0,
+158,122,ESC 23,39,88,MAT,Ladrillo KK 18 huecos,granel,3,dia,0.80,1.00,4,0,0,9.60,9.60,0.00,0.00,0.00,0.00,9.60,9.60,pendiente,pendiente,3,3,,,ok,0,
+159,123,ESC 23,39,87,MAT,Tabla 3m,granel,5,dia,1.00,1.00,4,0,0,20.00,20.00,0.00,0.00,0.00,0.00,20.00,20.00,pendiente,parcial,1,1,,,ok,0,
+160,123,ESC 23,39,88,MAT,Ladrillo KK 18 huecos,granel,3,dia,0.80,1.00,4,0,0,9.60,9.60,0.00,0.00,0.00,0.00,9.60,9.60,pendiente,completo,0,0,,,ok,0,
+161,125,ESC 23,40,89,MAT,Cemento 42.5kg,granel,8,dia,1.50,2.00,4,0,0,48.00,48.00,0.00,0.00,0.00,0.00,48.00,48.00,pendiente,pendiente,8,8,,,ok,0,
+162,126,ESC 23,40,89,MAT,Cemento 42.5kg,granel,8,dia,1.50,2.00,4,0,1,48.00,48.00,0.00,0.00,16.00,0.00,48.00,48.00,pendiente,completo,0,0,,,ok,0,
+163,128,ESC 23,41,90,MAT,Arena fina,granel,11,dia,2.00,2.50,4,0,0,88.00,88.00,0.00,0.00,0.00,0.00,88.00,88.00,pendiente,pendiente,11,11,,,ok,0,
+164,128,ESC 23,41,91,MAT,Arena gruesa,granel,7,dia,2.00,2.50,4,0,0,56.00,56.00,0.00,0.00,0.00,0.00,56.00,56.00,pendiente,pendiente,7,7,,,ok,0,
+165,129,ESC 23,41,90,MAT,Arena fina,granel,11,dia,2.00,2.50,4,0,2,88.00,88.00,0.00,0.00,55.00,0.00,88.00,88.00,pendiente,completo,0,0,,,ok,0,
+166,129,ESC 23,41,91,MAT,Arena gruesa,granel,7,dia,2.00,2.50,4,0,2,56.00,56.00,0.00,0.00,35.00,0.00,56.00,56.00,pendiente,completo,0,0,,,ok,0,
+167,131,ESC 23,42,92,MAT,Madera tornillo,granel,14,dia,0.50,0.60,4,0,0,28.00,28.00,0.00,0.00,0.00,0.00,28.00,28.00,pendiente,pendiente,14,14,,,ok,0,
+168,132,ESC 23,42,92,MAT,Madera tornillo,granel,14,dia,0.50,0.60,4,0,3,28.00,28.00,0.00,0.00,25.20,0.00,28.00,28.00,pendiente,completo,0,0,,,ok,0,
+169,134,ESC 23,43,93,MAT,Fierro 1/2 pulgada,granel,17,dia,7.00,8.00,4,0,0,476.00,476.00,0.00,0.00,0.00,0.00,476.00,476.00,pendiente,pendiente,17,17,,,ok,0,
+170,134,ESC 23,43,94,MAT,Alambre de amarre,granel,11,dia,1.00,1.50,4,0,0,44.00,44.00,0.00,0.00,0.00,0.00,44.00,44.00,pendiente,pendiente,11,11,,,ok,0,
+171,135,ESC 23,43,93,MAT,Fierro 1/2 pulgada,granel,17,dia,7.00,8.00,4,0,4,476.00,476.00,0.00,0.00,544.00,0.00,476.00,476.00,pendiente,parcial,1,1,,,ok,0,
+172,135,ESC 23,43,94,MAT,Alambre de amarre,granel,11,dia,1.00,1.50,4,0,4,44.00,44.00,0.00,0.00,66.00,0.00,44.00,44.00,pendiente,completo,0,0,,,ok,0,
+173,137,ESC 23,44,95,MAT,Ladrillo KK 18 huecos,granel,20,dia,0.80,1.00,4,0,0,64.00,64.00,0.00,0.00,0.00,0.00,64.00,64.00,pendiente,pendiente,20,20,,,ok,0,
+174,138,ESC 23,44,95,MAT,Ladrillo KK 18 huecos,granel,20,dia,0.80,1.00,4,0,5,64.00,64.00,0.00,0.00,100.00,0.00,64.00,64.00,pendiente,completo,0,0,,,ok,0,
+175,140,ESC 23,45,96,MAT,Piedra chancada,granel,23,dia,3.00,3.50,4,0,0,276.00,276.00,0.00,0.00,0.00,0.00,276.00,276.00,pendiente,pendiente,23,23,,,ok,0,
+176,140,ESC 23,45,97,MAT,Hormigón seco,granel,15,dia,2.50,3.00,4,0,0,150.00,150.00,0.00,0.00,0.00,0.00,150.00,150.00,pendiente,pendiente,15,15,,,ok,0,
+177,141,ESC 23,45,96,MAT,Piedra chancada,granel,23,dia,3.00,3.50,4,0,0,276.00,276.00,0.00,0.00,0.00,0.00,276.00,276.00,pendiente,completo,0,0,,,ok,0,
+178,141,ESC 23,45,97,MAT,Hormigón seco,granel,15,dia,2.50,3.00,4,0,0,150.00,150.00,0.00,0.00,0.00,0.00,150.00,150.00,pendiente,completo,0,0,,,ok,0,
+179,143,ESC 23,46,98,MAT,Arena gruesa,granel,26,dia,2.00,2.50,4,0,0,208.00,208.00,0.00,0.00,0.00,0.00,208.00,208.00,pendiente,pendiente,26,26,,,ok,0,
+180,144,ESC 23,46,98,MAT,Arena gruesa,granel,26,dia,2.00,2.50,4,0,1,208.00,208.00,0.00,0.00,65.00,0.00,208.00,208.00,pendiente,completo,0,0,,,ok,0,
+181,146,ESC 23,47,99,MAT,Clavos para construcción,granel,29,dia,1.50,2.00,4,0,0,174.00,174.00,0.00,0.00,0.00,0.00,174.00,174.00,pendiente,pendiente,29,29,,,ok,0,
+182,146,ESC 23,47,100,MAT,Triplay 4x8 6mm,granel,19,dia,8.00,10.00,4,0,0,608.00,608.00,0.00,0.00,0.00,0.00,608.00,608.00,pendiente,pendiente,19,19,,,ok,0,
+183,147,ESC 23,47,99,MAT,Clavos para construcción,granel,29,dia,1.50,2.00,4,0,2,174.00,174.00,0.00,0.00,116.00,0.00,174.00,174.00,pendiente,parcial,1,1,,,ok,0,
+184,147,ESC 23,47,100,MAT,Triplay 4x8 6mm,granel,19,dia,8.00,10.00,4,0,2,608.00,608.00,0.00,0.00,380.00,0.00,608.00,608.00,pendiente,completo,0,0,,,ok,0,
+185,149,ESC 23,48,101,MAT,Alambre de amarre,granel,32,dia,1.00,1.50,4,0,0,128.00,128.00,0.00,0.00,0.00,0.00,128.00,128.00,pendiente,pendiente,32,32,,,ok,0,
+186,150,ESC 23,48,101,MAT,Alambre de amarre,granel,32,dia,1.00,1.50,4,0,3,128.00,128.00,0.00,0.00,144.00,0.00,128.00,128.00,pendiente,completo,0,0,,,ok,0,
+187,152,ESC 23,49,102,MAT,Cal,granel,35,dia,1.00,1.50,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,pendiente,pendiente,35,35,,,ok,0,
+188,152,ESC 23,49,103,MAT,Tubería PVC 1/2 pulgada,granel,23,dia,3.00,4.00,4,0,0,276.00,276.00,0.00,0.00,0.00,0.00,276.00,276.00,pendiente,pendiente,23,23,,,ok,0,
+189,153,ESC 23,49,102,MAT,Cal,granel,35,dia,1.00,1.50,4,0,4,140.00,140.00,0.00,0.00,210.00,0.00,140.00,140.00,pendiente,completo,0,0,,,ok,0,
+190,153,ESC 23,49,103,MAT,Tubería PVC 1/2 pulgada,granel,23,dia,3.00,4.00,4,0,4,276.00,276.00,0.00,0.00,368.00,0.00,276.00,276.00,pendiente,completo,0,0,,,ok,0,
+191,155,ESC 23,50,104,MAT,Hormigón seco,granel,38,dia,2.50,3.00,4,0,0,380.00,380.00,0.00,0.00,0.00,0.00,380.00,380.00,pendiente,pendiente,38,38,,,ok,0,
+192,156,ESC 23,50,104,MAT,Hormigón seco,granel,38,dia,2.50,3.00,4,0,5,380.00,380.00,0.00,0.00,570.00,0.00,380.00,380.00,pendiente,completo,0,0,,,ok,0,
+193,158,ESC 23,51,105,MAT,Fierro 3/8 pulgada,granel,41,dia,5.00,6.00,4,0,0,820.00,820.00,0.00,0.00,0.00,0.00,820.00,820.00,pendiente,pendiente,41,41,,,ok,0,
+194,158,ESC 23,51,106,MAT,Tubería PVC 1 pulgada,granel,27,dia,5.00,6.00,4,0,0,540.00,540.00,0.00,0.00,0.00,0.00,540.00,540.00,pendiente,pendiente,27,27,,,ok,0,
+195,159,ESC 23,51,105,MAT,Fierro 3/8 pulgada,granel,41,dia,5.00,6.00,4,0,0,820.00,820.00,0.00,0.00,0.00,0.00,820.00,820.00,pendiente,parcial,1,1,,,ok,0,
+196,159,ESC 23,51,106,MAT,Tubería PVC 1 pulgada,granel,27,dia,5.00,6.00,4,0,0,540.00,540.00,0.00,0.00,0.00,0.00,540.00,540.00,pendiente,completo,0,0,,,ok,0,
+197,161,ESC 23,52,107,MAT,Triplay 4x8 6mm,granel,44,dia,8.00,10.00,4,0,0,1408.00,1408.00,0.00,0.00,0.00,0.00,1408.00,1408.00,pendiente,pendiente,44,44,,,ok,0,
+198,162,ESC 23,52,107,MAT,Triplay 4x8 6mm,granel,44,dia,8.00,10.00,4,0,1,1408.00,1408.00,0.00,0.00,440.00,0.00,1408.00,1408.00,pendiente,completo,0,0,,,ok,0,
+199,164,ESC 23,53,108,MAT,Triplay 4x8 12mm,granel,47,dia,12.00,15.00,4,0,0,2256.00,2256.00,0.00,0.00,0.00,0.00,2256.00,2256.00,pendiente,pendiente,47,47,,,ok,0,
+200,164,ESC 23,53,109,MAT,Soga nylon 1/2 pulgada,granel,31,dia,0.30,0.40,4,0,0,37.20,37.20,0.00,0.00,0.00,0.00,37.20,37.20,pendiente,pendiente,31,31,,,ok,0,
+201,165,ESC 23,53,108,MAT,Triplay 4x8 12mm,granel,47,dia,12.00,15.00,4,0,2,2256.00,2256.00,0.00,0.00,1410.00,0.00,2256.00,2256.00,pendiente,completo,0,0,,,ok,0,
+202,165,ESC 23,53,109,MAT,Soga nylon 1/2 pulgada,granel,31,dia,0.30,0.40,4,0,2,37.20,37.20,0.00,0.00,24.80,0.00,37.20,37.20,pendiente,completo,0,0,,,ok,0,
+203,167,ESC 23,54,110,MAT,Tubería PVC 1/2 pulgada,granel,50,dia,3.00,4.00,4,0,0,600.00,600.00,0.00,0.00,0.00,0.00,600.00,600.00,pendiente,pendiente,50,50,,,ok,0,
+204,168,ESC 23,54,110,MAT,Tubería PVC 1/2 pulgada,granel,50,dia,3.00,4.00,4,0,3,600.00,600.00,0.00,0.00,600.00,0.00,600.00,600.00,pendiente,completo,0,0,,,ok,0,
+205,170,ESC 23,55,111,MAT,Tubería PVC 3/4 pulgada,granel,53,dia,4.00,5.00,4,0,0,848.00,848.00,0.00,0.00,0.00,0.00,848.00,848.00,pendiente,pendiente,53,53,,,ok,0,
+206,170,ESC 23,55,112,MAT,PLATAFORMA,granel,35,dia,10.00,8.00,4,0,0,1400.00,1400.00,0.00,0.00,0.00,0.00,1400.00,1400.00,pendiente,pendiente,35,35,,,ok,0,
+207,171,ESC 23,55,111,MAT,Tubería PVC 3/4 pulgada,granel,53,dia,4.00,5.00,4,0,4,848.00,848.00,0.00,0.00,1060.00,0.00,848.00,848.00,pendiente,parcial,1,1,,,ok,0,
+208,171,ESC 23,55,112,MAT,PLATAFORMA,granel,35,dia,10.00,8.00,4,0,4,1400.00,1400.00,0.00,0.00,1120.00,0.00,1400.00,1400.00,pendiente,completo,0,0,,,ok,0,
+209,173,ESC 23,56,113,MAT,Tubería PVC 1 pulgada,granel,56,dia,5.00,6.00,4,0,0,1120.00,1120.00,0.00,0.00,0.00,0.00,1120.00,1120.00,pendiente,pendiente,56,56,,,ok,0,
+210,174,ESC 23,56,113,MAT,Tubería PVC 1 pulgada,granel,56,dia,5.00,6.00,4,0,5,1120.00,1120.00,0.00,0.00,1680.00,0.00,1120.00,1120.00,pendiente,completo,0,0,,,ok,0,
+211,176,ESC 23,57,114,MAT,Soga nylon 1/2 pulgada,granel,62,dia,0.30,0.40,4,0,0,74.40,74.40,0.00,0.00,0.00,0.00,74.40,74.40,pendiente,pendiente,62,62,,,ok,0,
+212,177,ESC 23,57,114,MAT,Soga nylon 1/2 pulgada,granel,62,dia,0.30,0.40,4,0,1,74.40,74.40,0.00,0.00,24.80,0.00,74.40,74.40,pendiente,completo,0,0,,,ok,0,
+213,179,ESC 23,58,115,MAT,PATAS,granel,65,dia,10.00,8.00,4,0,0,2600.00,2600.00,0.00,0.00,0.00,0.00,2600.00,2600.00,pendiente,pendiente,65,65,,,ok,0,
+214,179,ESC 23,58,116,MAT,Disco de corte 7 pulgadas,granel,43,dia,2.00,2.50,4,0,0,344.00,344.00,0.00,0.00,0.00,0.00,344.00,344.00,pendiente,pendiente,43,43,,,ok,0,
+215,180,ESC 23,58,115,MAT,PATAS,granel,65,dia,10.00,8.00,4,0,2,2600.00,2600.00,0.00,0.00,1040.00,0.00,2600.00,2600.00,pendiente,parcial,1,1,,,ok,0,
+216,180,ESC 23,58,116,MAT,Disco de corte 7 pulgadas,granel,43,dia,2.00,2.50,4,0,2,344.00,344.00,0.00,0.00,215.00,0.00,344.00,344.00,pendiente,completo,0,0,,,ok,0,
+217,182,ESC 23,59,117,MAT,PLATAFORMA,granel,68,dia,10.00,8.00,4,0,0,2720.00,2720.00,0.00,0.00,0.00,0.00,2720.00,2720.00,pendiente,pendiente,68,68,,,ok,0,
+218,183,ESC 23,59,117,MAT,PLATAFORMA,granel,68,dia,10.00,8.00,4,0,3,2720.00,2720.00,0.00,0.00,1632.00,0.00,2720.00,2720.00,pendiente,completo,0,0,,,ok,0,
+219,185,ESC 23,60,118,MAT,CRUZETAS,granel,71,dia,10.00,8.00,4,0,0,2840.00,2840.00,0.00,0.00,0.00,0.00,2840.00,2840.00,pendiente,pendiente,71,71,,,ok,0,
+220,185,ESC 23,60,119,MAT,Thinner,granel,47,dia,3.00,4.00,4,0,0,564.00,564.00,0.00,0.00,0.00,0.00,564.00,564.00,pendiente,pendiente,47,47,,,ok,0,
+221,186,ESC 23,60,118,MAT,CRUZETAS,granel,71,dia,10.00,8.00,4,0,4,2840.00,2840.00,0.00,0.00,2272.00,0.00,2840.00,2840.00,pendiente,completo,0,0,,,ok,0,
+222,186,ESC 23,60,119,MAT,Thinner,granel,47,dia,3.00,4.00,4,0,4,564.00,564.00,0.00,0.00,752.00,0.00,564.00,564.00,pendiente,completo,0,0,,,ok,0,
+223,188,ESC 23,61,120,MAT,Casco de seguridad,granel,74,dia,3.00,4.00,4,0,0,888.00,888.00,0.00,0.00,0.00,0.00,888.00,888.00,pendiente,pendiente,74,74,,,ok,0,
+224,189,ESC 23,61,120,MAT,Casco de seguridad,granel,74,dia,3.00,4.00,4,0,5,888.00,888.00,0.00,0.00,1480.00,0.00,888.00,888.00,pendiente,completo,0,0,,,ok,0,
+225,191,ESC 23,62,121,MAT,Guantes de construcción,granel,77,dia,1.00,1.50,4,0,0,308.00,308.00,0.00,0.00,0.00,0.00,308.00,308.00,pendiente,pendiente,77,77,,,ok,0,
+226,191,ESC 23,62,122,MAT,Yeso,granel,51,dia,1.00,1.50,4,0,0,204.00,204.00,0.00,0.00,0.00,0.00,204.00,204.00,pendiente,pendiente,51,51,,,ok,0,
+227,192,ESC 23,62,121,MAT,Guantes de construcción,granel,77,dia,1.00,1.50,4,0,0,308.00,308.00,0.00,0.00,0.00,0.00,308.00,308.00,pendiente,parcial,1,1,,,ok,0,
+228,192,ESC 23,62,122,MAT,Yeso,granel,51,dia,1.00,1.50,4,0,0,204.00,204.00,0.00,0.00,0.00,0.00,204.00,204.00,pendiente,completo,0,0,,,ok,0,
+229,195,ESC 24,63,123,MAT,K2,kit,1,dia,15.00,0.00,4,0,0,60.00,60.00,0.00,0.00,0.00,0.00,60.00,60.00,pendiente,pendiente,,1,,,ok,0,
+230,196,ESC 24,63,123,MAT,K2,kit,1,dia,15.00,0.00,4,1,1,60.00,60.00,15.00,0.00,0.00,0.00,75.00,60.00,bien,bien,,1,2026-08-17,2026-08-17,ok,3,dias_atraso: sistema=1 esperado=0 | monto_atraso: sistema=15 esperado=0 | saldo_item: sistema=75 esperado=60
+231,198,ESC 24,64,127,MAT,K3,kit,1,dia,65.00,0.00,4,0,0,260.00,260.00,0.00,0.00,0.00,0.00,260.00,260.00,pendiente,pendiente,,1,,,ok,0,
+232,199,ESC 24,64,127,MAT,K3,kit,1,dia,65.00,0.00,4,2,2,260.00,260.00,130.00,0.00,0.00,0.00,390.00,260.00,bien,bien,,1,2026-08-18,2026-08-18,ok,3,dias_atraso: sistema=2 esperado=0 | monto_atraso: sistema=130 esperado=0 | saldo_item: sistema=390 esperado=260
+233,201,ESC 24,65,130,MAT,K4,kit,1,dia,42.00,0.00,4,0,0,168.00,168.00,0.00,0.00,0.00,0.00,168.00,168.00,pendiente,pendiente,,1,,,ok,0,
+234,201,ESC 24,65,134,MAT,K11,kit,1,dia,48.00,0.00,4,0,0,192.00,192.00,0.00,0.00,0.00,0.00,192.00,192.00,pendiente,pendiente,,1,,,ok,0,
+235,202,ESC 24,65,130,MAT,K4,kit,1,dia,42.00,0.00,4,3,3,168.00,168.00,126.00,0.00,0.00,0.00,294.00,168.00,bien,bien,,1,2026-08-19,2026-08-19,ok,3,dias_atraso: sistema=3 esperado=0 | monto_atraso: sistema=126 esperado=0 | saldo_item: sistema=294 esperado=168
+236,202,ESC 24,65,134,MAT,K11,kit,1,dia,48.00,0.00,4,3,3,192.00,192.00,144.00,0.00,0.00,0.00,336.00,192.00,bien,bien,,1,2026-08-19,2026-08-19,ok,3,dias_atraso: sistema=3 esperado=0 | monto_atraso: sistema=144 esperado=0 | saldo_item: sistema=336 esperado=192
+237,204,ESC 24,66,138,MAT,K5,kit,1,dia,72.00,0.00,4,0,0,288.00,288.00,0.00,0.00,0.00,0.00,288.00,288.00,pendiente,pendiente,,1,,,ok,0,
+238,205,ESC 24,66,138,MAT,K5,kit,1,dia,72.00,0.00,4,4,4,288.00,288.00,288.00,0.00,0.00,0.00,576.00,288.00,bien,bien,,1,2026-08-20,2026-08-20,ok,3,dias_atraso: sistema=4 esperado=0 | monto_atraso: sistema=288 esperado=0 | saldo_item: sistema=576 esperado=288
+239,207,ESC 24,67,142,MAT,K6,kit,1,dia,28.00,0.00,4,0,0,112.00,112.00,0.00,0.00,0.00,0.00,112.00,112.00,pendiente,pendiente,,1,,,ok,0,
+240,208,ESC 24,67,142,MAT,K6,kit,1,dia,28.00,0.00,4,0,0,112.00,112.00,0.00,0.00,0.00,0.00,112.00,112.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+241,210,ESC 24,68,145,MAT,K7,kit,1,dia,75.00,0.00,4,0,0,300.00,300.00,0.00,0.00,0.00,0.00,300.00,300.00,pendiente,pendiente,,1,,,ok,0,
+242,210,ESC 24,68,150,MAT,K14,kit,1,dia,30.00,0.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+243,211,ESC 24,68,145,MAT,K7,kit,1,dia,75.00,0.00,4,0,1,300.00,300.00,0.00,0.00,0.00,0.00,300.00,300.00,pendiente,dañado,,1,,2026-08-17,ok,0,
+244,211,ESC 24,68,150,MAT,K14,kit,1,dia,30.00,0.00,4,1,1,120.00,120.00,30.00,0.00,0.00,0.00,150.00,120.00,bien,bien,,1,2026-08-17,2026-08-17,ok,3,dias_atraso: sistema=1 esperado=0 | monto_atraso: sistema=30 esperado=0 | saldo_item: sistema=150 esperado=120
+245,214,ESC 24,69,155,MAT,K9,kit,1,dia,28.00,0.00,4,0,0,112.00,112.00,0.00,0.00,0.00,0.00,112.00,112.00,pendiente,pendiente,,1,,,ok,0,
+246,215,ESC 24,69,155,MAT,K9,kit,1,dia,28.00,0.00,4,3,3,112.00,112.00,84.00,0.00,0.00,0.00,196.00,112.00,bien,bien,,1,2026-08-19,2026-08-19,ok,3,dias_atraso: sistema=3 esperado=0 | monto_atraso: sistema=84 esperado=0 | saldo_item: sistema=196 esperado=112
+247,217,ESC 24,70,168,MAT,K10,kit,1,dia,110.00,0.00,4,0,0,440.00,440.00,0.00,0.00,0.00,0.00,440.00,440.00,pendiente,pendiente,,1,,,ok,0,
+248,217,ESC 24,70,172,MAT,K17,kit,1,dia,25.00,0.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+249,218,ESC 24,70,168,MAT,K10,kit,1,dia,110.00,0.00,4,4,4,440.00,440.00,440.00,0.00,0.00,0.00,880.00,440.00,bien,bien,,1,2026-08-20,2026-08-20,ok,3,dias_atraso: sistema=4 esperado=0 | monto_atraso: sistema=440 esperado=0 | saldo_item: sistema=880 esperado=440
+250,218,ESC 24,70,172,MAT,K17,kit,1,dia,25.00,0.00,4,4,4,100.00,100.00,100.00,0.00,0.00,0.00,200.00,100.00,bien,bien,,1,2026-08-20,2026-08-20,ok,3,dias_atraso: sistema=4 esperado=0 | monto_atraso: sistema=100 esperado=0 | saldo_item: sistema=200 esperado=100
+251,220,ESC 24,71,177,MAT,K11,kit,1,dia,48.00,0.00,4,0,0,192.00,192.00,0.00,0.00,0.00,0.00,192.00,192.00,pendiente,pendiente,,1,,,ok,0,
+252,221,ESC 24,71,177,MAT,K11,kit,1,dia,48.00,0.00,4,0,0,192.00,192.00,0.00,0.00,0.00,0.00,192.00,192.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+253,223,ESC 24,72,181,MAT,K12,kit,1,dia,60.00,0.00,4,0,0,240.00,240.00,0.00,0.00,0.00,0.00,240.00,240.00,pendiente,pendiente,,1,,,ok,0,
+254,224,ESC 24,72,181,MAT,K12,kit,1,dia,60.00,0.00,4,1,1,240.00,240.00,60.00,0.00,0.00,0.00,300.00,240.00,bien,bien,,1,2026-08-17,2026-08-17,ok,3,dias_atraso: sistema=1 esperado=0 | monto_atraso: sistema=60 esperado=0 | saldo_item: sistema=300 esperado=240
+255,226,ESC 24,73,184,MAT,K13,kit,1,dia,18.00,0.00,4,0,0,72.00,72.00,0.00,0.00,0.00,0.00,72.00,72.00,pendiente,pendiente,,1,,,ok,0,
+256,226,ESC 24,73,192,MAT,K20,kit,1,dia,16.00,0.00,4,0,0,64.00,64.00,0.00,0.00,0.00,0.00,64.00,64.00,pendiente,pendiente,,1,,,ok,0,
+257,227,ESC 24,73,184,MAT,K13,kit,1,dia,18.00,0.00,4,0,2,72.00,72.00,0.00,0.00,0.00,0.00,72.00,72.00,pendiente,dañado,,1,,2026-08-18,ok,0,
+258,227,ESC 24,73,192,MAT,K20,kit,1,dia,16.00,0.00,4,2,2,64.00,64.00,32.00,0.00,0.00,0.00,96.00,64.00,bien,bien,,1,2026-08-18,2026-08-18,ok,3,dias_atraso: sistema=2 esperado=0 | monto_atraso: sistema=32 esperado=0 | saldo_item: sistema=96 esperado=64
+259,229,ESC 24,74,197,MAT,K14,kit,1,dia,30.00,0.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+260,230,ESC 24,74,197,MAT,K14,kit,1,dia,30.00,0.00,4,3,3,120.00,120.00,90.00,0.00,0.00,0.00,210.00,120.00,bien,bien,,1,2026-08-19,2026-08-19,ok,3,dias_atraso: sistema=3 esperado=0 | monto_atraso: sistema=90 esperado=0 | saldo_item: sistema=210 esperado=120
+261,232,ESC 24,75,202,MAT,K15,kit,1,dia,50.00,0.00,4,0,0,200.00,200.00,0.00,0.00,0.00,0.00,200.00,200.00,pendiente,pendiente,,1,,,ok,0,
+262,233,ESC 24,75,202,MAT,K15,kit,1,dia,50.00,0.00,4,4,4,200.00,200.00,200.00,0.00,0.00,0.00,400.00,200.00,bien,bien,,1,2026-08-20,2026-08-20,ok,3,dias_atraso: sistema=4 esperado=0 | monto_atraso: sistema=200 esperado=0 | saldo_item: sistema=400 esperado=200
+263,236,ESC 24,76,206,MAT,K17,kit,1,dia,25.00,0.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+264,237,ESC 24,76,206,MAT,K17,kit,1,dia,25.00,0.00,4,1,1,100.00,100.00,25.00,0.00,0.00,0.00,125.00,100.00,bien,bien,,1,2026-08-17,2026-08-17,ok,3,dias_atraso: sistema=1 esperado=0 | monto_atraso: sistema=25 esperado=0 | saldo_item: sistema=125 esperado=100
+265,239,ESC 24,77,211,MAT,K18,kit,1,dia,38.00,0.00,4,0,0,152.00,152.00,0.00,0.00,0.00,0.00,152.00,152.00,pendiente,pendiente,,1,,,ok,0,
+266,240,ESC 24,77,211,MAT,K18,kit,1,dia,38.00,0.00,4,2,2,152.00,152.00,76.00,0.00,0.00,0.00,228.00,152.00,bien,bien,,1,2026-08-18,2026-08-18,ok,3,dias_atraso: sistema=2 esperado=0 | monto_atraso: sistema=76 esperado=0 | saldo_item: sistema=228 esperado=152
+267,242,ESC 24,78,214,MAT,K19,kit,1,dia,100.00,0.00,4,0,0,400.00,400.00,0.00,0.00,0.00,0.00,400.00,400.00,pendiente,pendiente,,1,,,ok,0,
+268,242,ESC 24,78,217,MAT,K26,kit,1,dia,88.00,0.00,4,0,0,352.00,352.00,0.00,0.00,0.00,0.00,352.00,352.00,pendiente,pendiente,,1,,,ok,0,
+269,243,ESC 24,78,214,MAT,K19,kit,1,dia,100.00,0.00,4,0,3,400.00,400.00,0.00,0.00,0.00,0.00,400.00,400.00,pendiente,dañado,,1,,2026-08-19,ok,0,
+270,243,ESC 24,78,217,MAT,K26,kit,1,dia,88.00,0.00,4,3,3,352.00,352.00,264.00,0.00,0.00,0.00,616.00,352.00,bien,bien,,1,2026-08-19,2026-08-19,ok,3,dias_atraso: sistema=3 esperado=0 | monto_atraso: sistema=264 esperado=0 | saldo_item: sistema=616 esperado=352
+271,245,ESC 24,79,220,MAT,K20,kit,1,dia,16.00,0.00,4,0,0,64.00,64.00,0.00,0.00,0.00,0.00,64.00,64.00,pendiente,pendiente,,1,,,ok,0,
+272,246,ESC 24,79,220,MAT,K20,kit,1,dia,16.00,0.00,4,4,4,64.00,64.00,64.00,0.00,0.00,0.00,128.00,64.00,bien,bien,,1,2026-08-20,2026-08-20,ok,3,dias_atraso: sistema=4 esperado=0 | monto_atraso: sistema=64 esperado=0 | saldo_item: sistema=128 esperado=64
+273,248,ESC 24,80,225,MAT,K21,kit,1,dia,72.00,0.00,4,0,0,288.00,288.00,0.00,0.00,0.00,0.00,288.00,288.00,pendiente,pendiente,,1,,,ok,0,
+274,249,ESC 24,80,225,MAT,K21,kit,1,dia,72.00,0.00,4,0,0,288.00,288.00,0.00,0.00,0.00,0.00,288.00,288.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+275,251,ESC 24,81,229,MAT,K22,kit,1,dia,80.00,0.00,4,0,0,320.00,320.00,0.00,0.00,0.00,0.00,320.00,320.00,pendiente,pendiente,,1,,,ok,0,
+276,251,ESC 24,81,232,MAT,K29,kit,1,dia,48.00,0.00,4,0,0,192.00,192.00,0.00,0.00,0.00,0.00,192.00,192.00,pendiente,pendiente,,1,,,ok,0,
+277,252,ESC 24,81,229,MAT,K22,kit,1,dia,80.00,0.00,4,1,1,320.00,320.00,80.00,0.00,0.00,0.00,400.00,320.00,bien,bien,,1,2026-08-17,2026-08-17,ok,3,dias_atraso: sistema=1 esperado=0 | monto_atraso: sistema=80 esperado=0 | saldo_item: sistema=400 esperado=320
+278,252,ESC 24,81,232,MAT,K29,kit,1,dia,48.00,0.00,4,1,1,192.00,192.00,48.00,0.00,0.00,0.00,240.00,192.00,bien,bien,,1,2026-08-17,2026-08-17,ok,3,dias_atraso: sistema=1 esperado=0 | monto_atraso: sistema=48 esperado=0 | saldo_item: sistema=240 esperado=192
+279,254,ESC 24,82,236,MAT,K23,kit,1,dia,60.00,0.00,4,0,0,240.00,240.00,0.00,0.00,0.00,0.00,240.00,240.00,pendiente,pendiente,,1,,,ok,0,
+280,255,ESC 24,82,236,MAT,K23,kit,1,dia,60.00,0.00,4,2,2,240.00,240.00,120.00,0.00,0.00,0.00,360.00,240.00,bien,bien,,1,2026-08-18,2026-08-18,ok,3,dias_atraso: sistema=2 esperado=0 | monto_atraso: sistema=120 esperado=0 | saldo_item: sistema=360 esperado=240
+281,257,ESC 24,83,239,MAT,K24,kit,1,dia,30.00,0.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+282,258,ESC 24,83,239,MAT,K24,kit,1,dia,30.00,0.00,4,3,3,120.00,120.00,90.00,0.00,0.00,0.00,210.00,120.00,bien,bien,,1,2026-08-19,2026-08-19,ok,3,dias_atraso: sistema=3 esperado=0 | monto_atraso: sistema=90 esperado=0 | saldo_item: sistema=210 esperado=120
+283,260,ESC 24,84,243,MAT,K25,kit,1,dia,76.00,0.00,4,0,0,304.00,304.00,0.00,0.00,0.00,0.00,304.00,304.00,pendiente,pendiente,,1,,,ok,0,
+284,260,ESC 24,84,247,MAT,K2,kit,1,dia,15.00,0.00,4,0,0,60.00,60.00,0.00,0.00,0.00,0.00,60.00,60.00,pendiente,pendiente,,1,,,ok,0,
+285,261,ESC 24,84,243,MAT,K25,kit,1,dia,76.00,0.00,4,0,4,304.00,304.00,0.00,0.00,0.00,0.00,304.00,304.00,pendiente,dañado,,1,,2026-08-20,ok,0,
+286,261,ESC 24,84,247,MAT,K2,kit,1,dia,15.00,0.00,4,4,4,60.00,60.00,60.00,0.00,0.00,0.00,120.00,60.00,perdido,perdido,,1,2026-08-20,2026-08-20,ok,3,dias_atraso: sistema=4 esperado=0 | monto_atraso: sistema=60 esperado=0 | saldo_item: sistema=120 esperado=60
+287,267,ESC 25,85,251,SIB-05,Sierra de Banco,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+288,267,ESC 25,85,252,NIL-05,Nivel Láser,individual,1,dia,25.00,28.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+289,267,ESC 25,85,253,MAT,Piedra chancada,granel,16,dia,3.00,3.50,4,0,0,192.00,192.00,0.00,0.00,0.00,0.00,192.00,192.00,pendiente,pendiente,16,16,,,ok,0,
+290,267,ESC 25,85,254,MAT,K10,kit,1,dia,110.00,0.00,4,0,0,440.00,440.00,0.00,0.00,0.00,0.00,440.00,440.00,pendiente,pendiente,,1,,,ok,0,
+291,268,ESC 25,85,251,SIB-05,Sierra de Banco,individual,1,dia,30.00,35.00,4,4,4,120.00,120.00,120.00,140.00,140.00,0.00,240.00,260.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=120 esperado=140 | saldo_item: sistema=240 esperado=260
+292,268,ESC 25,85,252,NIL-05,Nivel Láser,individual,1,dia,25.00,28.00,4,4,4,100.00,100.00,100.00,112.00,112.00,0.00,200.00,212.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=100 esperado=112 | saldo_item: sistema=200 esperado=212
+293,268,ESC 25,85,253,MAT,Piedra chancada,granel,16,dia,3.00,3.50,4,0,4,192.00,192.00,0.00,0.00,224.00,0.00,192.00,192.00,pendiente,completo,0,0,,,ok,0,
+294,268,ESC 25,85,254,MAT,K10,kit,1,dia,110.00,0.00,4,4,4,440.00,440.00,440.00,0.00,0.00,0.00,880.00,440.00,bien,bien,,1,2026-08-20,2026-08-20,ok,3,dias_atraso: sistema=4 esperado=0 | monto_atraso: sistema=440 esperado=0 | saldo_item: sistema=880 esperado=440
+295,270,ESC 25,86,258,CAL-06,Caladora,individual,1,dia,12.00,15.00,4,0,0,48.00,48.00,0.00,0.00,0.00,0.00,48.00,48.00,pendiente,pendiente,,1,,,ok,0,
+296,270,ESC 25,86,259,TEO-06,Teodolito,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+297,270,ESC 25,86,260,MAT,Arena gruesa,granel,18,dia,2.00,2.50,4,0,0,144.00,144.00,0.00,0.00,0.00,0.00,144.00,144.00,pendiente,pendiente,18,18,,,ok,0,
+298,270,ESC 25,86,261,MAT,K11,kit,1,dia,48.00,0.00,4,0,0,192.00,192.00,0.00,0.00,0.00,0.00,192.00,192.00,pendiente,pendiente,,1,,,ok,0,
+299,271,ESC 25,86,258,CAL-06,Caladora,individual,1,dia,12.00,15.00,4,0,0,48.00,48.00,0.00,0.00,0.00,0.00,48.00,48.00,dañado,dañado,,1,2026-08-16,2026-08-16,ok,0,
+300,271,ESC 25,86,259,TEO-06,Teodolito,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+301,271,ESC 25,86,260,MAT,Arena gruesa,granel,18,dia,2.00,2.50,4,0,0,144.00,144.00,0.00,0.00,0.00,0.00,144.00,144.00,pendiente,completo,0,0,,,ok,0,
+302,271,ESC 25,86,261,MAT,K11,kit,1,dia,48.00,0.00,4,0,0,192.00,192.00,0.00,0.00,0.00,0.00,192.00,192.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+303,273,ESC 25,87,265,LIJ-07,Lijadora Orbital,individual,1,dia,15.00,18.00,4,0,0,60.00,60.00,0.00,0.00,0.00,0.00,60.00,60.00,pendiente,pendiente,,1,,,ok,0,
+304,273,ESC 25,87,266,ETT-07,Estación Total,individual,1,dia,80.00,90.00,4,0,0,320.00,320.00,0.00,0.00,0.00,0.00,320.00,320.00,pendiente,pendiente,,1,,,ok,0,
+305,273,ESC 25,87,267,MAT,Clavos para construcción,granel,20,dia,1.50,2.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,20,20,,,ok,0,
+306,273,ESC 25,87,268,MAT,K12,kit,1,dia,60.00,0.00,4,0,0,240.00,240.00,0.00,0.00,0.00,0.00,240.00,240.00,pendiente,pendiente,,1,,,ok,0,
+307,274,ESC 25,87,265,LIJ-07,Lijadora Orbital,individual,1,dia,15.00,18.00,4,1,1,60.00,60.00,15.00,18.00,18.00,0.00,75.00,78.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=15 esperado=18 | saldo_item: sistema=75 esperado=78
+308,274,ESC 25,87,266,ETT-07,Estación Total,individual,1,dia,80.00,90.00,4,1,1,320.00,320.00,80.00,90.00,90.00,0.00,400.00,410.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=80 esperado=90 | saldo_item: sistema=400 esperado=410
+309,274,ESC 25,87,267,MAT,Clavos para construcción,granel,20,dia,1.50,2.00,4,0,1,120.00,120.00,0.00,0.00,40.00,0.00,120.00,120.00,pendiente,completo,0,0,,,ok,0,
+310,274,ESC 25,87,268,MAT,K12,kit,1,dia,60.00,0.00,4,0,1,240.00,240.00,0.00,0.00,0.00,0.00,240.00,240.00,pendiente,dañado,,1,,2026-08-17,ok,0,
+311,277,ESC 25,88,271,ROZ-09,Rozadora,individual,1,dia,25.00,30.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+312,277,ESC 25,88,272,LAM-09,Lámpara de Obra,individual,1,dia,10.00,12.00,4,0,0,40.00,40.00,0.00,0.00,0.00,0.00,40.00,40.00,pendiente,pendiente,,1,,,ok,0,
+313,277,ESC 25,88,273,MAT,Cal,granel,24,dia,1.00,1.50,4,0,0,96.00,96.00,0.00,0.00,0.00,0.00,96.00,96.00,pendiente,pendiente,24,24,,,ok,0,
+314,277,ESC 25,88,274,MAT,K14,kit,1,dia,30.00,0.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+315,278,ESC 25,88,271,ROZ-09,Rozadora,individual,1,dia,25.00,30.00,4,3,3,100.00,100.00,75.00,90.00,90.00,0.00,175.00,190.00,bien,bien,,1,2026-08-19,2026-08-19,ok,2,monto_atraso: sistema=75 esperado=90 | saldo_item: sistema=175 esperado=190
+316,278,ESC 25,88,272,LAM-09,Lámpara de Obra,individual,1,dia,10.00,12.00,4,3,3,40.00,40.00,30.00,36.00,36.00,0.00,70.00,76.00,bien,bien,,1,2026-08-19,2026-08-19,ok,2,monto_atraso: sistema=30 esperado=36 | saldo_item: sistema=70 esperado=76
+317,278,ESC 25,88,273,MAT,Cal,granel,24,dia,1.00,1.50,4,0,3,96.00,96.00,0.00,0.00,108.00,0.00,96.00,96.00,pendiente,completo,0,0,,,ok,0,
+318,278,ESC 25,88,274,MAT,K14,kit,1,dia,30.00,0.00,4,3,3,120.00,120.00,90.00,0.00,0.00,0.00,210.00,120.00,bien,bien,,1,2026-08-19,2026-08-19,ok,3,dias_atraso: sistema=3 esperado=0 | monto_atraso: sistema=90 esperado=0 | saldo_item: sistema=210 esperado=120
+319,280,ESC 25,89,279,PUL-10,Pulidora de Piso,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,pendiente,pendiente,,1,,,ok,0,
+320,280,ESC 25,89,280,PRO-10,Prolongador Eléctrico,individual,1,dia,5.00,6.00,4,0,0,20.00,20.00,0.00,0.00,0.00,0.00,20.00,20.00,pendiente,pendiente,,1,,,ok,0,
+321,280,ESC 25,89,281,MAT,Hormigón seco,granel,26,dia,2.50,3.00,4,0,0,260.00,260.00,0.00,0.00,0.00,0.00,260.00,260.00,pendiente,pendiente,26,26,,,ok,0,
+322,280,ESC 25,89,282,MAT,K15,kit,1,dia,50.00,0.00,4,0,0,200.00,200.00,0.00,0.00,0.00,0.00,200.00,200.00,pendiente,pendiente,,1,,,ok,0,
+323,281,ESC 25,89,279,PUL-10,Pulidora de Piso,individual,1,dia,35.00,40.00,4,4,4,140.00,140.00,140.00,160.00,160.00,0.00,280.00,300.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=140 esperado=160 | saldo_item: sistema=280 esperado=300
+324,281,ESC 25,89,280,PRO-10,Prolongador Eléctrico,individual,1,dia,5.00,6.00,4,4,4,20.00,20.00,20.00,24.00,24.00,0.00,40.00,44.00,bien,bien,,1,2026-08-20,2026-08-20,ok,2,monto_atraso: sistema=20 esperado=24 | saldo_item: sistema=40 esperado=44
+325,281,ESC 25,89,281,MAT,Hormigón seco,granel,26,dia,2.50,3.00,4,0,4,260.00,260.00,0.00,0.00,312.00,0.00,260.00,260.00,pendiente,completo,0,0,,,ok,0,
+326,281,ESC 25,89,282,MAT,K15,kit,1,dia,50.00,0.00,4,4,4,200.00,200.00,200.00,0.00,0.00,0.00,400.00,200.00,bien,bien,,1,2026-08-20,2026-08-20,ok,3,dias_atraso: sistema=4 esperado=0 | monto_atraso: sistema=200 esperado=0 | saldo_item: sistema=400 esperado=200
+327,284,ESC 25,90,286,ATL-02,Taladro Angular,individual,1,dia,25.00,30.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+328,284,ESC 25,90,287,ASP-02,Aspiradora Industrial,individual,1,dia,20.00,22.00,4,0,0,80.00,80.00,0.00,0.00,0.00,0.00,80.00,80.00,pendiente,pendiente,,1,,,ok,0,
+329,284,ESC 25,90,288,MAT,Triplay 4x8 6mm,granel,30,dia,8.00,10.00,4,0,0,960.00,960.00,0.00,0.00,0.00,0.00,960.00,960.00,pendiente,pendiente,30,30,,,ok,0,
+330,284,ESC 25,90,289,MAT,K17,kit,1,dia,25.00,0.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+331,285,ESC 25,90,286,ATL-02,Taladro Angular,individual,1,dia,25.00,30.00,4,1,1,100.00,100.00,25.00,30.00,30.00,0.00,125.00,130.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=25 esperado=30 | saldo_item: sistema=125 esperado=130
+332,285,ESC 25,90,287,ASP-02,Aspiradora Industrial,individual,1,dia,20.00,22.00,4,1,1,80.00,80.00,20.00,22.00,22.00,0.00,100.00,102.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=20 esperado=22 | saldo_item: sistema=100 esperado=102
+333,285,ESC 25,90,288,MAT,Triplay 4x8 6mm,granel,30,dia,8.00,10.00,4,0,1,960.00,960.00,0.00,0.00,300.00,0.00,960.00,960.00,pendiente,completo,0,0,,,ok,0,
+334,285,ESC 25,90,289,MAT,K17,kit,1,dia,25.00,0.00,4,1,1,100.00,100.00,25.00,0.00,0.00,0.00,125.00,100.00,bien,bien,,1,2026-08-17,2026-08-17,ok,3,dias_atraso: sistema=1 esperado=0 | monto_atraso: sistema=25 esperado=0 | saldo_item: sistema=125 esperado=100
+335,294,ESC 26,91,294,SIB-05,Sierra de Banco,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,28.00,92.00,92.00,pendiente,pendiente,,1,,,ok,0,
+336,294,ESC 26,91,295,BOM-05,Bomba de Agua,individual,1,dia,25.00,28.00,4,0,0,100.00,100.00,0.00,0.00,0.00,0.00,100.00,100.00,pendiente,pendiente,,1,,,ok,0,
+337,294,ESC 26,91,296,MAT,Arena gruesa,granel,14,dia,2.00,2.50,4,0,0,112.00,112.00,0.00,0.00,0.00,0.00,112.00,112.00,pendiente,pendiente,14,14,,,ok,0,
+338,295,ESC 26,91,294,SIB-05,Sierra de Banco,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,28.00,92.00,92.00,pendiente,pendiente,,1,,,ok,0,
+339,295,ESC 26,91,295,BOM-05,Bomba de Agua,individual,1,dia,25.00,28.00,4,0,0,100.00,100.00,0.00,0.00,0.00,27.00,73.00,73.00,pendiente,pendiente,,1,,,ok,0,
+340,295,ESC 26,91,296,MAT,Arena gruesa,granel,14,dia,2.00,2.50,4,0,0,112.00,112.00,0.00,0.00,0.00,0.00,112.00,112.00,pendiente,pendiente,14,14,,,ok,0,
+341,296,ESC 26,91,294,SIB-05,Sierra de Banco,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,28.00,92.00,92.00,pendiente,pendiente,,1,,,ok,0,
+342,296,ESC 26,91,295,BOM-05,Bomba de Agua,individual,1,dia,25.00,28.00,4,0,0,100.00,100.00,0.00,0.00,0.00,27.00,73.00,73.00,pendiente,pendiente,,1,,,ok,0,
+343,296,ESC 26,91,296,MAT,Arena gruesa,granel,14,dia,2.00,2.50,4,0,0,112.00,112.00,0.00,0.00,0.00,0.00,112.00,112.00,pendiente,pendiente,14,14,,,ok,0,
+344,297,ESC 26,91,294,SIB-05,Sierra de Banco,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,28.00,92.00,92.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+345,297,ESC 26,91,295,BOM-05,Bomba de Agua,individual,1,dia,25.00,28.00,4,0,0,100.00,100.00,0.00,0.00,0.00,27.00,73.00,73.00,bien,bien,,1,2026-08-16,2026-08-16,ok,0,
+346,297,ESC 26,91,296,MAT,Arena gruesa,granel,14,dia,2.00,2.50,4,0,0,112.00,112.00,0.00,0.00,0.00,0.00,112.00,112.00,pendiente,completo,0,0,,,ok,0,
+347,300,ESC 26,92,297,LIJ-07,Lijadora Orbital,individual,1,dia,15.00,18.00,4,0,0,60.00,60.00,0.00,0.00,0.00,32.00,28.00,28.00,pendiente,pendiente,,1,,,ok,0,
+348,300,ESC 26,92,298,HID-07,Hidrolavadora,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,0.00,120.00,120.00,pendiente,pendiente,,1,,,ok,0,
+349,300,ESC 26,92,299,MAT,Alambre de amarre,granel,16,dia,1.00,1.50,4,0,0,64.00,64.00,0.00,0.00,0.00,0.00,64.00,64.00,pendiente,pendiente,16,16,,,ok,0,
+350,301,ESC 26,92,297,LIJ-07,Lijadora Orbital,individual,1,dia,15.00,18.00,4,0,0,60.00,60.00,0.00,0.00,0.00,32.00,28.00,28.00,pendiente,pendiente,,1,,,ok,0,
+351,301,ESC 26,92,298,HID-07,Hidrolavadora,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,33.00,87.00,87.00,pendiente,pendiente,,1,,,ok,0,
+352,301,ESC 26,92,299,MAT,Alambre de amarre,granel,16,dia,1.00,1.50,4,0,0,64.00,64.00,0.00,0.00,0.00,0.00,64.00,64.00,pendiente,pendiente,16,16,,,ok,0,
+353,302,ESC 26,92,297,LIJ-07,Lijadora Orbital,individual,1,dia,15.00,18.00,4,0,0,60.00,60.00,0.00,0.00,0.00,32.00,28.00,28.00,pendiente,pendiente,,1,,,ok,0,
+354,302,ESC 26,92,298,HID-07,Hidrolavadora,individual,1,dia,30.00,35.00,4,0,0,120.00,120.00,0.00,0.00,0.00,33.00,87.00,87.00,pendiente,pendiente,,1,,,ok,0,
+355,302,ESC 26,92,299,MAT,Alambre de amarre,granel,16,dia,1.00,1.50,4,0,0,64.00,64.00,0.00,0.00,0.00,0.00,64.00,64.00,pendiente,pendiente,16,16,,,ok,0,
+356,303,ESC 26,92,297,LIJ-07,Lijadora Orbital,individual,1,dia,15.00,18.00,4,2,2,60.00,60.00,30.00,36.00,36.00,32.00,58.00,64.00,bien,bien,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=30 esperado=36 | saldo_item: sistema=58 esperado=64
+357,303,ESC 26,92,298,HID-07,Hidrolavadora,individual,1,dia,30.00,35.00,4,2,2,120.00,120.00,60.00,70.00,70.00,33.00,147.00,157.00,dañado,dañado,,1,2026-08-18,2026-08-18,ok,2,monto_atraso: sistema=60 esperado=70 | saldo_item: sistema=147 esperado=157
+358,303,ESC 26,92,299,MAT,Alambre de amarre,granel,16,dia,1.00,1.50,4,0,2,64.00,64.00,0.00,0.00,48.00,0.00,64.00,64.00,pendiente,completo,0,0,,,ok,0,
+359,307,ESC 26,93,300,PUL-10,Pulidora de Piso,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,38.00,102.00,102.00,pendiente,pendiente,,1,,,ok,0,
+360,307,ESC 26,93,301,SOL-10,Soldadora Eléctrica,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,0.00,140.00,140.00,pendiente,pendiente,,1,,,ok,0,
+361,307,ESC 26,93,302,MAT,Fierro 3/8 pulgada,granel,19,dia,5.00,6.00,4,0,0,380.00,380.00,0.00,0.00,0.00,0.00,380.00,380.00,pendiente,pendiente,19,19,,,ok,0,
+362,308,ESC 26,93,300,PUL-10,Pulidora de Piso,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,38.00,102.00,102.00,pendiente,pendiente,,1,,,ok,0,
+363,308,ESC 26,93,301,SOL-10,Soldadora Eléctrica,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,42.00,98.00,98.00,pendiente,pendiente,,1,,,ok,0,
+364,308,ESC 26,93,302,MAT,Fierro 3/8 pulgada,granel,19,dia,5.00,6.00,4,0,0,380.00,380.00,0.00,0.00,0.00,0.00,380.00,380.00,pendiente,pendiente,19,19,,,ok,0,
+365,309,ESC 26,93,300,PUL-10,Pulidora de Piso,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,38.00,102.00,102.00,pendiente,pendiente,,1,,,ok,0,
+366,309,ESC 26,93,301,SOL-10,Soldadora Eléctrica,individual,1,dia,35.00,40.00,4,0,0,140.00,140.00,0.00,0.00,0.00,42.00,98.00,98.00,pendiente,pendiente,,1,,,ok,0,
+367,309,ESC 26,93,302,MAT,Fierro 3/8 pulgada,granel,19,dia,5.00,6.00,4,0,0,380.00,380.00,0.00,0.00,0.00,0.00,380.00,380.00,pendiente,pendiente,19,19,,,ok,0,
+368,310,ESC 26,93,300,PUL-10,Pulidora de Piso,individual,1,dia,35.00,40.00,4,1,1,140.00,140.00,35.00,40.00,40.00,38.00,137.00,142.00,bien,bien,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=35 esperado=40 | saldo_item: sistema=137 esperado=142
+369,310,ESC 26,93,301,SOL-10,Soldadora Eléctrica,individual,1,dia,35.00,40.00,4,1,1,140.00,140.00,35.00,40.00,40.00,42.00,133.00,138.00,dañado,dañado,,1,2026-08-17,2026-08-17,ok,2,monto_atraso: sistema=35 esperado=40 | saldo_item: sistema=133 esperado=138
+370,310,ESC 26,93,302,MAT,Fierro 3/8 pulgada,granel,19,dia,5.00,6.00,4,0,1,380.00,380.00,0.00,0.00,114.00,0.00,380.00,380.00,pendiente,completo,0,0,,,ok,0,
