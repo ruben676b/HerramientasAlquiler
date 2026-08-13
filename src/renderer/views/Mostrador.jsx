@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, X, Plus, Package, Wrench, Star, Info, Boxes, Eye } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { localDate } from '../lib/date';
@@ -59,6 +59,8 @@ export default function Mostrador() {
   // --- Agregar ítem ---
   const [modoItem, setModoItem] = useState('individual');
   const [herrId, setHerrId] = useState('');
+  const [buscarHerramienta, setBuscarHerramienta] = useState('');
+  const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
   const [granelId, setGranelId] = useState('');
   const [kitId, setKitId] = useState('');
   const [cantidad, setCantidad] = useState(1);
@@ -95,7 +97,7 @@ export default function Mostrador() {
   }, []);
 
   const buscar = useCallback(async (t) => {
-    if (!window.api || t.length < 2) return setResultados([]);
+    if (!window.api || t.length < 1) return setResultados([]);
     setBuscando(true);
     try {
       setResultados(await window.api.buscarClientes(t));
@@ -205,6 +207,7 @@ export default function Mostrador() {
     setExito(null);
     if (!cliente) return setError('Seleccione un cliente.');
     if (!items.length) return setError('Agregue al menos un ítem.');
+    if (fechaDevolucion && fechaSalida && fechaDevolucion < fechaSalida) return setError('La fecha de devolución no puede ser anterior a la fecha de salida.');
     if (!window.api) return setError('API no disponible.');
 
     setEnviando(true);
@@ -259,6 +262,25 @@ export default function Mostrador() {
 
   // Selecciones actuales (para habilitar el ojo según tengan imagen)
   const herrSel = herramientas.find((h) => h.id === herrId);
+  const herramientasFiltradas = useMemo(() => {
+    if (!buscarHerramienta) return [];
+    const q = buscarHerramienta.toLowerCase();
+    const rank = (h) => {
+      const name = (h.nombre || '').toLowerCase();
+      const id = (h.id || '').toLowerCase();
+      const idSinGuion = id.replace('-', '');
+      if (name.startsWith(q)) return 0;
+      if (id.startsWith(q)) return 1;
+      if (idSinGuion.startsWith(q)) return 2;
+      if (name.includes(q)) return 3;
+      if (id.includes(q)) return 4;
+      return 5;
+    };
+    return herramientas
+      .filter(h => rank(h) < 5)
+      .sort((a, b) => rank(a) - rank(b))
+      .slice(0, 20);
+  }, [buscarHerramienta, herramientas]);
   const granelSel = granelCat.find((g) => g.id === parseInt(granelId, 10));
 
   return (
@@ -394,7 +416,7 @@ export default function Mostrador() {
                     ))}
                   </div>
                 )}
-                {termino.length >= 2 && !buscando && resultados.length === 0 && (
+                {termino.length >= 1 && !buscando && resultados.length === 0 && (
                   <p className="text-xs mt-2" style={{ color: 'var(--muted)' }}>
                     Sin resultados. Registre el cliente en la sección Clientes.
                   </p>
@@ -476,7 +498,7 @@ export default function Mostrador() {
                 <label className={labelCls} style={{ color: 'var(--muted)' }}>
                   Devolución pactada
                 </label>
-                <DatePicker amplio value={fechaDevolucion} onChange={setFechaDevolucion} error={fechaDevolucion && fechaDevolucion < fechaSalida} />
+                <DatePicker amplio value={fechaDevolucion} onChange={setFechaDevolucion} min={fechaSalida} error={fechaDevolucion && fechaDevolucion < fechaSalida} />
               </div>
               <p className="text-xs" style={{ color: 'var(--muted)' }}>
                 {dias} día{dias !== 1 ? 's' : ''} de alquiler
@@ -572,27 +594,46 @@ export default function Mostrador() {
             {/* Selector */}
             {modoItem === 'individual' ? (
               <div className="flex gap-2 items-end">
-                <div className="flex-1">
+                <div className="flex-1 relative">
                   <label className={labelCls} style={{ color: 'var(--muted)' }}>
                     Herramienta disponible
                   </label>
-                  <select
-                    value={herrId}
-                    onChange={(e) => setHerrId(e.target.value)}
-                    className={inputCls}
-                    style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
-                  >
-                    <option value="">Seleccionar herramienta...</option>
-                    {herramientas.map((h) => (
-                      <option key={h.id} value={h.id}>
-                        {h.id} — {h.nombre} (S/ {h.precio_dia.toFixed(2)}/día)
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder={herrId ? herramientas.find(h => h.id === herrId)?.nombre || 'Seleccionada' : 'Buscar por nombre o código...'}
+                      value={buscarHerramienta}
+                      onChange={(e) => { setBuscarHerramienta(e.target.value); setHerrId(''); setMostrarSugerencias(true); }}
+                      onFocus={() => setMostrarSugerencias(true)}
+                      onBlur={() => setTimeout(() => setMostrarSugerencias(false), 150)}
+                      className={cn(inputCls, 'pr-8')}
+                      style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
+                    />
+                    {buscarHerramienta && (
+                      <button onClick={() => { setBuscarHerramienta(''); setHerrId(''); setMostrarSugerencias(false); }} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: 'var(--muted)' }}>
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                  {buscarHerramienta && herramientasFiltradas.length === 0 && (
+                    <p className="text-xs mt-1" style={{ color: 'var(--warning)' }}>Sin coincidencias.</p>
+                  )}
+                  {mostrarSugerencias && buscarHerramienta && herramientasFiltradas.length > 0 && (
+                    <div className="absolute z-30 top-full left-0 right-0 mt-1 rounded-md border shadow-lg max-h-48 overflow-y-auto"
+                      style={{ backgroundColor: 'var(--bg)', borderColor: 'var(--border)' }}>
+                      {herramientasFiltradas.slice(0, 12).map(h => (
+                        <button key={h.id}
+                          onMouseDown={() => { setHerrId(h.id); setBuscarHerramienta(''); setMostrarSugerencias(false); }}
+                          className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--surface)] flex justify-between items-center"
+                          style={{ color: 'var(--ink)' }}>
+                          <span><span className="font-mono font-bold" style={{ color: 'var(--primary)' }}>{h.id}</span> — {h.nombre}</span>
+                          <span className="font-mono shrink-0 ml-2" style={{ color: 'var(--muted)' }}>S/ {h.precio_dia.toFixed(2)}/día</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {!cargandoCatalogo && herramientas.length === 0 && (
-                    <p className="text-xs mt-1" style={{ color: 'var(--warning)' }}>
-                      No hay herramientas disponibles.
-                    </p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--warning)' }}>No hay herramientas disponibles.</p>
                   )}
                 </div>
                 <OjoButton

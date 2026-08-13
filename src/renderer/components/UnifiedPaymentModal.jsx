@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useToast } from './Toast';
 
-export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendiente, itemBase, itemMora, idDetalle, pendienteExterno, danosExterno, perdidasExterno, onClose, onConfirm }) {
+export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendiente, itemBase, itemMora, idDetalle, pendienteExterno, danosExterno, perdidasExterno, ventasExterno, onClose, onConfirm }) {
   const toast = useToast();
   const isItem = tipo === 'item';
   const garantia = contrato.garantia_retenida || 0;
@@ -37,11 +37,12 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
 
   const danosTotal = (danosExterno != null ? danosExterno : (contrato.total_danos || 0));
   const perdidasTotal = (perdidasExterno != null ? perdidasExterno : (contrato.total_perdidas || 0));
+  const ventasTotal = (ventasExterno != null ? ventasExterno : (contrato.total_ventas || 0));
 
   let total, pagado, saldoPendiente;
   if (!isItem) {
     pagado = contrato.total_pagado || 0;
-    total = baseEditada + atrasoEditado + danosTotal + perdidasTotal;
+    total = baseEditada + atrasoEditado + danosTotal + perdidasTotal + ventasTotal;
     // Usar pendiente externo solo si el usuario NO editó base ni mora
     saldoPendiente = (!userEdito && pendienteExterno != null) ? pendienteExterno : Math.max(0, total - pagado);
   }
@@ -199,6 +200,12 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
                   <div className="flex justify-between">
                     <span style={{ color: 'var(--warning)' }}>Cobro por da&ntilde;os</span>
                     <span className="font-mono tabular-nums" style={{ color: 'var(--warning)' }}>+ S/ {danosTotal.toFixed(2)}</span>
+                  </div>
+                )}
+                {ventasTotal > 0 && (
+                  <div className="flex justify-between">
+                    <span style={{ color: 'oklch(0.45 0.15 250)' }}>Cobro por venta de herramienta</span>
+                    <span className="font-mono tabular-nums" style={{ color: 'oklch(0.45 0.15 250)' }}>+ S/ {ventasTotal.toFixed(2)}</span>
                   </div>
                 )}
                 {perdidasTotal > 0 && (

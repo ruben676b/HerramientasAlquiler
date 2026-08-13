@@ -718,12 +718,13 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
             if (item.estado_devolucion === 'vendido') {
               try {
                 const h = db.prepare('SELECT nombre FROM HERRAMIENTA WHERE id = ?').get(detalle.id_herramienta);
+                const nombreVenta = (detalle.id_herramienta || '') + ' - ' + (h?.nombre || '');
                 db.prepare(`
                   INSERT INTO VENTA_INVENTARIO (tipo_item, id_herramienta, nombre_item, cantidad, precio_unitario, total, metodo, cliente_nombre)
                   VALUES ('individual', ?, ?, 1, ?, ?, ?, ?)
                 `).run(
                   detalle.id_herramienta,
-                  h?.nombre || detalle.id_herramienta || 'Herramienta',
+                  nombreVenta,
                   item.costo_perdida || 0,
                   item.costo_perdida || 0,
                   item.metodo || 'efectivo',
@@ -1171,9 +1172,12 @@ function getContratos(filtros = {}) {
 
     const totalContrato = itemsConAtraso.reduce((a, i) => a + i.total_item, 0) + (c.deposito_monto || 0);
     const total_danos = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_reparacion || 0), 0) + (danosTotalPorContrato[c.id] || 0);
-    const total_perdidas = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_perdida || 0) + ((i.tipo_item === 'kit' || i.estado_devolucion === 'perdido' || i.estado_devolucion === 'vendido') ? (i.costo_perdida || 0) : 0), 0);
+    // Ventas: solo items marcados como 'vendido' (el costo_perdida almacena el precio de venta)
+    const total_ventas = itemsConAtraso.reduce((a, i) => a + (i.estado_devolucion === 'vendido' ? (i.costo_perdida || 0) : 0), 0);
+    // Pérdidas: solo items 'perdido' + granel perdido (no incluye ventas)
+    const total_perdidas = itemsConAtraso.reduce((a, i) => a + (i.granel_dev_costo_perdida || 0) + ((i.tipo_item === 'kit' || i.estado_devolucion === 'perdido') ? (i.costo_perdida || 0) : 0), 0);
 
-    return { ...c, items: itemsConAtraso, pagos, dias_atraso: max_dias_atraso, total_atraso, total_contrato: totalContrato, total_danos, total_perdidas };
+    return { ...c, items: itemsConAtraso, pagos, dias_atraso: max_dias_atraso, total_atraso, total_contrato: totalContrato, total_danos, total_perdidas, total_ventas };
   });
 
   // Contar total (solo cuando se usa paginación)

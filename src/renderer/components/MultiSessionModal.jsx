@@ -217,7 +217,7 @@ function SessionForm({ session }) {
     }
   }, [session.id]);
 
-  const [step, setStep] = useState(session.step || 0);
+  const [step, setStep] = useState(saved.step || 0);
   const [error, setError] = useState('');
   const [dni, setDni] = useState(saved.dni || '');
   const [nombre, setNombre] = useState(saved.nombre || '');
@@ -758,7 +758,7 @@ function SessionForm({ session }) {
           <span style={{ color: 'var(--border)' }}>|</span>
           <span className="flex items-center gap-1">
             Hasta:
-            <DatePicker compacto value={item.fecha_devolucion_item || fechaDevolucion} onChange={(f) => cambiarFechaItem(idx, f)} />
+            <DatePicker compacto value={item.fecha_devolucion_item || fechaDevolucion} onChange={(f) => cambiarFechaItem(idx, f)} min={fechaSalida} />
           </span>
           <span className="font-medium" style={{ color: 'var(--info)' }}>
             {tarifa === 'mes' && item.precio_mes != null && item.meses_item > 0
@@ -1174,7 +1174,7 @@ const itemsData = itemsConDias.map(item => ({
               <DatePicker compacto value={fechaSalida} onChange={setFechaSalida} />
               <span className="text-[11px]" style={{ color: 'var(--faint)' }}>→</span>
               <span className="text-[11px] shrink-0" style={{ color: 'var(--muted)' }}>Devolución</span>
-              <DatePicker compacto value={fechaDevolucion} onChange={setFechaDevolucion} error={fechaDevolucion < fechaSalida} />
+              <DatePicker compacto value={fechaDevolucion} onChange={setFechaDevolucion} min={fechaSalida} error={fechaDevolucion < fechaSalida} />
               {items.length > 0 && (
                 <button onClick={() => setItems(items.map(i => ({
                   ...i,

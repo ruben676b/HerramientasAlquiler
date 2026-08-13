@@ -32,6 +32,7 @@
 
 const path = require('path');
 const USE_REAL_DB = process.env.ORACULO_REAL_DB === '1';
+const SOLO_SEED = process.env.ORACULO_SOLO_SEED === '1';
 const REAL_DB_PATH = path.resolve(__dirname, '..', 'alquiler_herramientas.db');
 const BACKUP_PATH = REAL_DB_PATH + '.oracle_backup';
 process.env.DB_PATH = USE_REAL_DB ? REAL_DB_PATH : '/tmp/opencode/oracle_' + Date.now() + '.db';
@@ -414,6 +415,12 @@ seed();
 
 // Evitar que init.js ejecute su seed automático (crearía Tabla 3m duplicada)
 db.prepare(`INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion) VALUES ('db_seeded', 'true', 'Indica que los datos semilla ya fueron insertados')`).run();
+
+if (SOLO_SEED) {
+  console.log('[ORACULO] Modo solo catálogo: 500 herramientas, 30 kits, 72 granel, 10 clientes.');
+  console.log('[ORACULO] Catálogo listo — omitiendo escenarios de prueba.');
+  process.exit(0);
+}
 
 /* ================================================================
    ORÁCULO — espejo del estado de negocio de cada contrato

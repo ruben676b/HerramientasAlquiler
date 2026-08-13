@@ -217,7 +217,7 @@ export default function Alquileres() {
         (new Date(c.fecha_devolucion_pactada + 'T00:00:00') - new Date(c.fecha_salida + 'T00:00:00')) / 86400000
       ) + 1);
       const montoBase = c.total_contrato ? c.total_contrato : (c.subtotal_diario || 0) * dias;
-      const total = montoBase + (c.total_atraso || 0) + (c.total_danos || 0) + (c.total_perdidas || 0);
+      const total = montoBase + (c.total_atraso || 0) + (c.total_danos || 0) + (c.total_perdidas || 0) + (c.total_ventas || 0);
       const pendiente = Math.max(0, total - (c.total_pagado || 0));
       return { ...c, _pendiente: pendiente };
     });
@@ -353,7 +353,8 @@ export default function Alquileres() {
               const montoAtraso = c.total_atraso || 0;
               const totalDanos = c.total_danos || 0;
               const totalPerdidas = c.total_perdidas || 0;
-              const total = montoBase + montoAtraso + totalDanos + totalPerdidas;
+              const totalVentas = c.total_ventas || 0;
+              const total = montoBase + montoAtraso + totalDanos + totalPerdidas + totalVentas;
               const pagado = c.total_pagado || 0;
               const garantia = c.garantia_retenida || 0;
               const pendiente = c._pendiente;
@@ -565,8 +566,19 @@ export default function Alquileres() {
                                                 <span />
                                               </div>
                                             )}
-                                            {/* Fila 3: Base S/ + Mora + Total */}
-                                            <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
+                                            {item.estado_devolucion === 'vendido' && item.costo_perdida > 0 && (
+  <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
+    <span />
+    <span className="text-[11px]" style={{ color: 'oklch(0.45 0.13 250)' }}>
+      Venta: S/ {(item.costo_perdida || 0).toFixed(0)}
+    </span>
+    <span className="font-mono tabular-nums text-[12px] font-bold" style={{ color: 'oklch(0.45 0.13 250)' }}>
+      S/ {(item.costo_perdida || 0).toFixed(2)}
+    </span>
+  </div>
+)}
+{/* Fila 3: Base S/ + Mora + Total */}
+<div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
                                               <span />
                                               <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
                                                 Base S/ {getBase(item).toFixed(0)}
@@ -665,6 +677,13 @@ return filas.map((g, gi) => {
                                     <div className="flex justify-between items-baseline text-xs">
                                       <span style={{ color: 'var(--warning)' }}>Cobro por daños</span>
                                       <span className="font-mono tabular-nums" style={{ color: 'var(--warning)' }}>+ S/ {totalDanos.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                  {/* Ventas */}
+                                  {totalVentas > 0 && (
+                                    <div className="flex justify-between items-baseline text-xs">
+                                      <span style={{ color: 'oklch(0.45 0.15 250)' }}>Cobro por venta de herramienta</span>
+                                      <span className="font-mono tabular-nums" style={{ color: 'oklch(0.45 0.15 250)' }}>+ S/ {totalVentas.toFixed(2)}</span>
                                     </div>
                                   )}
                                   {/* Pérdidas */}

@@ -69,13 +69,25 @@ export default function Inventario() {
 
   useEffect(() => { cargar(); }, []);
 
-  // Filtrado local
+  const rankTool = (h, q) => {
+    const name = (h.nombre || '').toLowerCase();
+    const id = (h.id || '').toLowerCase();
+    const idSinGuion = id.replace('-', '');
+    if (name.startsWith(q)) return 0;
+    if (id.startsWith(q)) return 1;
+    if (idSinGuion.startsWith(q)) return 2;
+    if (name.includes(q)) return 3;
+    if (id.includes(q)) return 4;
+    return 5;
+  };
+
+  // Filtrado local con ranking por relevancia
   const familiasFiltradas = busqueda
     ? familias.map((f) => ({
         ...f,
-        herramientas: f.herramientas.filter((h) =>
-          !busqueda || h.id.toLowerCase().includes(busqueda.toLowerCase()) || h.nombre.toLowerCase().includes(busqueda.toLowerCase()) || h.id.replace('-', '').toLowerCase().includes(busqueda.toLowerCase())
-        ),
+        herramientas: f.herramientas
+          .filter((h) => rankTool(h, busqueda.toLowerCase()) < 5)
+          .sort((a, b) => rankTool(a, busqueda.toLowerCase()) - rankTool(b, busqueda.toLowerCase())),
       })).filter((f) => {
         const q = busqueda.toLowerCase();
         const qSinGuion = q.replace('-', '');

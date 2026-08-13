@@ -31,7 +31,7 @@ function getClientesConCalificacion() {
  * @returns {Array}
  */
 function buscarClientesConCalificacion(termino) {
-  const patron = '%' + termino + '%';
+  const patron = termino + '%';
   const clientes = db.prepare(`
     SELECT c.id, c.tipo, c.nombre, c.dni, c.ruc, c.telefono, c.direccion, c.email,
            c.en_lista_negra, c.fecha_registro,

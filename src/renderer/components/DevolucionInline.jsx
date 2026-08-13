@@ -176,9 +176,19 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
     return a;
   }, 0);
   const costosPerdLocal = Object.values(costosPerdida).reduce((a, v) => a + (parseFloat(v) || 0), 0);
+  // Separar ventas de pérdidas en items individuales
+  const totalVentasLocal = Object.entries(estados).reduce((a, [idx, v]) => {
+    if (v !== 'vendido') return a;
+    return a + (parseFloat(costosNoDevueltos[idx + '_vendido']) || 0);
+  }, 0);
+  const totalPerdidasLocal = Object.entries(estados).reduce((a, [idx, v]) => {
+    if (v !== 'perdido') return a;
+    return a + (parseFloat(costosNoDevueltos[idx + '_perdido']) || 0);
+  }, 0);
   const totalDanos = costosDanosBackend + costosDanosLocal;
-  const totalPerdidas = costosPerdBackend + costosPerdLocal;
-  const totalCargosExtra = totalDanos + totalPerdidas;
+  const totalPerdidas = costosPerdBackend + costosPerdLocal + totalPerdidasLocal;
+  const totalVentas = totalVentasLocal;
+  const totalCargosExtra = totalDanos + totalPerdidas + totalVentas;
 
   const total = montoBase + montoAtrasoEfectivo + totalCargosExtra;
   const pendiente = Math.max(0, total - totalPagado);
@@ -281,10 +291,10 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
       setConfirmarVenta(ventas);
       return;
     }
-    await procesarDevoluciones(pendientes);
+    await procesarDevoluciones(pendientes, metodoPago);
   };
 
-  const procesarDevoluciones = async (pendientes) => {
+  const procesarDevoluciones = async (pendientes, metodoVenta) => {
     setCobrando(true);
     let exitos = 0;
     let fallos = 0;
@@ -307,6 +317,8 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
             costo_reparacion: estado === 'dañado' ? ((dañosAgregados[idx] || []).reduce((s, d) => s + (parseFloat(d.costo) || 0), 0)) : undefined,
             costo_perdida: esNoDevuelto ? montoNoDevuelto : undefined,
             danos: estado === 'dañado' ? (dañosAgregados[idx] || []).map(d => ({ nombre: d.nombre, costo: parseFloat(d.costo) || 0 })) : undefined,
+            metodo: estado === 'vendido' ? (metodoVenta || 'efectivo') : undefined,
+            clienteNombre: estado === 'vendido' ? (c.cliente_nombre || null) : undefined,
           }],
           observaciones: notas[idx] ? { [item.id]: notas[idx] } : {},
         });
@@ -1282,6 +1294,13 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
               })()}
               </>
             )}
+            {/* Ventas */}
+            {totalVentas > 0 && (
+              <div className="flex justify-between">
+                <span style={{ color: 'oklch(0.45 0.15 250)' }}>Cobro por venta de herramienta</span>
+                <span className="font-mono tabular-nums" style={{ color: 'oklch(0.45 0.15 250)' }}>+ S/ {totalVentas.toFixed(2)}</span>
+              </div>
+            )}
             {/* Pérdidas */}
             {totalPerdidas > 0 && (
               <div className="flex justify-between">
@@ -1432,6 +1451,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
         pendienteExterno={pagoItemState.esTotal ? pendiente : undefined}
         danosExterno={pagoItemState.esTotal ? totalDanos : undefined}
         perdidasExterno={pagoItemState.esTotal ? totalPerdidas : undefined}
+        ventasExterno={pagoItemState.esTotal ? totalVentas : undefined}
         onClose={() => setPagoItemState(null)}
         onConfirm={() => { setPagoItemState(null); onRecargar(); }}
       />
@@ -1476,18 +1496,9 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
           setConfirmarVenta(null);
           console.log('[DIAG] VentaDevolucion datos:', JSON.stringify({ idContrato: c.id, items: v.map(x => ({ id: x.item?.id, estado: estados[x.idx] })), pagos }));
           try {
-            for (const p of pagos) {
-              if (!p.monto || p.monto <= 0) continue;
-              const esGarantia = p.metodo === 'garantia';
-              await window.api.registrarPago({
-                idContrato: c.id,
-                monto: p.monto,
-                metodo: esGarantia ? 'efectivo' : p.metodo,
-                tipo: esGarantia ? 'devolucion_deposito' : 'saldo',
-                idDetalle: v[0]?.item?.id || undefined,
-              });
-            }
-            await procesarDevoluciones(v);
+            // Pasar el método de pago de la venta (primero encontrado, o 'efectivo' por defecto)
+            const metodoVenta = pagos && pagos.length > 0 && pagos[0].metodo !== 'garantia' ? pagos[0].metodo : 'efectivo';
+            await procesarDevoluciones(v, metodoVenta);
           } catch (e) {
             console.error('[DIAG] Error en venta:', e.message || e);
             toast('Error: ' + (e.message || 'desconocido'), 'error');

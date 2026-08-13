@@ -22,7 +22,7 @@ function parseIso(iso) {
   return { y, m: m - 1, d };
 }
 
-export default function DatePicker({ value, onChange, error, compacto, amplio }) {
+export default function DatePicker({ value, onChange, error, compacto, amplio, min }) {
   const [abierto, setAbierto] = useState(false);
   const refBoton = useRef(null);
   const refPop = useRef(null);
@@ -74,13 +74,30 @@ export default function DatePicker({ value, onChange, error, compacto, amplio })
     setAbierto(true);
   };
 
+  const minDate = min ? parseIso(min) : null;
+  const deshabilitado = (d) => {
+    if (!minDate) return false;
+    const fecha = { y: vista.y, m: vista.m, d };
+    if (fecha.y < minDate.y) return true;
+    if (fecha.y === minDate.y && fecha.m < minDate.m) return true;
+    if (fecha.y === minDate.y && fecha.m === minDate.m && fecha.d < minDate.d) return true;
+    return false;
+  };
+
   const elegir = (d) => {
+    if (deshabilitado(d)) return;
     onChange(aIso(vista.y, vista.m, d));
     setAbierto(false);
   };
 
   const elegirHoy = () => {
-    onChange(aIso(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()));
+    const hoyIso = aIso(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    if (min && hoyIso < min) {
+      onChange(min);
+      setAbierto(false);
+      return;
+    }
+    onChange(hoyIso);
     setAbierto(false);
   };
 
@@ -179,18 +196,22 @@ export default function DatePicker({ value, onChange, error, compacto, amplio })
                 if (d === null) return <div key={`b${i}`} className="h-8" />;
                 const esSel = sel && sel.y === vista.y && sel.m === vista.m && sel.d === d;
                 const esHoy = !esSel && vista.y === hoy.getFullYear() && vista.m === hoy.getMonth() && d === hoy.getDate();
+                const esDeshabilitado = deshabilitado(d);
                 return (
                   <button
                     key={d}
                     type="button"
                     onClick={() => elegir(d)}
-                    className="h-8 rounded-lg text-xs grid place-items-center transition-all duration-100 hover:scale-105"
+                    disabled={esDeshabilitado}
+                    className="h-8 rounded-lg text-xs grid place-items-center transition-all duration-100 hover:scale-105 disabled:hover:scale-100 disabled:cursor-not-allowed"
                     style={
-                      esSel
-                        ? { backgroundColor: 'var(--primary)', color: '#fff', fontWeight: 600 }
-                        : esHoy
-                          ? { color: 'var(--ink)', border: '1px solid var(--primary)' }
-                          : { color: 'var(--ink)' }
+                      esDeshabilitado
+                        ? { color: 'var(--faint)', opacity: 0.35 }
+                        : esSel
+                          ? { backgroundColor: 'var(--primary)', color: '#fff', fontWeight: 600 }
+                          : esHoy
+                            ? { color: 'var(--ink)', border: '1px solid var(--primary)' }
+                            : { color: 'var(--ink)' }
                     }
                   >
                     {d}

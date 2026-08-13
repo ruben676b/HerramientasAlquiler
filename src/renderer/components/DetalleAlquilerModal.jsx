@@ -22,7 +22,7 @@ const DEVOLUCION_ICONS = {
 export default function DetalleAlquilerModal({ contrato, onClose }) {
   if (!contrato) return null;
 
-  const { contrato: c, items, pagos, calificacion, total_atraso, total_danos, total_perdidas, total_base, total_pagado, total_general } = contrato;
+  const { contrato: c, items, pagos, calificacion, total_atraso, total_danos, total_perdidas, total_ventas, total_base, total_pagado, total_general } = contrato;
   const estadoStyle = ESTADO_STYLES[c.estado] || ESTADO_STYLES['alquilado'];
 
   const diasAlquiler = Math.max(1, Math.ceil(
@@ -189,6 +189,12 @@ export default function DetalleAlquilerModal({ contrato, onClose }) {
                   <div className="flex justify-between">
                     <span style={{ color: 'var(--danger)' }}>Cobro por pérdidas</span>
                     <span className="font-mono" style={{ color: 'var(--danger)' }}>+ S/ {total_perdidas.toFixed(2)}</span>
+                  </div>
+                )}
+                {total_ventas > 0 && (
+                  <div className="flex justify-between">
+                    <span style={{ color: 'oklch(0.45 0.15 250)' }}>Cobro por venta de herramienta</span>
+                    <span className="font-mono" style={{ color: 'oklch(0.45 0.15 250)' }}>+ S/ {total_ventas.toFixed(2)}</span>
                   </div>
                 )}
                 {c.deposito_monto > 0 && (
