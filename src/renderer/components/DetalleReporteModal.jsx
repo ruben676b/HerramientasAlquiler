@@ -13,11 +13,14 @@ const fmtMoneda = (v) => {
 
 const fmtFecha = (iso) => {
   if (!iso) return '-';
-  if (iso.includes('T')) {
-    const d = new Date(iso);
+  const s = iso.includes(' ') ? iso.replace(' ', 'T') : iso;
+  if (s.includes('T')) {
+    const d = new Date(s);
+    if (isNaN(d)) return iso;
     return d.toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
-  const d = new Date(iso + 'T12:00:00');
+  const d = new Date(s + 'T12:00:00');
+  if (isNaN(d)) return iso;
   return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 

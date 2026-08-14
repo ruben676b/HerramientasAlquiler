@@ -13,7 +13,9 @@ function formatearMoneda(v) {
 
 function formatearFecha(iso) {
   if (!iso) return '';
-  const d = new Date(iso.includes('T') ? iso : iso + 'T12:00:00');
+  const s = iso.includes(' ') ? iso.replace(' ', 'T') : iso;
+  const d = new Date(s.includes('T') ? s : s + 'T12:00:00');
+  if (isNaN(d)) return iso;
   return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 

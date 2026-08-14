@@ -163,7 +163,7 @@ export default function Alquileres() {
     if (!window.api || !cancelarReservaId) return;
     try {
       await window.api.cancelarReserva(cancelarReservaId, true);
-      toast('Reserva #' + cancelarReservaId + ' cancelada. Adelanto devuelto.');
+      toast('Reserva #' + cancelarReservaId + ' cancelada y enviada a la papelera. Adelanto devuelto.');
       setCancelarReservaId(null);
       recargar();
     } catch (e) {
@@ -294,8 +294,6 @@ export default function Alquileres() {
               .filter(e => conteo[e] > 0)
               .map(e => ({ id: e, label: e === 'devolucion incompleta' ? 'Dev. incompleta' : e.charAt(0).toUpperCase() + e.slice(1) })),
             { id: 'reservado', label: 'Reservado', info: true },
-            { id: 'cancelado', label: 'Cancelado', muted: true },
-            { id: 'papelera', label: 'Papelera', danger: true },
           ].map(f => {
             const activo = estadoFiltro === f.id;
             let bgColor = 'var(--surface)';
@@ -1085,7 +1083,7 @@ return filas.map((g, gi) => {
           <ConfirmModal
             open={!!cancelarReservaId}
             title="Cancelar reserva"
-            message={`¿Está segura de cancelar la reserva #${cancelarReservaId}? Las herramientas volverán a estar disponibles. Los adelantos serán devueltos.`}
+            message={`¿Está segura de cancelar la reserva #${cancelarReservaId}? Se enviará a la papelera y las herramientas volverán a estar disponibles. Los adelantos serán devueltos.`}
             confirmLabel="Cancelar Reserva"
             danger
             onConfirm={handleCancelarReserva}

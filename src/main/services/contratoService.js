@@ -551,8 +551,15 @@ function cancelarReserva(idContrato, devolverAdelanto = false) {
   }
 
   const ejecutar = db.transaction(() => {
-    db.prepare("UPDATE CONTRATO SET estado = 'cancelado', fecha_modificacion = ? WHERE id = ?")
-      .run(localDateTime(), idContrato);
+    db.prepare(`
+      UPDATE CONTRATO SET
+        estado = 'cancelado',
+        papelera = 1,
+        fecha_papelera = ?,
+        motivo_eliminacion = 'Cancelación de reserva',
+        fecha_modificacion = ?
+      WHERE id = ?
+    `).run(localDateTime(), localDateTime(), idContrato);
 
     const detallesGranel = db.prepare(
       "SELECT * FROM DETALLE_CONTRATO WHERE id_contrato = ? AND tipo_item = 'granel'"
@@ -852,7 +859,7 @@ function registrarDevolucion(idContrato, fechaDevolucionReal, itemsDevueltos, ob
     const completado = (individualesPendientes.cnt + granelPendientes.cnt) === 0;
     if (completado) {
       db.prepare("UPDATE CONTRATO SET estado = ?, fecha_devolucion_real = ?, fecha_modificacion = ? WHERE id = ?")
-        .run('devuelto', fechaDevolucionReal, localDateTime(), idContrato);
+        .run('devuelto', localDateTime(), localDateTime(), idContrato);
     } else {
       db.prepare("UPDATE CONTRATO SET estado = ?, fecha_modificacion = ? WHERE id = ?")
         .run('devolución incompleta', localDateTime(), idContrato);
@@ -1946,7 +1953,7 @@ function restaurarContrato(idContrato) {
             ' no esta disponible (estado: ' + herramienta.estado + ').');
         }
 
-        const nuevoEstado = contrato.estado === 'reservado' ? 'reservado' : 'alquilado';
+        const nuevoEstado = contrato.estado === 'reservado' || contrato.estado === 'cancelado' ? 'reservado' : 'alquilado';
         db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?')
           .run(nuevoEstado, d.id_herramienta);
       } else if (d.tipo_item === 'granel') {
