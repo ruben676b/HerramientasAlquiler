@@ -1,7 +1,7 @@
 const https = require('https');
 const db = require('../db/database');
 
-const BASE_URL = 'peruapi.com';
+const BASE_URL = 'api.decolecta.com';
 const TIMEOUT_MS = 8000;
 
 const configService = require('./configService');
@@ -29,17 +29,18 @@ function consultarDni(dni) {
 
     const apiKey = getApiKey();
     if (!apiKey) {
-      reject(new Error('API Key de RENIEC no configurada en las opciones.'));
+      reject(new Error('Token de RENIEC no configurado en las opciones.'));
       return;
     }
 
-    const url = `/api/dni/${dni}?summary=0&plan=0`;
+    const url = `/v1/reniec/dni?numero=${dni}`;
     const options = {
       hostname: BASE_URL,
       path: url,
       method: 'GET',
       headers: {
-        'X-API-KEY': apiKey,
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
       },
       timeout: TIMEOUT_MS,
     };
@@ -50,23 +51,25 @@ function consultarDni(dni) {
       res.on('end', () => {
         try {
           const json = JSON.parse(data);
-          if (json.code === '200' && json.cliente) {
-            const nombreCompleto = [json.nombres, json.apellido_paterno, json.apellido_materno]
+          if (res.statusCode === 200 && json.document_number) {
+            const nombreCompleto = [json.first_name, json.first_last_name, json.second_last_name]
               .filter(Boolean)
               .join(' ')
               .trim();
             resolve({
-              dni: json.dni,
-              nombre_completo: nombreCompleto || json.cliente,
+              dni: json.document_number,
+              nombre_completo: nombreCompleto || json.full_name || '',
             });
-          } else if (json.code === '404') {
+          } else if (res.statusCode === 400) {
+            reject(new Error(json.error || 'Solicitud inválida.'));
+          } else if (res.statusCode === 404) {
             reject(new Error('DNI no encontrado en RENIEC.'));
-          } else if (json.code === '429') {
+          } else if (res.statusCode === 429) {
             reject(new Error('Límite de consultas excedido. Intente más tarde.'));
-          } else if (json.code === '401') {
-            reject(new Error(`Error de autenticación con RENIEC. Servidor responde: ${json.mensaje || 'Token inválido o IP no autorizada'}`));
+          } else if (res.statusCode === 401 || res.statusCode === 403) {
+            reject(new Error('Token inválido o sin permisos para consultar RENIEC.'));
           } else {
-            reject(new Error(json.mensaje || 'Error al consultar RENIEC.'));
+            reject(new Error(json.error || 'Error al consultar RENIEC.'));
           }
         } catch {
           reject(new Error('Error al procesar respuesta de RENIEC.'));

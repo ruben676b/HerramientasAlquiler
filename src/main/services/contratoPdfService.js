@@ -129,6 +129,9 @@ function generarPdfDesdeDatos(datos) {
   doc.font('Helvetica').text(`  ${cliente.nombre}`);
   const dom = cliente.direccion || 'No registrado';
   doc.fontSize(8).text(`DNI N° ${cliente.dni || '—'}  |  Tel: ${cliente.telefono || '—'}  |  Domicilio: ${dom}`);
+  if (cliente.ubicacionObra) {
+    doc.fontSize(8).text(`Ubicación de obra: ${cliente.ubicacionObra}`);
+  }
   doc.moveDown(0.5);
 
   // ===== CLÁUSULAS (#10: [TOTAL] sin S/ duplicado) =====
@@ -375,6 +378,7 @@ function generarPdf(idContrato) {
       dni: contrato.cliente_dni,
       telefono: contrato.cliente_telefono,
       direccion: contrato.cliente_direccion,
+      ubicacionObra: contrato.ubicacion_obra || '',
     },
     items: (() => {
       const filas = [];

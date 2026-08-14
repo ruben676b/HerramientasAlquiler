@@ -184,6 +184,7 @@ function registerIpcHandlers() {
       dniCliente,
       nombreCliente,
       telefonoCliente,
+      ubicacionObra,
     } = data;
 
     return crearContrato(
@@ -197,7 +198,8 @@ function registerIpcHandlers() {
       pagos,
       dniCliente,
       nombreCliente,
-      telefonoCliente
+      telefonoCliente,
+      ubicacionObra
     );
   });
 
@@ -279,6 +281,7 @@ function registerIpcHandlers() {
       dniCliente,
       nombreCliente,
       telefonoCliente,
+      ubicacionObra,
     } = data;
 
     return crearReserva(
@@ -292,7 +295,8 @@ function registerIpcHandlers() {
       pagos,
       dniCliente,
       nombreCliente,
-      telefonoCliente
+      telefonoCliente,
+      ubicacionObra
     );
   });
 

@@ -540,7 +540,7 @@ export default function Inventario() {
                             <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_perdida || 0) > 0 ? 'var(--danger)' : 'var(--faint)' }}>{v.cantidad_perdida || 0}</span>
                             <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_vendida || 0) > 0 ? 'var(--info)' : 'var(--faint)' }}>{v.cantidad_vendida || 0}</span>
                             <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_baja || 0) > 0 ? 'var(--muted)' : 'var(--faint)' }}>{v.cantidad_baja || 0}</span>
-                            <span className="w-10 text-right font-mono font-semibold" style={{ color: 'var(--ink)' }}>{v.cantidad_total}</span>
+                            <span className="w-10 text-right font-mono font-semibold" style={{ color: 'var(--ink)' }}>{v.cantidad_total - (v.cantidad_perdida || 0) - (v.cantidad_vendida || 0)}</span>
                             <span className="flex-1 text-[10px] text-right" style={{ color: 'var(--muted)' }}>S/ {v.precio_dia.toFixed(2)}/día</span>
                             <div className="flex items-center gap-0.5 shrink-0 w-24 justify-end">
                               <button

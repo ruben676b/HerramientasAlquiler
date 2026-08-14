@@ -154,6 +154,7 @@ export function SessionsProvider({ children }) {
       dni: contrato.cliente_dni || '',
       nombre: contrato.cliente_nombre || '',
       telefono: contrato.cliente_telefono || '',
+      ubicacionObra: contrato.ubicacion_obra || '',
       clienteSeleccionado: {
         id: contrato.id_cliente,
         nombre: contrato.cliente_nombre,

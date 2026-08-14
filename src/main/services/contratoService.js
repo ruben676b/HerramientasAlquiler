@@ -97,7 +97,8 @@ function crearContrato(
   pagos,
   dniCliente,
   nombreCliente,
-  telefonoCliente
+  telefonoCliente,
+  ubicacionObra
 ) {
   if (!items || items.length === 0) {
     throw new Error('El contrato debe contener al menos un ítem.');
@@ -115,8 +116,8 @@ function crearContrato(
     const insertContrato = db.prepare(`
       INSERT INTO CONTRATO (
         id_cliente, id_usuario, fecha_salida, fecha_devolucion_pactada,
-        deposito_monto, deposito_dni, fecha_creacion, fecha_modificacion
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        deposito_monto, deposito_dni, fecha_creacion, fecha_modificacion, ubicacion_obra
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertDetalle = db.prepare(`
@@ -135,7 +136,8 @@ function crearContrato(
       depositoMonto,
       depositoDni,
       localDateTime(),
-      localDateTime()
+      localDateTime(),
+      ubicacionObra || null
     );
 
     const idContrato = resultado.lastInsertRowid;
@@ -370,7 +372,8 @@ function crearReserva(
   pagos,
   dniCliente,
   nombreCliente,
-  telefonoCliente
+  telefonoCliente,
+  ubicacionObra
 ) {
   if (!items || items.length === 0) {
     throw new Error('La reserva debe contener al menos un ítem.');
@@ -387,8 +390,8 @@ function crearReserva(
       INSERT INTO CONTRATO (
         id_cliente, id_usuario, fecha_salida, fecha_devolucion_pactada,
         deposito_monto, deposito_dni, estado, fecha_reserva,
-        fecha_creacion, fecha_modificacion
-      ) VALUES (?, ?, ?, ?, ?, ?, 'reservado', ?, ?, ?)
+        fecha_creacion, fecha_modificacion, ubicacion_obra
+      ) VALUES (?, ?, ?, ?, ?, ?, 'reservado', ?, ?, ?, ?)
     `);
 
     const insertDetalle = db.prepare(`
@@ -410,7 +413,8 @@ function crearReserva(
       depositoDni,
       fechaReserva,
       now,
-      now
+      now,
+      ubicacionObra || null
     );
 
     const idContrato = resultado.lastInsertRowid;
@@ -1565,7 +1569,7 @@ function editarContrato(idContrato, data) {
   const {
     idCliente, idUsuario, fechaSalida, fechaDevolucionPactada,
     depositoMonto, depositoDni, items,
-    dniCliente, nombreCliente, telefonoCliente,
+    dniCliente, nombreCliente, telefonoCliente, ubicacionObra,
   } = data;
 
   if (!items || items.length === 0) {
@@ -1604,10 +1608,11 @@ function editarContrato(idContrato, data) {
     db.prepare(`
       UPDATE CONTRATO SET
         id_cliente = ?, fecha_salida = ?, fecha_devolucion_pactada = ?,
-        deposito_monto = ?, deposito_dni = ?, fecha_modificacion = ?
+        deposito_monto = ?, deposito_dni = ?, ubicacion_obra = ?,
+        fecha_modificacion = ?
       WHERE id = ?
     `).run(idClienteReal, fechaSalida, fechaDevolucionPactada,
-      depositoMonto, depositoDni, localDateTime(), idContrato);
+      depositoMonto, depositoDni, ubicacionObra || null, localDateTime(), idContrato);
 
     // 4. Insertar nuevos detalles (misma logica que crearContrato)
     const insertDetalle = db.prepare(`
@@ -1744,7 +1749,7 @@ function editarReserva(idContrato, data) {
   const {
     idCliente, idUsuario, fechaReserva, fechaDevolucionPactada,
     depositoMonto, depositoDni, items,
-    dniCliente, nombreCliente, telefonoCliente,
+    dniCliente, nombreCliente, telefonoCliente, ubicacionObra,
   } = data;
 
   if (!items || items.length === 0) {
@@ -1787,10 +1792,10 @@ function editarReserva(idContrato, data) {
       UPDATE CONTRATO SET
         id_cliente = ?, fecha_salida = ?, fecha_devolucion_pactada = ?,
         deposito_monto = ?, deposito_dni = ?, fecha_reserva = ?,
-        fecha_modificacion = ?
+        ubicacion_obra = ?, fecha_modificacion = ?
       WHERE id = ?
     `).run(idClienteReal, fechaReserva, fechaDevolucionPactada,
-      depositoMonto, depositoDni, fechaReserva, localDateTime(), idContrato);
+      depositoMonto, depositoDni, fechaReserva, ubicacionObra || null, localDateTime(), idContrato);
 
     // 4. Insertar nuevos detalles (logica de crearReserva)
     const insertDetalle = db.prepare(`

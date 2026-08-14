@@ -116,6 +116,7 @@ estado TEXT NOT NULL CHECK (estado IN ('disponible', 'reservado', 'alquilado', '
       deposito_monto REAL NOT NULL DEFAULT 0 CHECK (deposito_monto >= 0),
       firma_digital_path TEXT,
       notas TEXT,
+      ubicacion_obra TEXT,
       fecha_modificacion TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       fecha_reserva TEXT,
       FOREIGN KEY (id_cliente) REFERENCES CLIENTE(id),
@@ -625,6 +626,17 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     console.error('[DB] Error en migración fecha_reserva:', err.message);
   }
 
+  // Migración: agregar ubicacion_obra a CONTRATO
+  try {
+    const hasObra = db.prepare("PRAGMA table_info('CONTRATO')").all().some(c => c.name === 'ubicacion_obra');
+    if (!hasObra) {
+      db.exec("ALTER TABLE CONTRATO ADD COLUMN ubicacion_obra TEXT");
+      console.log('[DB] Migración: columna ubicacion_obra agregada a CONTRATO.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración ubicacion_obra:', err.message);
+  }
+
   // Migración: agregar 'cancelado' al CHECK constraint de CONTRATO (requiere recrear la tabla)
   try {
     const contratos = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='CONTRATO'").get();
@@ -645,6 +657,7 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
           deposito_monto REAL NOT NULL DEFAULT 0 CHECK (deposito_monto >= 0),
           firma_digital_path TEXT,
           notas TEXT,
+          ubicacion_obra TEXT,
           fecha_modificacion TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
           fecha_reserva TEXT,
           FOREIGN KEY (id_cliente) REFERENCES CLIENTE(id),
@@ -654,7 +667,7 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
           id, id_cliente, id_usuario, fecha_creacion, fecha_salida,
           fecha_devolucion_pactada, fecha_devolucion_real, estado,
           deposito_dni, deposito_monto, firma_digital_path, notas,
-          fecha_modificacion, fecha_reserva
+          ubicacion_obra, fecha_modificacion, fecha_reserva
         FROM CONTRATO;
         DROP TABLE CONTRATO;
         ALTER TABLE CONTRATO_new RENAME TO CONTRATO;
@@ -869,7 +882,7 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     ['arrendadora_telefono', '985618849', 'Teléfono principal'],
     ['arrendadora_telefono2', '936719836', 'Teléfono secundario'],
     ['arrendadora_firma_base64', '', 'Firma de la arrendadora en base64'],
-    ['api_reniec_key', '', 'API Key de PeruAPI para consulta RENIEC (configurar en opciones)'],
+    ['api_reniec_key', '', 'Token de DECOLECTA para consulta RENIEC (configurar en opciones)'],
     ['contrato_clausulas', `Conste por el presente documento que celebra de una parte como ARRENDADORA la Sr(a). [ARRENDADORA_NOMBRE], identificada con DNI N° [ARRENDADORA_DNI], con domicilio en [ARRENDADORA_DIRECCION], y de la otra parte como ARRENDATARIO el Sr(a). [CLIENTE_NOMBRE], identificado con DNI N° [CLIENTE_DNI], con domicilio en [CLIENTE_DIRECCION], quienes convienen de mutuo acuerdo y regulado por las leyes vigentes sobre la materia, en los términos y condiciones siguientes:
 
 PRIMERO: EL ARRENDADOR es propietario de los equipos y maquinarias de construcción civil ubicado en [ARRENDADORA_DIRECCION], del distrito y provincia de Andahuaylas.
