@@ -60,7 +60,7 @@ export default function MultiSessionModal() {
           <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--sidebar-border)' }}>
             <span className="text-sm font-semibold" style={{ color: 'var(--sidebar-ink)' }}>Sesiones</span>
             <span className="text-[11px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: 'var(--sidebar-active)', color: 'var(--sidebar-ink)' }}>
-              {activeSessions.length}/{5}
+              {activeSessions.length}
             </span>
           </div>
 
@@ -120,8 +120,7 @@ export default function MultiSessionModal() {
               );
             })}
 
-            {activeSessions.length < 5 && (
-              <div className="px-2 py-1.5 space-y-1">
+            <div className="px-2 py-1.5 space-y-1">
                 <button
                   onClick={() => { const id = addSession('alquiler'); if (id) setActiveId(id); }}
                   className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] font-semibold transition-all duration-150"
@@ -131,10 +130,9 @@ export default function MultiSessionModal() {
                   onClick={() => { const id = addSession('reserva'); if (id) setActiveId(id); }}
                   className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] font-semibold transition-all duration-150"
                   style={{ backgroundColor: 'oklch(0.62 0.10 240 / 0.10)', color: 'oklch(0.52 0.08 240)' }}
-                ><Clock size={13} /> Nueva Reserva</button>
+><Clock size={13} /> Nueva Reserva</button>
               </div>
-            )}
-          </div>
+            </div>
 
         </div>
 
@@ -145,12 +143,11 @@ export default function MultiSessionModal() {
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <p className="text-sm" style={{ color: 'var(--muted)' }}>Seleccione o cree una sesión para comenzar</p>
-            </div>
+</div>
           )}
         </div>
-      </div>
 
-      <ConfirmModal
+        <ConfirmModal
         open={!!confirmDelete}
         title="Eliminar sesión"
         message={confirmDelete?.clientName
@@ -164,6 +161,7 @@ export default function MultiSessionModal() {
         }}
         onCancel={() => setConfirmDelete(null)}
       />
+    </div>
     </div>
   );
 }
@@ -1525,6 +1523,7 @@ const itemsData = itemsConDias.map(item => ({
                       <input type="number" step="1" min="0" value={pagoMonto}
                         placeholder={pendiente > 0 ? pendiente.toFixed(0) : '0'}
                         onChange={e => setPagoMonto(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); agregarPago(); } }}
                         className="w-24 h-7 px-1 rounded text-[11px] border font-mono text-center"
                         style={{
                           backgroundColor: 'var(--surface)',
@@ -1569,6 +1568,7 @@ const itemsData = itemsConDias.map(item => ({
                       <input type="number" step="1" min="0" value={garantiaMonto}
                         placeholder="0"
                         onChange={e => setGarantiaMonto(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); agregarGarantia(); } }}
                         className="w-24 h-7 px-1 rounded text-[11px] border font-mono text-center"
                         style={{
                           backgroundColor: 'var(--surface)',

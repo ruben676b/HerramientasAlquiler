@@ -221,7 +221,14 @@ function getResumenCaja(fecha) {
       'Venta: ' || cantidad || 'x ' || nombre_item AS notas,
       NULL AS contrato_num,
       COALESCE(cliente_nombre, 'Venta Mostrador') AS cliente_nombre,
-      NULL AS cliente_dni
+      NULL AS cliente_dni,
+      tipo_item,
+      id_herramienta,
+      id_item_granel,
+      cantidad,
+      precio_unitario,
+      cantidad_devuelta,
+      (cantidad - cantidad_devuelta) AS cantidad_devolvable
     FROM VENTA_INVENTARIO
     WHERE DATE(fecha) = ?
   `).all(fecha).map(v => ({ ...v, id: 'venta_' + v.id_venta, esVentaDirecta: true }));

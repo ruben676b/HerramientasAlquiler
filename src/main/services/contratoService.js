@@ -1291,8 +1291,16 @@ function revertirDevolucionItem(idDetalle) {
       db.prepare("UPDATE DETALLE_CONTRATO SET estado_devolucion = 'pendiente', fecha_devolucion_real = NULL, costo_perdida = NULL WHERE id = ?")
         .run(idDetalle);
 
-      db.prepare("UPDATE HERRAMIENTA SET estado = 'alquilado' WHERE id = ?")
-        .run(detalle.id_herramienta);
+      // Si era vendido, restaurar a disponible y eliminar VENTA_INVENTARIO
+      if (detalle.estado_devolucion === 'vendido') {
+        db.prepare("UPDATE HERRAMIENTA SET estado = 'disponible' WHERE id = ?")
+          .run(detalle.id_herramienta);
+        db.prepare("DELETE FROM VENTA_INVENTARIO WHERE id_herramienta = ? AND DATE(fecha) = DATE(?)")
+          .run(detalle.id_herramienta, detalle.fecha_devolucion_real);
+      } else {
+        db.prepare("UPDATE HERRAMIENTA SET estado = 'alquilado' WHERE id = ?")
+          .run(detalle.id_herramienta);
+      }
 
       if (detalle.estado_devolucion === 'dañado') {
         db.prepare("DELETE FROM MANTENIMIENTO WHERE id_herramienta = ? AND fecha_inicio = ? AND tipo = 'correctivo' AND descripcion LIKE 'Devolucion:%'")

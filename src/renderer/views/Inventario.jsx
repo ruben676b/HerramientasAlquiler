@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Search, Plus, Pencil, Trash2, Wrench, Package, X, History,
   ChevronDown, ChevronRight, CheckCircle, AlertTriangle, MinusCircle, Layers,
-  ImagePlus, Calendar, Clock, ShoppingCart, Tag,
+  ImagePlus, Calendar, Clock, ShoppingCart, Tag, Undo2,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { SEMANTIC, ESTADOS_HERRAMIENTA } from '../lib/constants';
@@ -11,6 +11,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import KitEditorModal from '../components/KitEditorModal';
 import DescripcionPopover from '../components/DescripcionPopover';
 import VentaModal from '../components/VentaModal';
+import DevolverVentaModal from '../components/DevolverVentaModal';
+import VentasGranelModal from '../components/VentasGranelModal';
 import { useToast } from '../components/Toast';
 
 /* ================================================================
@@ -41,6 +43,8 @@ export default function Inventario() {
   const [confirmUnidad, setConfirmUnidad] = useState(null);
   const [confirmKit, setConfirmKit] = useState(null);
   const [ventaData, setVentaData] = useState(null);
+  const [ventaADevolver, setVentaADevolver] = useState(null);
+  const [ventasGranel, setVentasGranel] = useState(null);
   const [historial, setHistorial] = useState({});
   const [expanded, setExpanded] = useState({});
   const searchRef = useRef(null);
@@ -68,6 +72,20 @@ export default function Inventario() {
   };
 
   useEffect(() => { cargar(); }, []);
+
+  // Devuelve la venta activa de una herramienta individual vendida
+  const devolverVentaHerramienta = async (h) => {
+    try {
+      const ventas = await window.api.getVentasInventario({ id_herramienta: h.id, soloDevolvibles: true });
+      if (ventas && ventas.length > 0) {
+        setVentaADevolver(ventas[0]);
+      } else {
+        toast('No se encontró una venta por devolver para ' + h.id, 'error');
+      }
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+    }
+  };
 
   const rankTool = (h, q) => {
     const name = (h.nombre || '').toLowerCase();
@@ -247,6 +265,11 @@ export default function Inventario() {
   };
   const handleDarBaja = async (id, cantidad, motivo) => {
     try { await window.api.darBajaGranel(id, cantidad, motivo); toast(cantidad + ' unidad(es) marcada(s) como ' + motivo); await cargar(); }
+    catch (e) { setError(e.message); }
+  };
+  const handleMoverDanadas = async (id, cantidad, destino) => {
+    const label = { disponible: 'reparada(s)', perdido: 'marcada(s) como perdida(s)', vendido: 'marcada(s) como vendida(s)', baja: 'dada(s) de baja' }[destino] || destino;
+    try { await window.api.moverDanadasGranel(id, cantidad, destino); toast(cantidad + ' unidad(es) ' + label); await cargar(); }
     catch (e) { setError(e.message); }
   };
   const handleRevertirAudit = async (auditId) => {
@@ -454,6 +477,16 @@ export default function Inventario() {
                                 style={{ color: 'var(--success)' }} title="Vender unidad"
                               ><ShoppingCart size={13} /></button>
                             )}
+                            {h.estado === 'vendido' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  devolverVentaHerramienta(h);
+                                }}
+                                className="p-1.5 rounded-md transition-colors duration-150 hover:bg-purple-50 dark:hover:bg-purple-950 shrink-0"
+                                style={{ color: 'oklch(0.50 0.18 300)' }} title="Devolver venta (reembolso)"
+                              ><Undo2 size={13} /></button>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -499,7 +532,7 @@ export default function Inventario() {
                       </span>
                     </div>
                     <span className="text-[10px] font-mono shrink-0" style={{ color: 'var(--muted)' }}>
-                      Disp {g.disponibles} / Total {g.total}
+                      Disp {g.disponibles} / Total {g.disponibles + (g.alquiladas || 0) + (g.danadas || 0)}
                     </span>
                     <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => setModal({ tipo: 'editar-granel', data: g })}
@@ -536,11 +569,20 @@ export default function Inventario() {
                               style={{ backgroundColor: cb?.soft, color: cb?.variable }}>{v.condicion}</span>
                             <span className="w-10 text-right font-mono" style={{ color: v.cantidad_disponible > 0 ? 'var(--ink)' : 'var(--faint)' }}>{v.cantidad_disponible}</span>
                             <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_alquilada || 0) > 0 ? 'oklch(0.45 0.12 240)' : 'var(--faint)' }}>{v.cantidad_alquilada || 0}</span>
-                            <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_danada || 0) > 0 ? 'oklch(0.55 0.13 70)' : 'var(--faint)' }}>{v.cantidad_danada || 0}</span>
+                            {(v.cantidad_danada || 0) > 0 ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setModal({ tipo: 'danados-granel', data: v }); }}
+                                className="w-9 text-right font-mono transition-colors duration-150 hover:opacity-70"
+                                style={{ color: 'oklch(0.55 0.13 70)' }}
+                                title={'Gestionar dañados: ' + (v.cantidad_danada || 0)}
+                              >{v.cantidad_danada || 0}</button>
+                            ) : (
+                              <span className="w-9 text-right font-mono" style={{ color: 'var(--faint)' }}>{v.cantidad_danada || 0}</span>
+                            )}
                             <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_perdida || 0) > 0 ? 'var(--danger)' : 'var(--faint)' }}>{v.cantidad_perdida || 0}</span>
                             <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_vendida || 0) > 0 ? 'var(--info)' : 'var(--faint)' }}>{v.cantidad_vendida || 0}</span>
                             <span className="w-9 text-right font-mono" style={{ color: (v.cantidad_baja || 0) > 0 ? 'var(--muted)' : 'var(--faint)' }}>{v.cantidad_baja || 0}</span>
-                            <span className="w-10 text-right font-mono font-semibold" style={{ color: 'var(--ink)' }}>{v.cantidad_total}</span>
+                            <span className="w-10 text-right font-mono font-semibold" style={{ color: 'var(--ink)' }}>{v.cantidad_disponible + (v.cantidad_alquilada || 0) + (v.cantidad_danada || 0)}</span>
                             <span className="flex-1 text-[10px] text-right" style={{ color: 'var(--muted)' }}>S/ {v.precio_dia.toFixed(2)}/día</span>
                             <div className="flex items-center gap-0.5 shrink-0 w-24 justify-end">
                               <button
@@ -558,6 +600,17 @@ export default function Inventario() {
                                 style={{ color: 'var(--success)' }}
                                 title="Vender material"
                               ><ShoppingCart size={12} /></button>
+                              {(v.cantidad_vendida || 0) > 0 && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setVentasGranel({ id: v.id, nombre: v.nombre || (g.nombre + ' (' + v.condicion + ')') });
+                                  }}
+                                  className="w-5 h-5 rounded flex items-center justify-center transition-colors duration-150 hover:bg-purple-50 dark:hover:bg-purple-950 active:scale-90"
+                                  style={{ color: 'oklch(0.50 0.18 300)' }}
+                                  title="Devolver ventas de este material"
+                                ><Undo2 size={12} /></button>
+                              )}
                               <button
                                 onClick={(e) => { e.stopPropagation(); setModal({ tipo: 'baja-granel', data: v }); }}
                                 className="w-5 h-5 rounded flex items-center justify-center text-[13px] font-bold transition-colors duration-150 hover:bg-red-50 dark:hover:bg-red-950 active:scale-90"
@@ -677,6 +730,7 @@ export default function Inventario() {
       {modal?.tipo === 'editar-granel' && <ModalEditarGranel data={modal.data} onSave={handleEditarGranel} onClose={() => setModal(null)} />}
       {modal?.tipo === 'danos-granel' && <ModalDañosGranel data={modal.data} onClose={() => setModal(null)} />}
       {modal?.tipo === 'sumar-stock' && <StockModal data={modal.data} onApply={(d) => handleAjustarStock(modal.data.id, d)} onClose={() => setModal(null)} />}
+      {modal?.tipo === 'danados-granel' && <DanadosGranelModal data={modal.data} onSave={handleMoverDanadas} onClose={() => setModal(null)} />}
       {modal?.tipo === 'baja-granel' && <BajaGranelModal data={modal.data} onSave={handleDarBaja} onClose={() => setModal(null)} />}
       {modal?.tipo === 'historial-herramienta' && <HistorialHerramientaModal herramienta={modal.herramienta} historial={modal.historial} onClose={() => setModal(null)} />}
       {modal?.tipo === 'historial-granel' && <HistorialGranelModal data={modal.data} onUndo={handleRevertirAudit} onClose={() => setModal(null)} />}
@@ -725,6 +779,22 @@ export default function Inventario() {
         item={ventaData}
         onClose={() => setVentaData(null)}
         onSuccess={cargar}
+      />
+
+      {/* Modal Devolver Venta (herramienta individual vendida) */}
+      <DevolverVentaModal
+        venta={ventaADevolver}
+        open={!!ventaADevolver}
+        onClose={() => setVentaADevolver(null)}
+        onSuccess={cargar}
+      />
+
+      {/* Modal lista de ventas de granel para devolver */}
+      <VentasGranelModal
+        data={ventasGranel}
+        open={!!ventasGranel}
+        onClose={() => setVentasGranel(null)}
+        onDevuelto={cargar}
       />
     </div>
   );
@@ -909,7 +979,7 @@ function StockModal({ data, onApply, onClose }) {
 
   return (
     <ModalShell title={'Comprar stock: ' + data.nombre + ' (' + data.condicion + ')'} onClose={onClose} onSubmit={aplicar}>
-      <p className="text-xs" style={{ color: 'var(--muted)' }}>Stock actual: {data.cantidad_disponible} de {data.cantidad_total}</p>
+      <p className="text-xs" style={{ color: 'var(--muted)' }}>Stock actual: {data.cantidad_disponible} de {data.cantidad_disponible + (data.cantidad_alquilada || 0) + (data.cantidad_danada || 0)}</p>
       <Field label="Cantidad a agregar" req>
         <input type="number" min="1" value={cant} onChange={(e) => setCant(e.target.value)} className={inputCls}
           style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} autoFocus
@@ -938,7 +1008,7 @@ function BajaGranelModal({ data, onSave, onClose }) {
   return (
     <ModalShell title={'Dar de baja: ' + data.nombre + ' (' + data.condicion + ')'} onClose={onClose} onSubmit={aplicar}>
       <p className="text-sm font-semibold text-center py-2 px-3 rounded-lg" style={{ color: 'var(--ink)', backgroundColor: 'var(--surface)' }}>
-        Total: {data.cantidad_disponible} de {data.cantidad_total}
+        Total: {data.cantidad_disponible} de {data.cantidad_disponible + (data.cantidad_alquilada || 0) + (data.cantidad_danada || 0)}
       </p>
       <Field label="Motivo" req>
         <div className="space-y-1">
@@ -958,6 +1028,57 @@ function BajaGranelModal({ data, onSave, onClose }) {
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicar(); } }} />
       </Field>
     </ModalShell>
+  );
+}
+
+function DanadosGranelModal({ data, onSave, onClose }) {
+  const [cant, setCant] = useState('');
+  const [err, setErr] = useState('');
+  const danadas = data.cantidad_danada || 0;
+
+  const DESTINOS = [
+    { id: 'disponible', label: 'Reparar (volver a disponible)', color: 'oklch(0.45 0.08 140)' },
+    { id: 'perdido', label: 'Perder', color: 'var(--danger)' },
+    { id: 'vendido', label: 'Vender', color: 'var(--info)' },
+    { id: 'baja', label: 'Dar de baja', color: 'var(--muted)' },
+  ];
+
+  const mover = (destino) => {
+    const c = parseInt(cant, 10);
+    if (!c || c < 1) return setErr('Ingrese una cantidad válida.');
+    if (c > danadas) return setErr('Solo hay ' + danadas + ' unidad(es) dañada(s).');
+    onSave(data.id, c, destino);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'oklch(0 0 0 / 0.4)' }} onClick={onClose}>
+      <div className="w-full max-w-sm rounded-xl p-5 space-y-3 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold" style={{ color: 'var(--ink)' }}>Gestionar dañados: {data.nombre} ({data.condicion})</h2>
+          <button onClick={onClose} className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 active:scale-90" style={{ color: 'var(--muted)' }}><X size={15} /></button>
+        </div>
+        <p className="text-sm font-semibold text-center py-2 px-3 rounded-lg" style={{ color: 'oklch(0.55 0.13 70)', backgroundColor: 'oklch(0.55 0.13 70 / 0.1)' }}>
+          Dañadas: {danadas}
+        </p>
+        <Field label="Cantidad a mover" req>
+          <input type="number" min="1" max={danadas} value={cant} onChange={(e) => { setCant(e.target.value); setErr(''); }} className={inputCls}
+            style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} autoFocus />
+        </Field>
+        {err && <p className="text-xs px-1" style={{ color: 'var(--danger)' }}>{err}</p>}
+        <div className="space-y-1.5">
+          {DESTINOS.map(d => (
+            <button key={d.id} onClick={() => mover(d.id)} disabled={danadas === 0}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 hover:opacity-80 active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none"
+              style={{ backgroundColor: d.color + '15', color: d.color }}>
+              {d.label}
+              <span className="font-mono">→</span>
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={onClose} className="w-full h-9 rounded-lg text-sm font-medium border transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5" style={{ color: 'var(--muted)', borderColor: 'var(--border)' }}>Cancelar</button>
+      </div>
+    </div>
   );
 }
 

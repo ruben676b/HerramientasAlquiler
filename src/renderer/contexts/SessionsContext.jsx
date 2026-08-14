@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useRef, useEffect, useCallback } f
 
 const STORAGE_KEY = 'alquiler_sessions';
 const DATA_PREFIX = 'alquiler_session_data_';
-const MAX_SESSIONS = 5;
 
 const SessionsContext = createContext(null);
 
@@ -38,10 +37,7 @@ export function SessionsProvider({ children }) {
     localStorage.removeItem(DATA_PREFIX + id);
   };
 
-  const addSession = useCallback((tipo) => {
-    const active = sessions.filter(s => !s.saved && s.tipo === tipo);
-    if (active.length >= MAX_SESSIONS) return null;
-
+const addSession = useCallback((tipo) => {
     const id = nextIdRef.current++;
     const label = tipo === 'reserva' ? 'Nueva Reserva' : 'Nuevo Alquiler';
     const newSession = {

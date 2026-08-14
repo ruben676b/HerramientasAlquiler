@@ -22,7 +22,7 @@ const {
   autoEliminarPapelera,
 } = require('./services/contratoService');
 const { checkActivation, activateLicense, getMachineId } = require('./services/licenseService');
-const { registrarVentaInventario } = require('./services/ventaService');
+const { registrarVentaInventario, anularVentaInventario, getVentasInventario } = require('./services/ventaService');
 const {
   getHerramientas,
   crearHerramienta,
@@ -39,6 +39,7 @@ const {
   ajustarStock,
   darBajaGranel,
   repararGranel,
+  moverDanadasGranel,
   generarPrefijo,
   crearCategoria,
   crearLote,
@@ -365,6 +366,10 @@ function registerIpcHandlers() {
     return repararGranel(id, cantidad);
   });
 
+  ipcMain.handle('mover-danados-granel', (_e, id, cantidad, destino) => {
+    return moverDanadasGranel(id, cantidad, destino);
+  });
+
   ipcMain.handle('dar-baja-granel', (_e, id, cantidad, motivo) => {
     return darBajaGranel(id, cantidad, motivo);
   });
@@ -562,6 +567,14 @@ ipcMain.handle('log', (_e, msg) => {
 
   ipcMain.handle('registrar-venta-inventario', (event, data) => {
     return registrarVentaInventario(data);
+  });
+
+  ipcMain.handle('anular-venta-inventario', (_e, data) => {
+    return anularVentaInventario(data.idVenta, data.cantidad);
+  });
+
+  ipcMain.handle('get-ventas-inventario', (_e, filtro) => {
+    return getVentasInventario(filtro || {});
   });
 
   ipcMain.handle('registrar-egreso-caja', (_e, data) => {

@@ -801,6 +801,17 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     console.error('[DB] Error en migración descuento_mora:', err);
   }
 
+  // Migración: cantidad_devuelta en VENTA_INVENTARIO (devoluciones/refunds de ventas de inventario)
+  try {
+    const hasCantDev = db.prepare("PRAGMA table_info('VENTA_INVENTARIO')").all().some(c => c.name === 'cantidad_devuelta');
+    if (!hasCantDev) {
+      db.exec("ALTER TABLE VENTA_INVENTARIO ADD COLUMN cantidad_devuelta INTEGER NOT NULL DEFAULT 0");
+      console.log('[DB] Migración: columna cantidad_devuelta agregada a VENTA_INVENTARIO.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración cantidad_devuelta:', err);
+  }
+
   // --- Datos semilla (solo primera vez) ---
 
   const yaSembrado = db.prepare(

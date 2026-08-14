@@ -367,6 +367,50 @@ function repararGranel(id, cantidad) {
   return { id, reparadas: cantidad, danadaRestante: (item.cantidad_danada || 0) - cantidad };
 }
 
+/**
+ * Mueve unidades dañadas a otro estado: disponible (reparar), perdido, vendido o de baja.
+ * @param {number} id - ID del ITEM_GRANEL
+ * @param {number} cantidad - Unidades dañadas a mover
+ * @param {'disponible'|'perdido'|'vendido'|'baja'} destino - Estado destino
+ */
+function moverDanadasGranel(id, cantidad, destino) {
+  if (!cantidad || cantidad < 1) throw new Error('Cantidad debe ser al menos 1.');
+  if (!['disponible', 'perdido', 'vendido', 'baja'].includes(destino)) {
+    throw new Error('Destino inválido. Use: disponible, perdido, vendido o baja.');
+  }
+
+  const item = db.prepare('SELECT * FROM ITEM_GRANEL WHERE id = ? AND activo = 1').get(id);
+  if (!item) throw new Error('Material no encontrado.');
+
+  const danadas = item.cantidad_danada || 0;
+  if (danadas < cantidad) {
+    throw new Error('Solo hay ' + danadas + ' unidades dañadas, no suficientes para mover ' + cantidad + '.');
+  }
+
+  const prev = readGranelState(id);
+
+  if (destino === 'disponible') {
+    // El trigger trg_granel_disponible recalcula cantidad_disponible solo
+    db.prepare('UPDATE ITEM_GRANEL SET cantidad_danada = cantidad_danada - ? WHERE id = ?')
+      .run(cantidad, id);
+  } else {
+    const colMap = { perdido: 'cantidad_perdida', vendido: 'cantidad_vendida', baja: 'cantidad_baja' };
+    const col = colMap[destino];
+    db.prepare(`
+      UPDATE ITEM_GRANEL
+      SET cantidad_danada = cantidad_danada - ?,
+          ${col} = ${col} + ?
+      WHERE id = ?
+    `).run(cantidad, cantidad, id);
+  }
+
+  const next = readGranelState(id);
+  const accion = destino === 'disponible' ? 'reparacion' : destino;
+  insertAudit(id, accion, cantidad, prev, next);
+
+  return { id, destino, cantidad };
+}
+
 /* ================================================================
    AUDITORÍA — historial de modificaciones de stock granel
    ================================================================ */
@@ -827,6 +871,7 @@ module.exports = {
   ajustarStock,
   darBajaGranel,
   repararGranel,
+  moverDanadasGranel,
   generarPrefijo,
   crearCategoria,
   crearLote,

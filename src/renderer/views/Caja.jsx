@@ -3,13 +3,14 @@ import {
   DollarSign, Banknote, Smartphone, CreditCard,
   Calendar, ChevronLeft, ChevronRight, ArrowUpRight,
   ArrowDownLeft, Receipt, TrendingUp, Hash, Clock,
-  RefreshCw, Wallet, MinusCircle, Trash2, Tag
+  RefreshCw, Wallet, MinusCircle, Trash2, Tag, Undo2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { localDate } from '../lib/date';
 import { useCajaInicial } from '../main';
 import NuevoEgresoModal from '../components/NuevoEgresoModal';
 import ConfirmModal from '../components/ConfirmModal';
+import DevolverVentaModal from '../components/DevolverVentaModal';
 import { useToast } from '../components/Toast';
 
 /* ================================================================
@@ -93,6 +94,7 @@ export default function Caja() {
   // Estados de Modales
   const [modalEgresoOpen, setModalEgresoOpen] = useState(false);
   const [egresoAEliminar, setEgresoAEliminar] = useState(null);
+  const [ventaADevolver, setVentaADevolver] = useState(null);
 
   const cargarDatos = useCallback(async () => {
     if (!window.api) return;
@@ -557,6 +559,18 @@ export default function Caja() {
                         </button>
                       )}
 
+                      {/* Botón Devolver para Ventas de Inventario */}
+                      {mov.esVentaDirecta && mov.cantidad_devolvable > 0 && (
+                        <button
+                          onClick={() => setVentaADevolver(mov)}
+                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                          style={{ color: 'oklch(0.50 0.18 300)' }}
+                          title="Devolver venta (reembolso)"
+                        >
+                          <Undo2 size={14} />
+                        </button>
+                      )}
+
                       {/* Monto */}
                       <span
                         className="text-[14px] font-bold font-mono shrink-0"
@@ -577,6 +591,14 @@ export default function Caja() {
       <NuevoEgresoModal
         open={modalEgresoOpen}
         onClose={() => setModalEgresoOpen(false)}
+        onSuccess={cargarDatos}
+      />
+
+      {/* Modal Devolver Venta */}
+      <DevolverVentaModal
+        venta={ventaADevolver}
+        open={!!ventaADevolver}
+        onClose={() => setVentaADevolver(null)}
         onSuccess={cargarDatos}
       />
 

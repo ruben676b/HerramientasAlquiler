@@ -6,7 +6,6 @@ import AnularPagoModal from './AnularPagoModal';
 import CalificarContratoModal from './CalificarContratoModal';
 import ImagenVisor from './ImagenVisor';
 import ConfirmModal from './ConfirmModal';
-import VentaDevolucionModal from './VentaDevolucionModal';
 import { gruparPagos } from '../lib/gruparPagos';
 import { localDate } from '../lib/date';
 
@@ -52,9 +51,6 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [editandoCostoPerd, setEditandoCostoPerd] = useState({});
   const [editandoCantGranel, setEditandoCantGranel] = useState({});
   const [costoPerdManual, setCostoPerdManual] = useState({});
-  // Estado para pérdida/venta de herramientas individuales (desplegable "No devuelto")
-  const [noDevueltoAbierto, setNoDevueltoAbierto] = useState({});
-  const noDevueltoRefs = useRef({});
   const [costosNoDevueltos, setCostosNoDevueltos] = useState({});
   const savingRef = useRef({});
   const guardadosRef = useRef({});
@@ -84,7 +80,6 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [detalleDañosAbierto, setDetalleDañosAbierto] = useState(undefined);
   // Confirmación para deshacer devolución: null | { tipo, idx, idDevolucion?, nombre }
   const [confirmDeshacer, setConfirmDeshacer] = useState(null);
-  const [confirmarVenta, setConfirmarVenta] = useState(null);
 
   const verImagenItem = async (item) => {
     try {
@@ -177,18 +172,9 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   }, 0);
   const costosPerdLocal = Object.values(costosPerdida).reduce((a, v) => a + (parseFloat(v) || 0), 0);
   // Separar ventas de pérdidas en items individuales
-  const totalVentasLocal = Object.entries(estados).reduce((a, [idx, v]) => {
-    if (v !== 'vendido') return a;
-    return a + (parseFloat(costosNoDevueltos[idx + '_vendido']) || 0);
-  }, 0);
-  const totalPerdidasLocal = Object.entries(estados).reduce((a, [idx, v]) => {
-    if (v !== 'perdido') return a;
-    return a + (parseFloat(costosNoDevueltos[idx + '_perdido']) || 0);
-  }, 0);
   const totalDanos = costosDanosBackend + costosDanosLocal;
-  const totalPerdidas = costosPerdBackend + costosPerdLocal + totalPerdidasLocal;
-  const totalVentas = totalVentasLocal;
-  const totalCargosExtra = totalDanos + totalPerdidas + totalVentas;
+  const totalPerdidas = costosPerdBackend + costosPerdLocal;
+  const totalCargosExtra = totalDanos + totalPerdidas;
 
   const total = montoBase + montoAtrasoEfectivo + totalCargosExtra;
   const pendiente = Math.max(0, total - totalPagado);
@@ -240,7 +226,6 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
         setCostosPerdida(p => { const n = { ...p }; delete n[idx]; return n; });
         setCostosRep(p => { const n = { ...p }; delete n[idx]; return n; });
         setCostosNoDevueltos(p => { const n = { ...p }; delete n[idx + '_perdido']; delete n[idx + '_vendido']; return n; });
-        setNoDevueltoAbierto(p => { const n = { ...p }; delete n[idx]; return n; });
         setDañosCat(p => { const n = { ...p }; delete n[idx]; return n; });
         setDañosAgregados(p => { const n = { ...p }; delete n[idx]; return n; });
 setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
@@ -287,14 +272,10 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
     }
 
     const ventas = pendientes.filter(({ idx }) => estados[idx] === 'vendido');
-    if (ventas.length > 0) {
-      setConfirmarVenta(ventas);
-      return;
-    }
-    await procesarDevoluciones(pendientes, metodoPago);
+    await procesarDevoluciones(pendientes);
   };
 
-  const procesarDevoluciones = async (pendientes, metodoVenta) => {
+  const procesarDevoluciones = async (pendientes) => {
     setCobrando(true);
     let exitos = 0;
     let fallos = 0;
@@ -304,10 +285,6 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
       guardadosRef.current[idx] = true;
       try {
         const hoy = localDate();
-        const esNoDevuelto = estado === 'perdido' || estado === 'vendido';
-        const montoNoDevuelto = esNoDevuelto
-          ? (parseFloat(costosNoDevueltos[idx + '_' + estado]) || (estado === 'vendido' ? (item.item_precio_venta ?? item.item_valor_reposicion ?? 0) : (item.item_valor_reposicion ?? item.item_precio_venta ?? 0)))
-          : undefined;
         await window.api.registrarDevolucion({
           idContrato: c.id,
           fechaDevolucionReal: hoy,
@@ -315,10 +292,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
             id_detalle: item.id,
             estado_devolucion: estado,
             costo_reparacion: estado === 'dañado' ? ((dañosAgregados[idx] || []).reduce((s, d) => s + (parseFloat(d.costo) || 0), 0)) : undefined,
-            costo_perdida: esNoDevuelto ? montoNoDevuelto : undefined,
             danos: estado === 'dañado' ? (dañosAgregados[idx] || []).map(d => ({ nombre: d.nombre, costo: parseFloat(d.costo) || 0 })) : undefined,
-            metodo: estado === 'vendido' ? (metodoVenta || 'efectivo') : undefined,
-            clienteNombre: estado === 'vendido' ? (c.cliente_nombre || null) : undefined,
           }],
           observaciones: notas[idx] ? { [item.id]: notas[idx] } : {},
         });
@@ -733,43 +707,6 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                             </button>
                           );
                         })}
-                        <div className="relative inline-flex">
-                          <button ref={el => noDevueltoRefs.current[idx] = el} onClick={() => setNoDevueltoAbierto(p => ({ ...p, [idx]: !p[idx] }))}
-                            className="flex items-center gap-0.5 px-1.5 h-5 rounded text-[9px] font-medium transition-all duration-150"
-                            style={{
-                              backgroundColor: est === 'perdido' ? 'oklch(0.55 0.19 30)' : est === 'vendido' ? 'oklch(0.45 0.15 250)' : 'var(--bg)',
-                              color: est === 'perdido' || est === 'vendido' ? '#fff' : 'var(--muted)',
-                              border: est === 'perdido' || est === 'vendido' ? 'none' : '0.5px solid var(--border)',
-                            }}>
-                            {est === 'perdido' ? (
-                              <><X size={10} /> Perdido</>
-                            ) : est === 'vendido' ? (
-                              <><CheckCircle size={10} /> Vendido</>
-                            ) : (
-                              <><ChevronRight size={10} /> No devuelto</>
-                            )}
-                          </button>
-                          {noDevueltoAbierto[idx] && est !== 'perdido' && est !== 'vendido' && (
-                            <div className="fixed z-50 flex flex-col gap-0.5 p-1 rounded border shadow-lg"
-                              style={{
-                                backgroundColor: 'var(--surface)',
-                                borderColor: 'var(--border)',
-                                left: (noDevueltoRefs.current[idx]?.getBoundingClientRect().left ?? 0) + 'px',
-                                top: ((noDevueltoRefs.current[idx]?.getBoundingClientRect().bottom ?? 0) + 4) + 'px',
-                              }}>
-                              <button onClick={() => { seleccionarEstado(idx, 'perdido'); setNoDevueltoAbierto(p => ({ ...p, [idx]: false })); }}
-                                className="flex items-center gap-1.5 px-2.5 h-7 rounded text-[11px] font-medium text-left whitespace-nowrap hover:opacity-80"
-                                style={{ backgroundColor: 'oklch(0.55 0.19 30 / 0.1)', color: 'oklch(0.55 0.19 30)' }}>
-                                <X size={12} /> Perdido
-                              </button>
-                              <button onClick={() => { seleccionarEstado(idx, 'vendido'); setNoDevueltoAbierto(p => ({ ...p, [idx]: false })); }}
-                                className="flex items-center gap-1.5 px-2.5 h-7 rounded text-[11px] font-medium text-left whitespace-nowrap hover:opacity-80"
-                                style={{ backgroundColor: 'oklch(0.45 0.15 250 / 0.1)', color: 'oklch(0.45 0.15 250)' }}>
-                                <CheckCircle size={12} /> Vendido
-                              </button>
-                            </div>
-                          )}
-                        </div>
                       </div>
                     )}
                     <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
@@ -1064,28 +1001,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                     </>
                   )}
                   {/* Perdido/Vendido: monto (reposición o precio de venta) — solo individual */}
-                  {!esGranel && !esKit && (est === 'perdido' || est === 'vendido') && !yaGuardado && (
-                    <div className="flex items-center gap-2 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
-                      <span className="text-[10px] shrink-0" style={{ color: 'var(--muted)' }}>
-                        {est === 'vendido' ? 'Precio de venta: S/' : 'Valor de reposición: S/'}
-                      </span>
-                      <input type="number" step="0.01" min="0"
-                        value={costosNoDevueltos[idx + '_' + est] ?? (est === 'vendido' ? (item.item_precio_venta ?? item.item_valor_reposicion ?? '') : (item.item_valor_reposicion ?? item.item_precio_venta ?? ''))}
-                        onChange={e => setCostosNoDevueltos(p => ({ ...p, [idx + '_' + est]: e.target.value }))}
-                        className="w-20 h-6 px-1 rounded text-xs border text-center font-mono dev-nospin"
-                        style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
-                      {(est === 'vendido' ? (item.item_precio_venta ?? item.item_valor_reposicion) : (item.item_valor_reposicion ?? item.item_precio_venta)) != null && (
-                        <span className="text-[9px] px-1 py-0.5 rounded whitespace-nowrap"
-                          style={{ color: 'oklch(0.40 0.12 250)', backgroundColor: 'oklch(0.93 0.05 250)' }}>
-                          Sugerido: S/{(est === 'vendido' ? (item.item_precio_venta ?? item.item_valor_reposicion) : (item.item_valor_reposicion ?? item.item_precio_venta))}
-                        </span>
-                      )}
-                      <span className="text-[9px]" style={{ color: 'var(--faint)' }}>
-                        {est === 'vendido' ? 'El cliente se lleva la herramienta' : 'Sale del stock'}
-                      </span>
-                    </div>
-                  )}
-                </>
+                  </>
               );
               };
               const renderItemCard = (item, idx) => {
@@ -1295,14 +1211,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
               </>
             )}
             {/* Ventas */}
-            {totalVentas > 0 && (
-              <div className="flex justify-between">
-                <span style={{ color: 'oklch(0.45 0.15 250)' }}>Cobro por venta de herramienta</span>
-                <span className="font-mono tabular-nums" style={{ color: 'oklch(0.45 0.15 250)' }}>+ S/ {totalVentas.toFixed(2)}</span>
-              </div>
-            )}
-            {/* Pérdidas */}
-            {totalPerdidas > 0 && (
+{totalPerdidas > 0 && (
               <div className="flex justify-between">
                 <span style={{ color: 'var(--danger)' }}>Cobro por pérdidas</span>
                 <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {totalPerdidas.toFixed(2)}</span>
@@ -1451,7 +1360,6 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
         pendienteExterno={pagoItemState.esTotal ? pendiente : undefined}
         danosExterno={pagoItemState.esTotal ? totalDanos : undefined}
         perdidasExterno={pagoItemState.esTotal ? totalPerdidas : undefined}
-        ventasExterno={pagoItemState.esTotal ? totalVentas : undefined}
         onClose={() => setPagoItemState(null)}
         onConfirm={() => { setPagoItemState(null); onRecargar(); }}
       />
@@ -1480,30 +1388,6 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
         danger={true}
         onConfirm={ejecutarDeshacer}
         onCancel={() => setConfirmDeshacer(null)}
-      />
-    )}
-    {confirmarVenta && (
-      <VentaDevolucionModal
-        ventas={confirmarVenta.map(({ item, idx }) => ({
-          item,
-          monto: parseFloat(costosNoDevueltos[idx + '_vendido']) || (item.item_precio_venta ?? item.item_valor_reposicion ?? 0),
-        }))}
-        contrato={c}
-        garantia={c.garantia_retenida || 0}
-        onClose={() => setConfirmarVenta(null)}
-        onConfirm={async (pagos) => {
-          const v = confirmarVenta;
-          setConfirmarVenta(null);
-          console.log('[DIAG] VentaDevolucion datos:', JSON.stringify({ idContrato: c.id, items: v.map(x => ({ id: x.item?.id, estado: estados[x.idx] })), pagos }));
-          try {
-            // Pasar el método de pago de la venta (primero encontrado, o 'efectivo' por defecto)
-            const metodoVenta = pagos && pagos.length > 0 && pagos[0].metodo !== 'garantia' ? pagos[0].metodo : 'efectivo';
-            await procesarDevoluciones(v, metodoVenta);
-          } catch (e) {
-            console.error('[DIAG] Error en venta:', e.message || e);
-            toast('Error: ' + (e.message || 'desconocido'), 'error');
-          }
-        }}
       />
     )}
     {visor && (

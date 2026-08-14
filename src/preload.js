@@ -61,6 +61,7 @@ contextBridge.exposeInMainWorld('api', {
   eliminarVariante: (id) => ipcRenderer.invoke('eliminar-variante', id),
   ajustarStock: (id, delta) => ipcRenderer.invoke('ajustar-stock', id, delta),
   repararGranel: (id, cantidad) => ipcRenderer.invoke('reparar-granel', id, cantidad),
+  moverDanadasGranel: (id, cantidad, destino) => ipcRenderer.invoke('mover-danados-granel', id, cantidad, destino),
   darBajaGranel: (id, cantidad, motivo) => ipcRenderer.invoke('dar-baja-granel', id, cantidad, motivo),
   getAuditGranel: (itemId) => ipcRenderer.invoke('get-audit-granel', itemId),
   revertirAuditGranel: (auditId) => ipcRenderer.invoke('revertir-audit-granel', auditId),
@@ -123,6 +124,8 @@ contextBridge.exposeInMainWorld('api', {
   // Caja
   getResumenCaja: (fecha) => ipcRenderer.invoke('get-resumen-caja', fecha),
   registrarVentaInventario: (data) => ipcRenderer.invoke('registrar-venta-inventario', data),
+  anularVentaInventario: (idVenta, cantidad) => ipcRenderer.invoke('anular-venta-inventario', { idVenta, cantidad }),
+  getVentasInventario: (filtro) => ipcRenderer.invoke('get-ventas-inventario', filtro),
   registrarEgresoCaja: (data) => ipcRenderer.invoke('registrar-egreso-caja', data),
   eliminarEgresoCaja: (id) => ipcRenderer.invoke('eliminar-egreso-caja', id),
   guardarCajaDiaria: (fecha, montoInicial) => ipcRenderer.invoke('guardar-caja-diaria', fecha, montoInicial),
