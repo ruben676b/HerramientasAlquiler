@@ -132,7 +132,7 @@ function generarReporte() {
     total_egresos: totalEgresos,
     total_neto: totalNeto,
     totales_metodo: totalesMetodo,
-    datos,
+    datos_json: datos,
   };
 }
 

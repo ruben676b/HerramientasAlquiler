@@ -12,9 +12,11 @@ import {
   Moon,
   Layers,
   Settings,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useSessions } from '../contexts/SessionsContext';
+import PapeleraModal from './PapeleraModal';
 
 const NAV_ITEMS = [
   { id: 'alquileres', label: 'Alquileres', icon: Store },
@@ -45,6 +47,7 @@ function useTheme() {
 
 export default function Sidebar({ activeView, onNavigate, collapsed, onToggle }) {
   const [theme, toggleTheme] = useTheme();
+  const [papeleraAbierta, setPapeleraAbierta] = useState(false);
   const { activeAlquileres, activeReservas, openDialog, isOpen, closeDialog } = useSessions();
 
   return (
@@ -192,8 +195,22 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggle })
         })}
       </nav>
 
-      {/* ===== THEME TOGGLE ===== */}
-      <div className="shrink-0 px-2.5 pb-3 pt-1">
+      {/* ===== PAPELERA + THEME TOGGLE ===== */}
+      <div className="shrink-0 px-2.5 pb-3 pt-1 space-y-1">
+        <button
+          onClick={() => setPapeleraAbierta(true)}
+          className={cn(
+            'w-full flex items-center rounded-[10px] text-[13px] font-medium',
+            'transition-colors duration-150 hover:bg-[var(--sidebar-hover)] active:scale-95',
+            collapsed ? 'justify-center h-10' : 'h-[38px] px-3 gap-3'
+          )}
+          style={{ color: 'var(--sidebar-muted)' }}
+          title={collapsed ? 'Papelera' : undefined}
+        >
+          <Trash2 size={17} className="shrink-0" />
+          {!collapsed && <span>Papelera</span>}
+        </button>
+
         <button
           onClick={toggleTheme}
           className={cn(
@@ -220,6 +237,8 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggle })
           )}
         </button>
       </div>
+
+      <PapeleraModal open={papeleraAbierta} onClose={() => setPapeleraAbierta(false)} />
     </aside>
   );
 }

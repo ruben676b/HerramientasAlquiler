@@ -152,7 +152,7 @@ function getGranelAgrupado() {
       };
     }
     const g = mapa[item.nombre];
-    g.total += item.cantidad_total;
+    g.total += item.cantidad_total - (item.cantidad_perdida || 0) - (item.cantidad_vendida || 0);
     g.disponibles += item.cantidad_disponible;
     g.alquiladas += item.cantidad_alquilada || 0;
     g.danadas += item.cantidad_danada || 0;
@@ -831,7 +831,7 @@ function getHerramientasPorCategoria() {
 
   return categorias.map((cat) => {
     const herramientas = db
-      .prepare('SELECT * FROM HERRAMIENTA WHERE id_categoria = ? AND activo = 1 ORDER BY id')
+      .prepare("SELECT * FROM HERRAMIENTA WHERE id_categoria = ? AND activo = 1 AND estado NOT IN ('vendido', 'perdida') ORDER BY id")
       .all(cat.id);
 
     const conteo = { disponible: 0, alquilado: 0, mantenimiento: 0, malogrado: 0 };

@@ -82,7 +82,7 @@ const {
   getContratosCliente,
   getDetalleContrato,
 } = require('./services/clienteService');
-const { getResumenCaja, registrarEgreso, eliminarEgreso, guardarCajaDiaria, getHistorialCaja, getCajaDiariaPorFecha } = require('./services/cajaService');
+const { getResumenCaja, registrarEgreso, eliminarEgreso, guardarCajaDiaria, getHistorialCaja, getCajaDiariaPorFecha, getEstadoCaja, abrirCaja, cerrarCaja } = require('./services/cajaService');
 const { generarReporte, getReportes, getReporteById } = require('./services/reporteService');
 const { exportarReportePDF } = require('./services/reportePdfService');
 const {
@@ -185,6 +185,7 @@ function registerIpcHandlers() {
       dniCliente,
       nombreCliente,
       telefonoCliente,
+      ubicacionObra,
     } = data;
 
     return crearContrato(
@@ -198,7 +199,8 @@ function registerIpcHandlers() {
       pagos,
       dniCliente,
       nombreCliente,
-      telefonoCliente
+      telefonoCliente,
+      ubicacionObra
     );
   });
 
@@ -280,6 +282,7 @@ function registerIpcHandlers() {
       dniCliente,
       nombreCliente,
       telefonoCliente,
+      ubicacionObra,
     } = data;
 
     return crearReserva(
@@ -293,7 +296,8 @@ function registerIpcHandlers() {
       pagos,
       dniCliente,
       nombreCliente,
-      telefonoCliente
+      telefonoCliente,
+      ubicacionObra
     );
   });
 
@@ -595,6 +599,18 @@ ipcMain.handle('log', (_e, msg) => {
 
   ipcMain.handle('get-caja-diaria', (_e, fecha) => {
     return getCajaDiariaPorFecha(fecha);
+  });
+
+  ipcMain.handle('get-estado-caja', () => {
+    return getEstadoCaja();
+  });
+
+  ipcMain.handle('abrir-caja', (_e, monto) => {
+    return abrirCaja(monto);
+  });
+
+  ipcMain.handle('cerrar-caja', () => {
+    return cerrarCaja();
   });
 
   // --- Reportes ---

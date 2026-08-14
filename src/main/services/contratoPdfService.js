@@ -18,9 +18,51 @@ function getConfig(clave) {
   return row ? row.valor : '';
 }
 
+/**
+ * Agrupa ítems del contrato por (nombre + precio + tarifa + fecha de devolución),
+ * sumando la cantidad. Permite mostrar "3 × Amoladora" en una sola línea sin exponer códigos.
+ */
+function agruparItems(items) {
+  const grupos = [];
+  const idx = new Map();
+  for (const item of items) {
+    const desgloseKey =
+      item.desglose && item.desglose.length > 0
+        ? JSON.stringify(item.desglose.map(d => String(d.cantidad) + '::' + String(d.nombre)))
+        : '';
+    const key = [
+      item.nombre || '',
+      item.precio_dia,
+      item.tarifa || 'dia',
+      item.fecha_devolucion_pactada || '',
+      desgloseKey,
+    ].join('|');
+    if (idx.has(key)) {
+      const exist = idx.get(key);
+      exist.cantidad = (exist.cantidad || 1) + (item.cantidad || 1);
+      if (item.snapshot != null && exist.snapshotValido) exist.snapshot += item.snapshot;
+      if (item.snapshot == null) exist.snapshotValido = false;
+    } else {
+      const nuevo = {
+        ...item,
+        snapshot: item.snapshot != null ? item.snapshot : undefined,
+        snapshotValido: item.snapshot != null,
+      };
+      idx.set(key, nuevo);
+      grupos.push(nuevo);
+    }
+  }
+  for (const g of grupos) {
+    if (!g.snapshotValido) delete g.snapshot;
+    delete g.snapshotValido;
+  }
+  return grupos;
+}
+
 function generarPdfDesdeDatos(datos) {
   ensureDir();
-  const { arrendadora, cliente, items, fechas, total, numContrato, firmaPath, deposito, firmaBase64 } = datos;
+  const { arrendadora, cliente, fechas, total, numContrato, firmaPath, deposito, firmaBase64 } = datos;
+  const items = agruparItems(datos.items || []);
 
   // Si hay firma en base64, guardarla temporal para previsualización
   let firmaPreviewPath = firmaPath;
@@ -87,6 +129,9 @@ function generarPdfDesdeDatos(datos) {
   doc.font('Helvetica').text(`  ${cliente.nombre}`);
   const dom = cliente.direccion || 'No registrado';
   doc.fontSize(8).text(`DNI N° ${cliente.dni || '—'}  |  Tel: ${cliente.telefono || '—'}  |  Domicilio: ${dom}`);
+  if (cliente.ubicacionObra) {
+    doc.fontSize(8).text(`Ubicación de obra: ${cliente.ubicacionObra}`);
+  }
   doc.moveDown(0.5);
 
   // ===== CLÁUSULAS (#10: [TOTAL] sin S/ duplicado) =====
@@ -124,13 +169,14 @@ function generarPdfDesdeDatos(datos) {
   doc.fontSize(9).font('Helvetica-Bold').text('EQUIPOS ALQUILADOS:');
   doc.moveDown(0.3);
 
-  const colX = [45, 115, 200, 290, 410];
-  const colWidths = [65, 80, 55, 55, 55];
-  const headers = ['Código', 'Descripción', 'Precio/día', 'Cant.', 'Subtotal'];
+  const colX = [45, 90, 325, 450];
+  const colWidths = [40, 230, 120, 90];
+  const headers = ['Cant.', 'Descripción', 'Precio', 'Subtotal'];
+  const headerAlign = ['center', 'left', 'right', 'right'];
   const tableTop = doc.y;
 
   doc.fontSize(6.5).font('Helvetica-Bold');
-  headers.forEach((h, i) => doc.text(h, colX[i], tableTop, { width: colWidths[i] }));
+  headers.forEach((h, i) => doc.text(h, colX[i], tableTop, { width: colWidths[i], align: headerAlign[i] }));
   doc.moveDown(0.3);
   doc.moveTo(45, doc.y).lineTo(550, doc.y).stroke();
   doc.moveDown(0.1);
@@ -138,7 +184,6 @@ function generarPdfDesdeDatos(datos) {
   doc.font('Helvetica').fontSize(6.5);
   let y = doc.y;
   items.forEach((item) => {
-    if (y > 720) { doc.addPage(); y = 45; }
     const tarifa = item.tarifa || 'dia';
     const fechaDevItem = item.fecha_devolucion_pactada || fechas.devolucion;
     const sub = item.snapshot != null
@@ -152,13 +197,22 @@ function generarPdfDesdeDatos(datos) {
             })()
           : item.precio_dia * contarHabiles(fechas.salida, fechaDevItem) * item.cantidad);
     const esGranel = item.codigo && item.codigo.includes('(') && !/^[A-Z]+-\d/.test(item.codigo);
-    const codigo = esGranel ? 'Material' : (item.codigo || '—');
-    doc.text(codigo, colX[0], y, { width: colWidths[0] });
-    doc.text(item.nombre || '—', colX[1], y, { width: colWidths[1] });
-    doc.text(`S/ ${item.precio_dia.toFixed(2)}/${tarifa === 'mes' ? 'mes' : 'día'}`, colX[2], y, { width: colWidths[2], align: 'right' });
-    doc.text(String(item.cantidad), colX[3], y, { width: colWidths[3], align: 'center' });
-    doc.text(`S/ ${sub.toFixed(2)}`, colX[4], y, { width: colWidths[4], align: 'right' });
-    y += 11;
+    const descripcion = (esGranel ? 'Material: ' : '') + (item.nombre || '—');
+    const precioTxt = `S/ ${item.precio_dia.toFixed(2)}/${tarifa === 'mes' ? 'mes' : 'día'}`;
+    const subTxt = `S/ ${sub.toFixed(2)}`;
+
+    if (y > 720) { doc.addPage(); y = 45; }
+
+    const hDesc = doc.heightOfString(descripcion, { width: colWidths[1] });
+    const hPrecio = doc.heightOfString(precioTxt, { width: colWidths[2] });
+    const hSub = doc.heightOfString(subTxt, { width: colWidths[3] });
+    const altoFila = Math.max(hDesc, hPrecio, hSub) + 2;
+
+    doc.text(String(item.cantidad), colX[0], y, { width: colWidths[0], align: 'center' });
+    doc.text(descripcion, colX[1], y, { width: colWidths[1] });
+    doc.text(precioTxt, colX[2], y, { width: colWidths[2], align: 'right' });
+    doc.text(subTxt, colX[3], y, { width: colWidths[3], align: 'right' });
+    y += altoFila;
     if (item.desglose) {
       const lineas = Array.isArray(item.desglose)
         ? item.desglose
@@ -166,8 +220,9 @@ function generarPdfDesdeDatos(datos) {
       doc.font('Helvetica-Oblique').fontSize(7);
       for (const c of lineas) {
         if (y > 720) { doc.addPage(); y = 45; }
+        const hLinea = doc.heightOfString('• ' + (c.cantidad ? c.cantidad + ' × ' : '') + (c.nombre || '—'), { width: colX[2] - colX[1] - 5 });
         doc.text('• ' + (c.cantidad ? c.cantidad + ' × ' : '') + (c.nombre || '—'), colX[1], y, { width: colX[2] - colX[1] - 5 });
-        y += 8;
+        y += hLinea + 1;
       }
       doc.font('Helvetica').fontSize(6.5);
     }
@@ -323,6 +378,7 @@ function generarPdf(idContrato) {
       dni: contrato.cliente_dni,
       telefono: contrato.cliente_telefono,
       direccion: contrato.cliente_direccion,
+      ubicacionObra: contrato.ubicacion_obra || '',
     },
     items: (() => {
       const filas = [];

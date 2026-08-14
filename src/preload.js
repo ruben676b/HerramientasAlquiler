@@ -42,11 +42,6 @@ contextBridge.exposeInMainWorld('api', {
 
   // Sistema
   closeApp: () => ipcRenderer.send('force-quit'),
-  onCloseRequested: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on('close-requested', handler);
-    return () => ipcRenderer.removeListener('close-requested', handler);
-  },
   checkDbStatus: () => ipcRenderer.invoke('check-db-status'),
 
   // Inventario
@@ -123,6 +118,9 @@ contextBridge.exposeInMainWorld('api', {
 
   // Caja
   getResumenCaja: (fecha) => ipcRenderer.invoke('get-resumen-caja', fecha),
+  getEstadoCaja: () => ipcRenderer.invoke('get-estado-caja'),
+  abrirCaja: (monto) => ipcRenderer.invoke('abrir-caja', monto),
+  cerrarCaja: () => ipcRenderer.invoke('cerrar-caja'),
   registrarVentaInventario: (data) => ipcRenderer.invoke('registrar-venta-inventario', data),
   anularVentaInventario: (idVenta, cantidad) => ipcRenderer.invoke('anular-venta-inventario', { idVenta, cantidad }),
   getVentasInventario: (filtro) => ipcRenderer.invoke('get-ventas-inventario', filtro),

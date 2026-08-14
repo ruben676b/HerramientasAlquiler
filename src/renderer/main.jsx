@@ -5,7 +5,6 @@ import { SessionsProvider } from './contexts/SessionsContext';
 import { DevolucionesProvider } from './contexts/DevolucionesContext';
 import ActivationPage from './components/ActivationPage';
 import CajaInicialModal from './components/CajaInicialModal';
-import CierreCajaModal from './components/CierreCajaModal';
 import Layout from './components/Layout';
 import './index.css';
 
@@ -17,7 +16,6 @@ function App() {
   // 'checking' → 'not_activated' → 'activated' → 'caja_inicial' → 'ready'
   const [licenseStatus, setLicenseStatus] = useState('checking');
   const [cajaInicial, setCajaInicial] = useState(0);
-  const [showCierre, setShowCierre] = useState(false);
 
   useEffect(() => {
     window.api.license.check()
@@ -25,41 +23,42 @@ function App() {
       .catch(() => setLicenseStatus('not_activated'));
   }, []);
 
-  // When license is activated, move to caja_inicial step
+  // When license is activated, determine if the caja is open or must be opened
   useEffect(() => {
-    if (licenseStatus === 'activated') {
-      setLicenseStatus('caja_inicial');
-    }
-  }, [licenseStatus]);
+    if (licenseStatus !== 'activated') return;
 
-  // Listen for close request from main process
-  useEffect(() => {
-    if (window.api && window.api.onCloseRequested) {
-      const cleanup = window.api.onCloseRequested(() => {
-        // Only show confirmation if caja is open (app is ready)
-        if (licenseStatus === 'ready') {
-          setShowCierre(true);
+    const hoy = (() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+
+    (async () => {
+      try {
+        const estado = await window.api.getEstadoCaja();
+        if (estado.estado === 'abierta' && estado.fechaApertura === hoy) {
+          // La jornada sigue abierta: restaurar caja inicial y continuar sin pedir monto.
+          setCajaInicial(estado.montoInicial || 0);
+          setLicenseStatus('ready');
         } else {
-          // If caja hasn't been opened yet, just close
-          window.api.closeApp();
+          setLicenseStatus('caja_inicial');
         }
-      });
-      return cleanup;
-    }
+      } catch (e) {
+        console.error('Error obteniendo estado de caja:', e);
+        setLicenseStatus('caja_inicial');
+      }
+    })();
   }, [licenseStatus]);
 
   const handleCajaInicialConfirm = useCallback((monto) => {
-    setCajaInicial(monto);
-    setLicenseStatus('ready');
-  }, []);
-
-  const handleCierreConfirm = useCallback(() => {
-    setShowCierre(false);
-    window.api.closeApp();
-  }, []);
-
-  const handleCierreCancel = useCallback(() => {
-    setShowCierre(false);
+    (async () => {
+      try {
+        await window.api.abrirCaja(monto);
+      } catch (e) {
+        console.error('Error abriendo caja:', e);
+      }
+      setCajaInicial(monto);
+      setLicenseStatus('ready');
+    })();
   }, []);
 
   if (licenseStatus === 'checking') {
@@ -87,12 +86,6 @@ function App() {
         <SessionsProvider>
           <DevolucionesProvider>
             <Layout />
-            <CierreCajaModal
-              open={showCierre}
-              cajaInicial={cajaInicial}
-              onConfirm={handleCierreConfirm}
-              onCancel={handleCierreCancel}
-            />
           </DevolucionesProvider>
         </SessionsProvider>
       </ToastProvider>

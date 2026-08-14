@@ -3,7 +3,7 @@ import {
   DollarSign, Banknote, Smartphone, CreditCard,
   Calendar, ChevronLeft, ChevronRight, ArrowUpRight,
   ArrowDownLeft, Receipt, TrendingUp, Hash, Clock,
-  RefreshCw, Wallet, MinusCircle, Trash2, Tag, Undo2
+  RefreshCw, Wallet, MinusCircle, Trash2, Tag, Undo2, Lock
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { localDate } from '../lib/date';
@@ -11,6 +11,7 @@ import { useCajaInicial } from '../main';
 import NuevoEgresoModal from '../components/NuevoEgresoModal';
 import ConfirmModal from '../components/ConfirmModal';
 import DevolverVentaModal from '../components/DevolverVentaModal';
+import CierreCajaModal from '../components/CierreCajaModal';
 import { useToast } from '../components/Toast';
 
 /* ================================================================
@@ -95,6 +96,7 @@ export default function Caja() {
   const [modalEgresoOpen, setModalEgresoOpen] = useState(false);
   const [egresoAEliminar, setEgresoAEliminar] = useState(null);
   const [ventaADevolver, setVentaADevolver] = useState(null);
+  const [cierreAbierto, setCierreAbierto] = useState(false);
 
   const cargarDatos = useCallback(async () => {
     if (!window.api) return;
@@ -192,6 +194,20 @@ export default function Caja() {
 
         {/* Date Picker & Action */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Botón Cerrar Caja */}
+          <button
+            onClick={() => setCierreAbierto(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-bold transition-all shadow-sm active:scale-95 hover:opacity-90 cursor-pointer"
+            style={{
+              backgroundColor: 'oklch(0.93 0.04 25)',
+              color: 'oklch(0.52 0.20 25)',
+              border: '1px solid oklch(0.85 0.06 25)',
+            }}
+          >
+            <Lock size={16} />
+            <span>Cerrar Caja</span>
+          </button>
+
           {/* Botón Registrar Egreso */}
           <button
             onClick={() => setModalEgresoOpen(true)}
@@ -611,6 +627,14 @@ export default function Caja() {
         danger
         onConfirm={confirmEliminarEgreso}
         onCancel={() => setEgresoAEliminar(null)}
+      />
+
+      {/* Modal Cerrar Caja */}
+      <CierreCajaModal
+        open={cierreAbierto}
+        cajaInicial={cajaInicial}
+        onConfirm={() => window.api.closeApp()}
+        onCancel={() => setCierreAbierto(false)}
       />
     </div>
   );

@@ -164,7 +164,7 @@ export default function Configuracion() {
         {tab === 'api' && (
           <>
             <p className="text-xs" style={{ color: 'var(--muted)' }}>Configuraciones de servicios externos y licencias.</p>
-            <Field label="API Key de RENIEC (PeruAPI)">
+            <Field label="Token de RENIEC (DECOLECTA)">
               <input value={config.api_reniec_key || ''} onChange={e => setConfig(p => ({ ...p, api_reniec_key: e.target.value }))}
                 className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)', textTransform: 'none' }} />
             </Field>

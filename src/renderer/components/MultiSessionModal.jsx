@@ -189,6 +189,7 @@ function SessionForm({ session }) {
     setDni(nuevoDni);
     setNombre(nuevoNombre);
     setTelefono(data.telefono || '');
+    setUbicacionObra(data.ubicacionObra || '');
     const defaultFechaLoad = session.tipo === 'reserva'
       ? (data.fechaReserva || fmtLocalDate(new Date(Date.now() + 86400000)))
       : fmtLocalDate(new Date());
@@ -220,6 +221,7 @@ function SessionForm({ session }) {
   const [dni, setDni] = useState(saved.dni || '');
   const [nombre, setNombre] = useState(saved.nombre || '');
   const [telefono, setTelefono] = useState(saved.telefono || '');
+  const [ubicacionObra, setUbicacionObra] = useState(saved.ubicacionObra || '');
   const defaultFecha = session.tipo === 'reserva'
     ? (saved.fechaReserva || fmtLocalDate(new Date(Date.now() + 86400000)))
     : fmtLocalDate(new Date());
@@ -337,8 +339,8 @@ function SessionForm({ session }) {
 
   // Auto-guardar items
   useEffect(() => {
-    saveFormData(session.id, { dni, nombre, telefono, fechaSalida, fechaDevolucion, fechaReserva, clienteSeleccionado, items, step, firmaBase64, pagos, depositoMonto, depositoDni, editContratoId });
-  }, [items, dni, nombre, telefono, fechaSalida, fechaDevolucion, clienteSeleccionado, session.id, step, pagos, editContratoId]);
+    saveFormData(session.id, { dni, nombre, telefono, ubicacionObra, fechaSalida, fechaDevolucion, fechaReserva, clienteSeleccionado, items, step, firmaBase64, pagos, depositoMonto, depositoDni, editContratoId });
+  }, [items, dni, nombre, telefono, ubicacionObra, fechaSalida, fechaDevolucion, clienteSeleccionado, session.id, step, pagos, editContratoId]);
 
   // Sincronizar fechaSalida y fechaDevolucion con fechaReserva en reservas
   useEffect(() => {
@@ -877,6 +879,7 @@ const itemsData = itemsConDias.map(item => ({
           dniCliente: dni || '',
           nombreCliente: nombre || '',
           telefonoCliente: telefono || '',
+          ubicacionObra: ubicacionObra || '',
           idUsuario: 1,
           fechaSalida: esReserva ? fechaReserva : fechaSalida,
           fechaDevolucionPactada: fechaDevolucion,
@@ -898,6 +901,7 @@ const itemsData = itemsConDias.map(item => ({
           dniCliente: dni || '',
           nombreCliente: nombre || '',
           telefonoCliente: telefono || '',
+          ubicacionObra: ubicacionObra || '',
           idUsuario: 1,
           fechaReserva,
           fechaDevolucionPactada: fechaDevolucion,
@@ -913,6 +917,7 @@ const itemsData = itemsConDias.map(item => ({
           dniCliente: dni || '',
           nombreCliente: nombre || '',
           telefonoCliente: telefono || '',
+          ubicacionObra: ubicacionObra || '',
           idUsuario: 1,
           fechaSalida,
           fechaDevolucionPactada: fechaDevolucion,
@@ -1400,7 +1405,7 @@ const itemsData = itemsConDias.map(item => ({
                       const total = itemsConDias.reduce((a, item) => a + item.sub_calc, 0);
                       const pdfPath = await window.api.generarPdfPreview({
                         arrendadora: { nombre: 'SOLEDAD SUPANTA QUISPE', dni: '72094861', ruc: '10720948619', direccion: 'Av. Los Pinos N° 348', telefono: '985618849' },
-                        cliente: { nombre: nombre || '—', dni: dni || '—', telefono: telefono || '—', direccion: '' },
+                        cliente: { nombre: nombre || '—', dni: dni || '—', telefono: telefono || '—', direccion: '', ubicacionObra: ubicacionObra || '' },
                         items: itemsConDias.map(item => ({ codigo: item.id_herramienta || (item.nombre + ' (' + item.condicion + ')'), nombre: item.nombre, cantidad: item.cantidad, precio_dia: infoTarifa(item).precio, tarifa: item.tarifa || 'dia', snapshot: item.sub_calc, desglose: item._componentes ? item._componentes.map(c => ({ cantidad: c.cantidad * (item.cantidad || 1), nombre: c.nombre })) : undefined, fecha_devolucion_pactada: item.fecha_devolucion_item || fechaDevolucion })),
                         fechas: { salida: fechaSalida, devolucion: fechaDevolucion },
                         total, firmaBase64: firmaBase64 || null,
@@ -1592,6 +1597,14 @@ const itemsData = itemsConDias.map(item => ({
                         ))}
                       </div>
                     )}
+                  </div>
+                  {/* Fila: Ubicación de obra (opcional) */}
+                  <div>
+                    <p className="text-[11px] font-semibold mb-1.5" style={{ color: 'var(--ink)' }}>Ubicación de obra <span style={{ color: 'var(--faint)' }}>(opcional)</span></p>
+                    <input value={ubicacionObra} onChange={(e) => setUbicacionObra(e.target.value)}
+                      className="w-full h-8 px-2 rounded border text-[12px]"
+                      style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)', textTransform: 'none' }}
+                      placeholder="Ej: Av. Los Pinos N° 348, Andahuaylas" />
                   </div>
                 </div>
 

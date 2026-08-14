@@ -30,11 +30,14 @@ const fmtFechaLarga = (iso) => {
 
 const fmtFecha = (iso) => {
   if (!iso) return '-';
-  if (iso.includes('T')) {
-    const d = new Date(iso);
+  const s = iso.includes(' ') ? iso.replace(' ', 'T') : iso;
+  if (s.includes('T')) {
+    const d = new Date(s);
+    if (isNaN(d)) return iso;
     return d.toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
-  const d = new Date(iso + 'T12:00:00');
+  const d = new Date(s + 'T12:00:00');
+  if (isNaN(d)) return iso;
   return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
@@ -82,9 +85,9 @@ export default function Reportes() {
       const reporte = await window.api.generarReporte();
       setReporteSeleccionado(reporte);
       await cargarDatos();
-      toast.success('Reporte generado exitosamente');
+      toast('Reporte generado exitosamente');
     } catch (e) {
-      toast.error(e.message || 'Error al generar reporte');
+      toast(e.message || 'Error al generar reporte', 'error');
       console.error('Error generando reporte:', e);
     } finally {
       setGenerando(false);
@@ -97,7 +100,7 @@ export default function Reportes() {
       const reporte = await window.api.obtenerReporte(id);
       setReporteSeleccionado(reporte);
     } catch (e) {
-      toast.error('Error al cargar reporte');
+      toast('Error al cargar reporte', 'error');
     }
   };
 
@@ -112,7 +115,7 @@ export default function Reportes() {
         setCajaDetalle(data);
       }
     } catch (e) {
-      toast.error('Error al cargar detalle de caja');
+      toast('Error al cargar detalle de caja', 'error');
     } finally {
       setCargandoCajaDetalle(false);
     }

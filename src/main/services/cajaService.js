@@ -339,6 +339,89 @@ function getCajaDiariaPorFecha(fecha) {
   };
 }
 
+/**
+ * Lee el estado persistido de la caja desde la tabla CONFIGURACION.
+ *
+ * @returns {{ estado: string, montoInicial: number, fechaApertura: string }}
+ */
+function getEstadoCaja() {
+  const leer = (clave) => {
+    const row = db.prepare('SELECT valor FROM CONFIGURACION WHERE clave = ?').get(clave);
+    return row ? row.valor : null;
+  };
+
+  const estado = leer('caja_estado') || 'cerrada';
+  const montoInicial = parseFloat(leer('caja_monto_inicial')) || 0;
+  const fechaApertura = leer('caja_fecha_apertura') || null;
+
+  return { estado, montoInicial, fechaApertura };
+}
+
+/**
+ * Abre la caja del día persistiendo el monto inicial.
+ *
+ * @param {number} montoInicial
+ * @returns {{ estado: string, montoInicial: number, fechaApertura: string }}
+ */
+function abrirCaja(montoInicial) {
+  const monto = parseFloat(montoInicial) || 0;
+  const fecha = localDate();
+
+  const upsert = db.prepare('INSERT OR REPLACE INTO CONFIGURACION (clave, valor) VALUES (?, ?)');
+  upsert.run('caja_estado', 'abierta');
+  upsert.run('caja_monto_inicial', String(monto));
+  upsert.run('caja_fecha_apertura', fecha);
+
+  return { estado: 'abierta', montoInicial: monto, fechaApertura: fecha };
+}
+
+/**
+ * Cierra la caja: guarda el snapshot del día de apertura en el historial
+ * y marca la caja como cerrada.
+ *
+ * @returns {{ success: boolean, cerrada: boolean }}
+ */
+function cerrarCaja() {
+  const estado = getEstadoCaja();
+  if (estado.estado !== 'abierta') {
+    return { success: true, cerrada: false };
+  }
+
+  const fecha = estado.fechaApertura || localDate();
+  try {
+    guardarCajaDiaria(fecha, estado.montoInicial);
+  } catch (e) {
+    console.error('[cerrarCaja] Error guardando caja diaria:', e);
+  }
+
+  const upsert = db.prepare('INSERT OR REPLACE INTO CONFIGURACION (clave, valor) VALUES (?, ?)');
+  upsert.run('caja_estado', 'cerrada');
+  upsert.run('caja_monto_inicial', '0');
+  upsert.run('caja_fecha_apertura', '');
+
+  return { success: true, cerrada: true };
+}
+
+/**
+ * Verifica si la caja quedó abierta de un día anterior y, de ser así,
+ * la cierra automáticamente (guardando el snapshot del día previo).
+ *
+ * @returns {{ cerroAutomatico: boolean }}
+ */
+function verificarCierreAutomatico() {
+  const estado = getEstadoCaja();
+  if (estado.estado !== 'abierta') {
+    return { cerroAutomatico: false };
+  }
+
+  if (estado.fechaApertura && estado.fechaApertura !== localDate()) {
+    cerrarCaja();
+    return { cerroAutomatico: true };
+  }
+
+  return { cerroAutomatico: false };
+}
+
 module.exports = {
   getResumenCaja,
   registrarEgreso,
@@ -346,4 +429,8 @@ module.exports = {
   guardarCajaDiaria,
   getHistorialCaja,
   getCajaDiariaPorFecha,
+  getEstadoCaja,
+  abrirCaja,
+  cerrarCaja,
+  verificarCierreAutomatico,
 };
