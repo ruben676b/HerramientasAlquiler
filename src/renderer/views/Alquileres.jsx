@@ -218,16 +218,20 @@ export default function Alquileres() {
       ) + 1);
       const montoBase = c.total_contrato ? c.total_contrato : (c.subtotal_diario || 0) * dias;
       const total = montoBase + (c.total_atraso || 0) + (c.total_danos || 0) + (c.total_perdidas || 0) + (c.total_ventas || 0);
-      const pendiente = Math.max(0, total - (c.total_pagado || 0));
-      return { ...c, _pendiente: pendiente };
+const pendiente = Math.max(0, total - (c.total_pagado || 0));
+    const herramientasAtrasadas = (c.items || []).filter(i => {
+      if (i.id_item_granel) return (i.granel_pendiente || 0) > 0 && (i.dias_atraso_item || 0) > 0;
+      return i.estado_devolucion === 'pendiente' && (i.dias_atraso_item || 0) > 0;
+    }).length;
+    return { ...c, _pendiente: pendiente, _herramientasAtrasadas: herramientasAtrasadas };
     });
   }, [todosContratos]);
 
   const conteo = useMemo(() => {
     const c = {};
     c[''] = contratosConPendiente.length;
-    c['deudores'] = contratosConPendiente.filter(x => x._pendiente > 0).length;
-    c['atrasado'] = contratosConPendiente.filter(x => x.dias_atraso > 0 && !(x.estado === 'devuelto' && x._pendiente <= 0)).length;
+    c['deudores'] = contratosConPendiente.filter(x => x._pendiente > 0 && x._herramientasAtrasadas <= 0).length;
+    c['atrasado'] = contratosConPendiente.filter(x => x._pendiente > 0 || x._herramientasAtrasadas > 0).length;
     c['alquilado'] = contratosConPendiente.filter(x => x.estado === 'alquilado').length;
     c['devuelto'] = contratosConPendiente.filter(x => x.estado === 'devuelto' && x._pendiente <= 0).length;
     c['devolucion incompleta'] = contratosConPendiente.filter(x => x.estado === 'devolucion incompleta').length;
@@ -239,8 +243,8 @@ export default function Alquileres() {
 
   const contratosFiltrados = useMemo(() => {
     if (!estadoFiltro) return contratosConPendiente;
-    if (estadoFiltro === 'deudores') return contratosConPendiente.filter(c => c._pendiente > 0);
-    if (estadoFiltro === 'atrasado') return contratosConPendiente.filter(c => c.dias_atraso > 0 && !(c.estado === 'devuelto' && c._pendiente <= 0));
+    if (estadoFiltro === 'deudores') return contratosConPendiente.filter(c => c._pendiente > 0 && c._herramientasAtrasadas <= 0);
+    if (estadoFiltro === 'atrasado') return contratosConPendiente.filter(c => c._pendiente > 0 || c._herramientasAtrasadas > 0);
     if (estadoFiltro === 'devuelto') return contratosConPendiente.filter(c => c.estado === 'devuelto' && c._pendiente <= 0);
     if (estadoFiltro === 'papelera') return contratosConPendiente.filter(c => c.papelera === 1);
     return contratosConPendiente.filter(c => c.estado === estadoFiltro);
@@ -289,7 +293,7 @@ export default function Alquileres() {
           {[
             { id: '', label: 'Todos' },
             { id: 'deudores', label: 'Deudores', danger: true },
-            { id: 'atrasado', label: 'Atrasado', danger: true },
+            { id: 'atrasado', label: 'Deudores y herramientas atrasadas', danger: true },
             ...['alquilado', 'devuelto', 'devolucion incompleta']
               .filter(e => conteo[e] > 0)
               .map(e => ({ id: e, label: e === 'devolucion incompleta' ? 'Dev. incompleta' : e.charAt(0).toUpperCase() + e.slice(1) })),
