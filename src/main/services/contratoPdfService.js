@@ -298,12 +298,12 @@ function generarPdfDesdeDatos(datos) {
 
   // Firma de la arrendadora (arriba de su línea)
   if (firmaArrPath && fs.existsSync(firmaArrPath)) {
-    doc.image(firmaArrPath, colFirmas[0] + 10, firmaY - 55, { width: 120, height: 45 });
+    doc.image(firmaArrPath, colFirmas[0] + 10, firmaY - 55, { fit: [120, 45], align: 'center', valign: 'middle' });
   }
 
   // Firma del cliente: imagen grande arriba de la línea
   if (firmaPreviewPath && fs.existsSync(firmaPreviewPath)) {
-    doc.image(firmaPreviewPath, colFirmas[1] + 10, firmaY - 55, { width: 120, height: 45 });
+    doc.image(firmaPreviewPath, colFirmas[1] + 10, firmaY - 55, { fit: [120, 45], align: 'center', valign: 'middle' });
   }
 
   doc.fontSize(7).font('Helvetica');

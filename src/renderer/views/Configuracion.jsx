@@ -145,19 +145,21 @@ export default function Configuracion() {
         {tab === 'firma' && (
           <>
             <p className="text-xs" style={{ color: 'var(--muted)' }}>Firma que aparecerá en todos los contratos como ARRENDADORA.</p>
-            {config.arrendadora_firma_base64 ? (
-              <div className="space-y-2">
-                <img src={config.arrendadora_firma_base64} alt="Firma" className="max-w-[200px] rounded-lg border" style={{ borderColor: 'var(--border)' }} />
-                <button className="text-xs underline" style={{ color: 'var(--muted)' }} onClick={() => guardar('arrendadora_firma_base64', '')}>Eliminar firma</button>
-              </div>
-            ) : (
-              <SignaturePad onSave={async (dataUrl) => {
+            <SignaturePad
+              value={config.arrendadora_firma_base64}
+              onSave={async (dataUrl) => {
                 if (!window.api) return;
                 await window.api.saveConfig('arrendadora_firma_base64', dataUrl);
                 setConfig(p => ({ ...p, arrendadora_firma_base64: dataUrl }));
                 toast('Firma guardada');
-              }} disabled={false} />
-            )}
+              }}
+              onClear={async () => {
+                if (!window.api) return;
+                await window.api.saveConfig('arrendadora_firma_base64', '');
+                setConfig(p => ({ ...p, arrendadora_firma_base64: '' }));
+              }}
+              disabled={false}
+            />
           </>
         )}
 

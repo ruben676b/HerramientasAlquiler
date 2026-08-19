@@ -1420,18 +1420,7 @@ const itemsData = itemsConDias.map(item => ({
                 >👁 Previsualizar PDF</button>
                 <div className="mt-3">
                   <p className="text-xs font-medium mb-2" style={{ color: 'var(--ink)' }}>Firma del cliente</p>
-                  {firmaBase64 ? (
-                    <div className="space-y-2">
-                      <div className="border rounded-lg p-2 bg-white flex items-center justify-center" style={{ borderColor: 'var(--border)', height: 80 }}>
-                        <img src={firmaBase64} alt="Firma" className="max-h-full" />
-                      </div>
-                      <button onClick={() => setFirmaBase64(null)}
-                        className="text-[11px] px-2 py-1 rounded border hover:bg-red-50 dark:hover:bg-red-950"
-                        style={{ color: 'var(--muted)', borderColor: 'var(--border)' }}>Limpiar firma</button>
-                    </div>
-                  ) : (
-                    <SignaturePad onSave={(dataUrl) => setFirmaBase64(dataUrl)} disabled={false} />
-                  )}
+                  <SignaturePad value={firmaBase64} onSave={(dataUrl) => setFirmaBase64(dataUrl)} onClear={() => setFirmaBase64(null)} disabled={false} />
                 </div>
               </div>
 
