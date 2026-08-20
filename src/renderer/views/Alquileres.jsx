@@ -32,15 +32,16 @@ const fmtFechaCorta = (iso) => {
 
 const baseItem = (item, contrato) => {
   if (item.total_item != null) return item.total_item;
+  const fechaSalida = item.fecha_salida_item || contrato.fecha_salida;
   const fechaDev = item.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;
   if (item.tarifa_aplicada === 'mes') {
-    const desg = desglosarMensual(contrato.fecha_salida, fechaDev);
+    const desg = desglosarMensual(fechaSalida, fechaDev);
     const mes = item.precio_dia_aplicado || 0;
     const diaria = mes / 30;
     if (desg.meses > 0) return (mes * desg.meses + diaria * desg.diasExtra) * (item.cantidad || 1);
     return diaria * desg.totalHabiles * (item.cantidad || 1);
   }
-  return (item.precio_dia_aplicado || 0) * contarHabiles(contrato.fecha_salida, fechaDev) * (item.cantidad || 1);
+  return (item.precio_dia_aplicado || 0) * contarHabiles(fechaSalida, fechaDev) * (item.cantidad || 1);
 };
 
 export default function Alquileres() {
@@ -547,7 +548,7 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                                             <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
                                               <span />
                                               <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                                                Salida: {fmtFechaCorta(c.fecha_salida)} &middot; Pactada: {fmtFechaCorta(item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada)}
+                                                Salida: {fmtFechaCorta(item.fecha_salida_item || c.fecha_salida)} &middot; Pactada: {fmtFechaCorta(item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada)}
                                                 &middot; Base: {item.tarifa_aplicada === 'mes' && (item.meses_item || 0) > 0
                                                   ? `${item.meses_item} mes${item.meses_item !== 1 ? 'es' : ''}${(item.dias_extra_item || 0) > 0 ? ` + ${item.dias_extra_item} día${item.dias_extra_item !== 1 ? 's' : ''}` : ''} (${item.dias_habiles_item || item.dias_item || 0} día${(item.dias_habiles_item || item.dias_item || 0) !== 1 ? 's' : ''} sin dom.)`
                                                   : (item.dias_habiles_item || item.dias_item || 0) + ' día' + ((item.dias_habiles_item || item.dias_item || 0) !== 1 ? 's' : '') + ' sin dom.'}

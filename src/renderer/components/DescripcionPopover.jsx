@@ -3,7 +3,7 @@ import { Info } from 'lucide-react';
 
 /**
  * Ícono pequeño con tooltip (hover) y popover al hacer clic.
- * Solo se renderiza si `text` tiene contenido.
+ * Siempre se renderiza. Si no hay texto, muestra "Sin descripción".
  * El popover usa posición fija para no recortarse en contenedores con scroll.
  */
 export default function DescripcionPopover({ text, size = 13, className = '', width = 280 }) {
@@ -30,7 +30,7 @@ export default function DescripcionPopover({ text, size = 13, className = '', wi
     };
   }, [abierto]);
 
-  if (!text) return null;
+  const displayText = (text && text.trim()) || null;
 
   const abrir = (e) => {
     e.stopPropagation();
@@ -47,7 +47,7 @@ export default function DescripcionPopover({ text, size = 13, className = '', wi
         ref={btnRef}
         role="button"
         tabIndex={0}
-        title={text}
+        title={displayText || 'Sin descripción'}
         onClick={abrir}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); abrir(e); } }}
         className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 active:scale-90 transition-colors duration-150"
@@ -69,11 +69,12 @@ export default function DescripcionPopover({ text, size = 13, className = '', wi
             zIndex: 9999,
             backgroundColor: 'var(--bg)',
             border: '1px solid var(--border)',
-            color: 'var(--ink)',
+            color: displayText ? 'var(--ink)' : 'var(--muted)',
             boxShadow: '0 4px 16px oklch(0 0 0 / 0.18)',
+            fontStyle: displayText ? 'normal' : 'italic',
           }}
         >
-          {text}
+          {displayText || 'Sin descripción'}
         </span>
       )}
     </span>

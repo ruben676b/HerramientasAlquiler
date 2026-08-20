@@ -124,8 +124,9 @@ function crearContrato(
       INSERT INTO DETALLE_CONTRATO (
         id_contrato, tipo_item, id_herramienta, id_item_granel, id_kit,
         cantidad, precio_dia_aplicado,
-        fecha_devolucion_pactada_item, total_item_snapshot, tarifa_aplicada
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        fecha_devolucion_pactada_item, total_item_snapshot, tarifa_aplicada,
+        fecha_salida_item
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const resultado = insertContrato.run(
@@ -176,7 +177,8 @@ function crearContrato(
           item.precio_aplicado != null ? item.precio_aplicado : herramienta.precio_dia,
           fechaDevItem,
           item.total_item_snapshot != null ? item.total_item_snapshot : null,
-          item.tarifa_aplicada || 'dia'
+          item.tarifa_aplicada || 'dia',
+          item.fecha_salida_item || null
         );
 
         db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(
@@ -219,7 +221,8 @@ function crearContrato(
           item.precio_aplicado != null ? item.precio_aplicado : granel.precio_dia,
           fechaDevItemG,
           item.total_item_snapshot != null ? item.total_item_snapshot : null,
-          item.tarifa_aplicada || 'dia'
+          item.tarifa_aplicada || 'dia',
+          item.fecha_salida_item || null
         );
 
         db.prepare(
@@ -261,7 +264,8 @@ function crearContrato(
           item.precio_aplicado != null ? item.precio_aplicado : kit.precio_dia,
           item.fecha_devolucion_pactada || null,
           item.total_item_snapshot != null ? item.total_item_snapshot : null,
-          item.tarifa_aplicada || 'dia'
+          item.tarifa_aplicada || 'dia',
+          item.fecha_salida_item || null
         );
 
         // Líneas hijas: componentes del kit (precio 0, controlan stock/devolución)
@@ -294,7 +298,8 @@ function crearContrato(
               0,
               null,
               null,
-              'dia'
+              'dia',
+              item.fecha_salida_item || null
             );
             db.prepare(
               'UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?'
@@ -324,7 +329,8 @@ function crearContrato(
               0,
               null,
               null,
-              'dia'
+              'dia',
+              item.fecha_salida_item || null
             );
             db.prepare('UPDATE HERRAMIENTA SET estado = ? WHERE id = ?').run(
               'alquilado',
@@ -398,8 +404,9 @@ function crearReserva(
       INSERT INTO DETALLE_CONTRATO (
         id_contrato, tipo_item, id_herramienta, id_item_granel,
         cantidad, precio_dia_aplicado,
-        fecha_devolucion_pactada_item, total_item_snapshot
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        fecha_devolucion_pactada_item, total_item_snapshot,
+        tarifa_aplicada, fecha_salida_item
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const now = localDateTime();
@@ -455,7 +462,9 @@ function crearReserva(
           1,
           herramienta.precio_dia,
           fechaDevItem,
-          item.total_item_snapshot != null ? item.total_item_snapshot : null
+          item.total_item_snapshot != null ? item.total_item_snapshot : null,
+          item.tarifa_aplicada || 'dia',
+          item.fecha_salida_item || null
         );
 
         db.prepare("UPDATE HERRAMIENTA SET estado = 'reservado' WHERE id = ?")
@@ -489,7 +498,9 @@ function crearReserva(
           item.cantidad,
           granel.precio_dia,
           fechaDevItemG,
-          item.total_item_snapshot != null ? item.total_item_snapshot : null
+          item.total_item_snapshot != null ? item.total_item_snapshot : null,
+          item.tarifa_aplicada || 'dia',
+          item.fecha_salida_item || null
         );
 
         db.prepare(
@@ -1155,13 +1166,14 @@ function getContratos(filtros = {}) {
       }
       item.danos_devueltos = danosPorDetalle[item.id] || [];
 
+      const fechaSalidaItem = item.fecha_salida_item || c.fecha_salida;
       const fechaDevItem = item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada;
       const diasItem = Math.max(1, Math.ceil(
-        (new Date(fechaDevItem + 'T00:00:00') - new Date(c.fecha_salida + 'T00:00:00')) / 86400000
+        (new Date(fechaDevItem + 'T00:00:00') - new Date(fechaSalidaItem + 'T00:00:00')) / 86400000
       ) + 1);
       const totalItem = item.total_item_snapshot != null
         ? item.total_item_snapshot
-        : calcularTotalItem(item.tarifa_aplicada || 'dia', item.precio_dia_aplicado, c.fecha_salida, fechaDevItem, item.cantidad);
+        : calcularTotalItem(item.tarifa_aplicada || 'dia', item.precio_dia_aplicado, fechaSalidaItem, fechaDevItem, item.cantidad);
 
       const fechaPactadaItem = new Date(fechaDevItem + 'T00:00:00');
       const refDate = item.fecha_devolucion_real
@@ -1177,8 +1189,8 @@ function getContratos(filtros = {}) {
       const pagadoItem = pagosPorDetalle[item.id] || 0;
       const saldoItem = Math.max(0, totalItem + montoAtrasoItem - pagadoItem);
 
-      const desgMes = item.tarifa_aplicada === 'mes' ? desglosarMensual(c.fecha_salida, fechaDevItem) : null;
-      return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem, dias_item: diasItem, dias_habiles_item: contarHabiles(c.fecha_salida, fechaDevItem), meses_item: desgMes ? desgMes.meses : 0, dias_extra_item: desgMes ? desgMes.diasExtra : 0, total_item: totalItem, pagado_item: pagadoItem, saldo_item: saldoItem };
+      const desgMes = item.tarifa_aplicada === 'mes' ? desglosarMensual(fechaSalidaItem, fechaDevItem) : null;
+      return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem, dias_item: diasItem, dias_habiles_item: contarHabiles(fechaSalidaItem, fechaDevItem), meses_item: desgMes ? desgMes.meses : 0, dias_extra_item: desgMes ? desgMes.diasExtra : 0, total_item: totalItem, pagado_item: pagadoItem, saldo_item: saldoItem };
     });
 
     const totalContrato = itemsConAtraso.reduce((a, i) => a + i.total_item, 0) + (c.deposito_monto || 0);
@@ -1627,8 +1639,9 @@ function editarContrato(idContrato, data) {
       INSERT INTO DETALLE_CONTRATO (
         id_contrato, tipo_item, id_herramienta, id_item_granel, id_kit,
         cantidad, precio_dia_aplicado,
-        fecha_devolucion_pactada_item, total_item_snapshot, tarifa_aplicada
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        fecha_devolucion_pactada_item, total_item_snapshot, tarifa_aplicada,
+        fecha_salida_item
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const item of items) {
@@ -1650,7 +1663,8 @@ function editarContrato(idContrato, data) {
           item.precio_aplicado != null ? item.precio_aplicado : herramienta.precio_dia,
           item.fecha_devolucion_pactada || null,
           item.total_item_snapshot != null ? item.total_item_snapshot : null,
-          item.tarifa_aplicada || 'dia'
+          item.tarifa_aplicada || 'dia',
+          item.fecha_salida_item || null
         );
         db.prepare("UPDATE HERRAMIENTA SET estado = 'alquilado' WHERE id = ?")
           .run(item.id_herramienta);
@@ -1675,7 +1689,8 @@ function editarContrato(idContrato, data) {
           item.precio_aplicado != null ? item.precio_aplicado : granel.precio_dia,
           item.fecha_devolucion_pactada || null,
           item.total_item_snapshot != null ? item.total_item_snapshot : null,
-          item.tarifa_aplicada || 'dia'
+          item.tarifa_aplicada || 'dia',
+          item.fecha_salida_item || null
         );
         db.prepare(
           'UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?'
@@ -1701,7 +1716,8 @@ function editarContrato(idContrato, data) {
           item.precio_aplicado != null ? item.precio_aplicado : kit.precio_dia,
           item.fecha_devolucion_pactada || null,
           item.total_item_snapshot != null ? item.total_item_snapshot : null,
-          item.tarifa_aplicada || 'dia'
+          item.tarifa_aplicada || 'dia',
+          item.fecha_salida_item || null
         );
 
         for (const comp of componentes) {
@@ -1718,7 +1734,8 @@ function editarContrato(idContrato, data) {
             }
             insertDetalle.run(
               idContrato, 'granel', null, comp.id_item_granel, item.id_kit,
-              necesario, 0, null, null, 'dia'
+              necesario, 0, null, null, 'dia',
+              item.fecha_salida_item || null
             );
             db.prepare(
               'UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?'
@@ -1734,7 +1751,8 @@ function editarContrato(idContrato, data) {
             }
             insertDetalle.run(
               idContrato, 'individual', comp.id_herramienta, null, item.id_kit,
-              1, 0, null, null, 'dia'
+              1, 0, null, null, 'dia',
+              item.fecha_salida_item || null
             );
             db.prepare("UPDATE HERRAMIENTA SET estado = 'alquilado' WHERE id = ?")
               .run(comp.id_herramienta);
@@ -1810,8 +1828,9 @@ function editarReserva(idContrato, data) {
       INSERT INTO DETALLE_CONTRATO (
         id_contrato, tipo_item, id_herramienta, id_item_granel,
         cantidad, precio_dia_aplicado,
-        fecha_devolucion_pactada_item, total_item_snapshot
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        fecha_devolucion_pactada_item, total_item_snapshot,
+        tarifa_aplicada, fecha_salida_item
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const item of items) {
@@ -1842,7 +1861,9 @@ function editarReserva(idContrato, data) {
           idContrato, 'individual', item.id_herramienta, null,
           1, herramienta.precio_dia,
           item.fecha_devolucion_pactada || null,
-          item.total_item_snapshot != null ? item.total_item_snapshot : null
+          item.total_item_snapshot != null ? item.total_item_snapshot : null,
+          item.tarifa_aplicada || 'dia',
+          item.fecha_salida_item || null
         );
         db.prepare("UPDATE HERRAMIENTA SET estado = 'reservado' WHERE id = ?")
           .run(item.id_herramienta);
@@ -1866,7 +1887,9 @@ function editarReserva(idContrato, data) {
           idContrato, 'granel', null, item.id_item_granel,
           item.cantidad, granel.precio_dia,
           item.fecha_devolucion_pactada || null,
-          item.total_item_snapshot != null ? item.total_item_snapshot : null
+          item.total_item_snapshot != null ? item.total_item_snapshot : null,
+          item.tarifa_aplicada || 'dia',
+          item.fecha_salida_item || null
         );
         db.prepare(
           'UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?'

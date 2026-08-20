@@ -111,7 +111,7 @@ function registerIpcHandlers() {
         `SELECT id, nombre, condicion, precio_dia, precio_minimo, precio_mes,
                 cantidad_total, cantidad_disponible, cantidad_danada,
                 cantidad_alquilada, cantidad_perdida, cantidad_vendida, cantidad_baja,
-                imagen_path
+                imagen_path, descripcion
          FROM ITEM_GRANEL WHERE activo = 1 ORDER BY nombre, condicion`
       )
       .all();

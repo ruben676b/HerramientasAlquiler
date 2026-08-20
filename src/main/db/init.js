@@ -137,6 +137,7 @@ estado TEXT NOT NULL CHECK (estado IN ('disponible', 'reservado', 'alquilado', '
       fecha_devolucion_pactada_item TEXT,
       total_item_snapshot REAL,
       tarifa_aplicada TEXT NOT NULL DEFAULT 'dia' CHECK (tarifa_aplicada IN ('dia', 'minimo', 'mes')),
+      fecha_salida_item TEXT,
       costo_perdida REAL CHECK (costo_perdida >= 0),
       FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
       FOREIGN KEY (id_herramienta) REFERENCES HERRAMIENTA(id),
@@ -823,6 +824,40 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     }
   } catch (err) {
     console.error('[DB] Error en migración cantidad_devuelta:', err);
+  }
+
+  // Migración: fecha_salida_item en DETALLE_CONTRATO (fecha de salida por item individual)
+  try {
+    const hasFechaSalidaItem = db.prepare("PRAGMA table_info('DETALLE_CONTRATO')").all().some(c => c.name === 'fecha_salida_item');
+    if (!hasFechaSalidaItem) {
+      db.exec("ALTER TABLE DETALLE_CONTRATO ADD COLUMN fecha_salida_item TEXT");
+      console.log('[DB] Migración: columna fecha_salida_item agregada a DETALLE_CONTRATO.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración fecha_salida_item:', err);
+  }
+
+  // Migración: propagar descripción de categoría a herramientas individuales con descripción vacía
+  try {
+    const updated = db.prepare(`
+      UPDATE HERRAMIENTA
+      SET descripcion = (
+        SELECT c.descripcion
+        FROM CATEGORIA_HERRAMIENTA c
+        WHERE c.id = HERRAMIENTA.id_categoria
+          AND c.descripcion IS NOT NULL
+          AND c.descripcion != ''
+      )
+      WHERE (descripcion IS NULL OR descripcion = '')
+        AND id_categoria IN (
+          SELECT id FROM CATEGORIA_HERRAMIENTA WHERE descripcion IS NOT NULL AND descripcion != ''
+        )
+    `).run();
+    if (updated.changes > 0) {
+      console.log('[DB] Migración: descripción de categoría propagada a', updated.changes, 'herramientas.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración descripción de categoría:', err);
   }
 
   // --- Datos semilla (solo primera vez) ---

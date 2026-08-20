@@ -177,9 +177,10 @@ function obtenerContratosCompletados(fechaCorte, fechaFin) {
     let totalBase = 0;
 
     for (const item of items) {
+      const fechaSalidaItem = item.fecha_salida_item || c.fecha_salida;
       const fechaPactadaItem = item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada;
       const diasItem = Math.max(1, Math.ceil(
-        (new Date(fechaPactadaItem + 'T00:00:00') - new Date(c.fecha_salida + 'T00:00:00')) / 86400000
+        (new Date(fechaPactadaItem + 'T00:00:00') - new Date(fechaSalidaItem + 'T00:00:00')) / 86400000
       ) + 1);
       const totalItem = item.total_item_snapshot != null
         ? item.total_item_snapshot

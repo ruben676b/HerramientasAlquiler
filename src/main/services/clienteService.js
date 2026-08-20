@@ -277,13 +277,14 @@ function getDetalleContrato(idContrato) {
       total_perdidas += item.costo_perdida || 0;
     }
 
+    const fechaSalidaItem = item.fecha_salida_item || contrato.fecha_salida;
     const fechaDevItem = item.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;
     const diasItem = Math.max(1, Math.ceil(
-      (new Date(fechaDevItem + 'T00:00:00') - new Date(contrato.fecha_salida + 'T00:00:00')) / 86400000
+      (new Date(fechaDevItem + 'T00:00:00') - new Date(fechaSalidaItem + 'T00:00:00')) / 86400000
     ) + 1);
     const totalItem = item.total_item_snapshot != null
       ? item.total_item_snapshot
-      : calcularTotalItem(item.tarifa_aplicada || 'dia', item.precio_dia_aplicado, contrato.fecha_salida, fechaDevItem, item.cantidad);
+      : calcularTotalItem(item.tarifa_aplicada || 'dia', item.precio_dia_aplicado, fechaSalidaItem, fechaDevItem, item.cantidad);
     const fechaPactadaItem = new Date(fechaDevItem + 'T00:00:00');
     const refDate = item.fecha_devolucion_real
       ? new Date(item.fecha_devolucion_real + 'T00:00:00')
@@ -297,8 +298,8 @@ function getDetalleContrato(idContrato) {
     ).get(idContrato, item.id)['COALESCE(SUM(monto), 0)'];
     const saldoItem = Math.max(0, totalItem + montoAtrasoItem - pagadoItem);
 
-    const desgMes = item.tarifa_aplicada === 'mes' ? desglosarMensual(contrato.fecha_salida, fechaDevItem) : null;
-    return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem, dias_item: diasItem, dias_habiles_item: contarHabiles(contrato.fecha_salida, fechaDevItem), meses_item: desgMes ? desgMes.meses : 0, dias_extra_item: desgMes ? desgMes.diasExtra : 0, total_item: totalItem, pagado_item: pagadoItem, saldo_item: saldoItem };
+    const desgMes = item.tarifa_aplicada === 'mes' ? desglosarMensual(fechaSalidaItem, fechaDevItem) : null;
+    return { ...item, dias_atraso_item: diasAtrasoItem, monto_atraso_item: montoAtrasoItem, dias_item: diasItem, dias_habiles_item: contarHabiles(fechaSalidaItem, fechaDevItem), meses_item: desgMes ? desgMes.meses : 0, dias_extra_item: desgMes ? desgMes.diasExtra : 0, total_item: totalItem, pagado_item: pagadoItem, saldo_item: saldoItem };
   });
 
   // Sumar costos de DAÑO_DEVOLUCION para individuales dañados

@@ -343,7 +343,7 @@ export default function Inventario() {
       <div className="flex gap-0.5 p-0.5 rounded-lg w-fit" style={{ backgroundColor: 'var(--surface)' }}>
         {[
           { id: 'herramientas', label: 'Herramientas', icon: Wrench },
-          { id: 'granel', label: 'Material a granel', icon: Package },
+          { id: 'granel', label: 'Tablas, Puntales, Soleras', icon: Package },
           { id: 'kits', label: 'Kits', icon: Layers },
         ].map((t) => (
           <button key={t.id} onClick={() => { setTab(t.id); setBusqueda(''); }}

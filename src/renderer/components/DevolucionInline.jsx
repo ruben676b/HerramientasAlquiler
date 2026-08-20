@@ -751,7 +751,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                   {/* Fila 2: Fechas del ítem (heredadas del kit en componentes) */}
                   {!esHijo && (
                   <div className="text-[10px] mb-1" style={{ color: 'var(--muted)' }}>
-                    Salida: {fmtFecha(c.fecha_salida)} &middot; Pactada: {fmtFecha(fechaPactadaItem)}
+                    Salida: {fmtFecha(item.fecha_salida_item || c.fecha_salida)} &middot; Pactada: {fmtFecha(fechaPactadaItem)}
                     <span style={{ color: 'var(--muted)' }}> &middot; Base: {diasItem} día{diasItem !== 1 ? 's' : ''}</span>
                   </div>
                   )}

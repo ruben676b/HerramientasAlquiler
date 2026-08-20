@@ -574,12 +574,14 @@ function crearLote({ id_categoria, nombre, precio_dia, precio_minimo, precio_mes
   const cat = db.prepare('SELECT * FROM CATEGORIA_HERRAMIENTA WHERE id = ?').get(id_categoria);
   if (!cat) throw new Error('Categoría no encontrada: ' + id_categoria);
 
-  // Guardar precios en la categoría para persistencia
+  const descFinal = descripcion != null && descripcion.trim() ? descripcion.trim() : cat.descripcion || null;
+
+  // Guardar precios y descripción en la categoría para persistencia
   db.prepare(`
     UPDATE CATEGORIA_HERRAMIENTA
-    SET nombre = ?, precio_dia = ?, precio_minimo = ?, precio_mes = ?, precio_venta = ?
+    SET nombre = ?, descripcion = ?, precio_dia = ?, precio_minimo = ?, precio_mes = ?, precio_venta = ?
     WHERE id = ?
-  `).run(nombre, precio_dia || 0,
+  `).run(nombre, descFinal, precio_dia || 0,
     precio_minimo != null ? precio_minimo : null,
     precio_mes != null ? precio_mes : null,
     precio_venta != null ? precio_venta : null,
@@ -605,7 +607,7 @@ function crearLote({ id_categoria, nombre, precio_dia, precio_minimo, precio_mes
     for (let i = 0; i < cantidad; i++) {
       const num = String(inicio + i);
       const id = id_categoria + '-' + num;
-      insert.run(id, id_categoria, nombre, descripcion || null,
+      insert.run(id, id_categoria, nombre, descFinal,
         precio_dia || 0,
         precio_minimo != null ? precio_minimo : null,
         precio_mes != null ? precio_mes : null,

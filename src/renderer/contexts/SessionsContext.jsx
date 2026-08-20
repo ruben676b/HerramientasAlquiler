@@ -176,6 +176,7 @@ const addSession = useCallback((tipo) => {
           cantidad: item.cantidad || 1,
           condicion: item.item_condicion || undefined,
           tarifa: item.tarifa_aplicada || 'dia',
+          fecha_salida_item: item.fecha_salida_item || null,
           fecha_devolucion_item: item.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada,
           _componentes: undefined,
         })),

@@ -453,6 +453,10 @@ function SessionForm({ session }) {
     setItems(items.map((item, i) => i === idx ? { ...item, fecha_devolucion_item: fecha, total_editado: undefined } : item));
   };
 
+  const cambiarFechaSalidaItem = (idx, fecha) => {
+    setItems(items.map((item, i) => i === idx ? { ...item, fecha_salida_item: fecha || null, total_editado: undefined } : item));
+  };
+
   const quitarItem = (idx) => setItems(items.filter((_, i) => i !== idx));
 
   const cambiarCantidad = (idx, delta) => {
@@ -598,17 +602,18 @@ function SessionForm({ session }) {
   const totalPagado = pagos.reduce((a, p) => a + p.monto, 0);
   const itemsConDias = useMemo(() => {
     return itemsConMaximo.map(item => {
+      const salidaDate = item.fecha_salida_item || fechaSalida;
       const devDate = item.fecha_devolucion_item || fechaDevolucion;
       const tarifa = item.tarifa || 'dia';
       const diasItem = Math.max(1, Math.ceil(
-        (new Date(devDate + 'T00:00:00') - new Date(fechaSalida + 'T00:00:00')) / 86400000
+        (new Date(devDate + 'T00:00:00') - new Date(salidaDate + 'T00:00:00')) / 86400000
       ) + 1);
-      const diasHabilesItem = contarHabiles(fechaSalida, devDate);
+      const diasHabilesItem = contarHabiles(salidaDate, devDate);
       let subCalc;
       let mesesItem = 0;
       let diasExtraItem = 0;
       if (tarifa === 'mes' && item.precio_mes != null) {
-        const desg = desglosarMensual(fechaSalida, devDate);
+        const desg = desglosarMensual(salidaDate, devDate);
         mesesItem = desg.meses;
         diasExtraItem = desg.diasExtra;
         if (desg.meses > 0) {
@@ -754,11 +759,17 @@ function SessionForm({ session }) {
 
         {/* Línea 2: Fecha por ítem + botones rápidos */}
         <div className="flex items-center gap-2 mt-1.5 text-xs" style={{ color: 'var(--muted)' }}>
-          <span>Desde: {new Date(fechaSalida + 'T00:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          <span className="flex items-center gap-1">
+            Desde:
+            <DatePicker compacto value={item.fecha_salida_item || fechaSalida} onChange={(f) => cambiarFechaSalidaItem(idx, f)} />
+            {item.fecha_salida_item && (
+              <button onClick={() => cambiarFechaSalidaItem(idx, null)} className="text-[10px] opacity-50 hover:opacity-100 transition-opacity" title="Restaurar fecha de salida del contrato">✕</button>
+            )}
+          </span>
           <span style={{ color: 'var(--border)' }}>|</span>
           <span className="flex items-center gap-1">
             Hasta:
-            <DatePicker compacto value={item.fecha_devolucion_item || fechaDevolucion} onChange={(f) => cambiarFechaItem(idx, f)} min={fechaSalida} />
+            <DatePicker compacto value={item.fecha_devolucion_item || fechaDevolucion} onChange={(f) => cambiarFechaItem(idx, f)} min={item.fecha_salida_item || fechaSalida} />
           </span>
           <span className="font-medium" style={{ color: 'var(--info)' }}>
             {tarifa === 'mes' && item.precio_mes != null && item.meses_item > 0
@@ -853,6 +864,7 @@ const itemsData = itemsConDias.map(item => ({
         id_item_granel: item.id_item_granel || undefined,
         id_kit: item.id_kit || undefined,
         cantidad: item.cantidad || 1,
+        fecha_salida_item: item.fecha_salida_item || undefined,
         fecha_devolucion_pactada: item.fecha_devolucion_item || undefined,
         tarifa_aplicada: item.tarifa || 'dia',
         precio_aplicado: infoTarifa(item).precio,
