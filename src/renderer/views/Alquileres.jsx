@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Search, Plus, ChevronDown, ChevronRight, Calendar, Clock,
   XCircle, X, CheckCircle, AlertTriangle, FileText, ArrowRight, Star,
-  Ban, RefreshCw, Trash2, Edit, RotateCcw,
+  Ban, RefreshCw, Trash2, Edit, RotateCcw, Phone, CreditCard,
 } from 'lucide-react';
 import { SEMANTIC } from '../lib/constants';
 import Button from '../components/ui/button';
@@ -18,6 +18,18 @@ import TagChip from '../components/TagChip';
 import { contarHabiles, desglosarMensual } from '../lib/duracion';
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+// Paleta de colores semánticos por estado de alquiler
+const ESTADO_COLOR = {
+  atrasado:         { vivid: 'var(--danger)',  bg: 'oklch(0.97 0.012 25)', badge: 'oklch(0.95 0.02 25)',   badgeText: 'var(--danger)' },
+  deuda:            { vivid: 'var(--warning)', bg: 'oklch(0.97 0.015 75)', badge: 'oklch(0.95 0.025 75)', badgeText: 'var(--warning)' },
+  incompleto:       { vivid: 'oklch(0.58 0.13 55)', bg: 'oklch(0.97 0.015 55)', badge: 'oklch(0.93 0.04 55)', badgeText: 'oklch(0.48 0.13 55)' },
+  reservado:        { vivid: 'var(--info)',    bg: 'oklch(0.97 0.015 240)', badge: 'oklch(0.93 0.04 240)', badgeText: 'var(--info)' },
+  devuelto:         { vivid: 'var(--success)', bg: 'var(--bg)',            badge: null,                    badgeText: null },
+  papelera:         { vivid: 'oklch(0.40 0.12 25)', bg: 'oklch(0.97 0.008 25)', badge: 'oklch(0.93 0.02 25)', badgeText: 'var(--danger)' },
+  cancelado:        { vivid: 'var(--muted)',   bg: 'var(--bg)',            badge: 'oklch(0.90 0.003 60)', badgeText: 'var(--muted)' },
+  normal:           { vivid: 'var(--success)', bg: 'var(--bg)',            badge: null,                    badgeText: null },
+};
 
 const fmtFecha = (iso) => {
   if (!iso) return '';
@@ -245,7 +257,7 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
   const contratosFiltrados = useMemo(() => {
     if (!estadoFiltro) return contratosConPendiente;
     if (estadoFiltro === 'deudores') return contratosConPendiente.filter(c => c._pendiente > 0 && c._herramientasAtrasadas <= 0);
-    if (estadoFiltro === 'atrasado') return contratosConPendiente.filter(c => c._pendiente > 0 || c._herramientasAtrasadas > 0);
+    if (estadoFiltro === 'atrasado') return contratosConPendiente.filter(c => c._pendiente > 0 && c._herramientasAtrasadas > 0);
     if (estadoFiltro === 'devuelto') return contratosConPendiente.filter(c => c.estado === 'devuelto' && c._pendiente <= 0);
     if (estadoFiltro === 'papelera') return contratosConPendiente.filter(c => c.papelera === 1);
     return contratosConPendiente.filter(c => c.estado === estadoFiltro);
@@ -293,29 +305,22 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
         <div className="flex gap-1.5 flex-wrap">
           {[
             { id: '', label: 'Todos' },
-            { id: 'deudores', label: 'Deudores', danger: true },
-            { id: 'atrasado', label: 'Deudores y herramientas atrasadas', danger: true },
+            { id: 'deudores', label: 'Deudores', stateColor: 'deuda' },
+            { id: 'atrasado', label: 'Deudores y herramientas atrasadas', stateColor: 'atrasado' },
             ...['alquilado', 'devuelto', 'devolucion incompleta']
               .filter(e => conteo[e] > 0)
-              .map(e => ({ id: e, label: e === 'devolucion incompleta' ? 'Dev. incompleta' : e.charAt(0).toUpperCase() + e.slice(1) })),
-            { id: 'reservado', label: 'Reservado', info: true },
+              .map(e => ({ id: e, label: e === 'devolucion incompleta' ? 'Dev. incompleta' : e.charAt(0).toUpperCase() + e.slice(1), stateColor: e === 'devolucion incompleta' ? 'incompleto' : null })),
+            { id: 'reservado', label: 'Reservado', stateColor: 'reservado' },
           ].map(f => {
             const activo = estadoFiltro === f.id;
             let bgColor = 'var(--surface)';
             let txtColor = 'var(--muted)';
             let bdrColor = '0.5px solid var(--border)';
-            if (f.danger) {
-              bgColor = 'oklch(0.95 0.015 25)';
-              txtColor = 'var(--danger)';
-              bdrColor = '0.5px solid var(--danger)';
-            } else if (f.info) {
-              bgColor = 'oklch(0.93 0.04 240)';
-              txtColor = 'var(--info)';
-              bdrColor = '0.5px solid var(--info)';
-            } else if (f.muted) {
-              bgColor = 'oklch(0.90 0.003 60)';
-              txtColor = 'var(--muted)';
-              bdrColor = '0.5px solid var(--border)';
+            if (f.stateColor && ESTADO_COLOR[f.stateColor]) {
+              const sc = ESTADO_COLOR[f.stateColor];
+              bgColor = sc.badge || bgColor;
+              txtColor = sc.badgeText || txtColor;
+              bdrColor = '0.5px solid ' + (sc.vivid || 'var(--border)');
             }
             if (activo) {
               bgColor = 'var(--ink)';
@@ -330,7 +335,7 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                   color: txtColor,
                   border: bdrColor,
                 }}>
-                {f.danger && <AlertTriangle size={11} />}
+                {f.stateColor === 'atrasado' && <AlertTriangle size={11} />}
                 {f.label}
                 {f.id && <span style={{ opacity: 0.7 }}>{conteo[f.id] || 0}</span>}
               </button>
@@ -366,6 +371,7 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
               const pagos = c.pagos || [];
 
               let borderColor = 'var(--border)';
+              let headerBg = 'var(--bg)';
               let badges = [];
 
               const itemsAtrasados = (c.items || []).filter(i => {
@@ -374,14 +380,18 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
               }).length;
 
               if (c.estado === 'reservado') {
-                borderColor = 'var(--info)';
+                const s = ESTADO_COLOR.reservado;
+                borderColor = s.vivid;
+                headerBg = s.bg;
                 if (c.fecha_reserva) {
-                  badges.push({ text: 'Reservado: ' + fmtFecha(c.fecha_reserva), bg: 'oklch(0.93 0.04 240)', color: 'var(--info)', icon: false });
+                  badges.push({ text: 'Reservado: ' + fmtFecha(c.fecha_reserva), bg: s.badge, color: s.badgeText, icon: false });
                 } else {
-                  badges.push({ text: 'Reservado', bg: 'oklch(0.93 0.04 240)', color: 'var(--info)', icon: false });
+                  badges.push({ text: 'Reservado', bg: s.badge, color: s.badgeText, icon: false });
                 }
               } else if (c.papelera === 1) {
-                borderColor = 'oklch(0.40 0.12 25)';
+                const s = ESTADO_COLOR.papelera;
+                borderColor = s.vivid;
+                headerBg = s.bg;
                 const diasRest = (() => {
                   if (!c.fecha_papelera) return 7;
                   const fp = new Date(c.fecha_papelera + 'T00:00:00');
@@ -390,79 +400,91 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                   const diff = Math.floor((hoy - fp) / 86400000);
                   return Math.max(0, 7 - diff);
                 })();
-                badges.push({ text: `Papelera · ${diasRest} dia${diasRest !== 1 ? 's' : ''} restante${diasRest !== 1 ? 's' : ''}`, bg: 'oklch(0.93 0.02 25)', color: 'var(--danger)', icon: true });
+                badges.push({ text: `Papelera · ${diasRest} dia${diasRest !== 1 ? 's' : ''} restante${diasRest !== 1 ? 's' : ''}`, bg: s.badge, color: s.badgeText, icon: true });
               } else if (c.estado === 'cancelado') {
-                borderColor = 'var(--muted)';
-                badges.push({ text: 'Reserva cancelada', bg: 'oklch(0.90 0.003 60)', color: 'var(--muted)', icon: false });
+                const s = ESTADO_COLOR.cancelado;
+                borderColor = s.vivid;
+                headerBg = s.bg;
+                badges.push({ text: 'Reserva cancelada', bg: s.badge, color: s.badgeText, icon: false });
               } else if (c.estado === 'devuelto' && pendiente <= 0) {
-                borderColor = 'var(--muted)';
-              } else if (c.estado === 'devolución incompleta' || (c.estado === 'devuelto' && pendiente > 0)) {
-                borderColor = 'var(--danger)';
-                if (itemsAtrasados > 0) {
-                  badges.push({ text: `Atrasado ${itemsAtrasados} herramienta${itemsAtrasados !== 1 ? 's' : ''}`, bg: 'oklch(0.95 0.015 25)', color: 'var(--danger)', icon: true });
-                }
-                if (pendiente > 0) {
-                  badges.push({ text: `Debe S/ ${pendiente.toFixed(2)}`, bg: 'oklch(0.95 0.015 25)', color: 'var(--danger)', icon: true });
-                }
-              } else if (c.estado === 'atrasado' || c.dias_atraso > 0) {
-                borderColor = 'var(--danger)';
-                badges.push({ text: `Atrasado ${itemsAtrasados} herramienta${itemsAtrasados !== 1 ? 's' : ''}`, bg: 'oklch(0.95 0.015 25)', color: 'var(--danger)', icon: true });
-                if (pendiente > 0) {
-                  badges.push({ text: `Debe S/ ${pendiente.toFixed(2)}`, bg: 'oklch(0.95 0.015 25)', color: 'var(--danger)', icon: true });
-                }
-              } else if (pendiente > 0 || itemsAtrasados > 0) {
-                borderColor = 'var(--danger)';
-                if (itemsAtrasados > 0) {
-                  badges.push({ text: `Atrasado ${itemsAtrasados} herramienta${itemsAtrasados !== 1 ? 's' : ''}`, bg: 'oklch(0.95 0.015 25)', color: 'var(--danger)', icon: true });
-                }
-                if (pendiente > 0) {
-                  badges.push({ text: `Debe S/ ${pendiente.toFixed(2)}`, bg: 'oklch(0.95 0.015 25)', color: 'var(--danger)', icon: true });
-                }
+                borderColor = ESTADO_COLOR.devuelto.vivid;
+                headerBg = ESTADO_COLOR.devuelto.bg;
               } else {
-                borderColor = 'var(--success)';
+                // Determinar estado dominante por prioridad: atrasado > deuda > incompleto
+                let dominante = null;
+                if (c.estado === 'atrasado' || c.dias_atraso > 0 || itemsAtrasados > 0) {
+                  dominante = 'atrasado';
+                } else if (pendiente > 0) {
+                  dominante = 'deuda';
+                } else if (c.estado === 'devolución incompleta' || (c.estado === 'devuelto' && pendiente > 0)) {
+                  dominante = 'incompleto';
+                }
+
+                if (dominante) {
+                  const s = ESTADO_COLOR[dominante];
+                  borderColor = s.vivid;
+                  headerBg = s.bg;
+                  if (itemsAtrasados > 0) {
+                    const sa = ESTADO_COLOR.atrasado;
+                    badges.push({ text: `Atrasado ${itemsAtrasados} herramienta${itemsAtrasados !== 1 ? 's' : ''}`, bg: sa.badge, color: sa.badgeText, icon: true });
+                  }
+                  if (pendiente > 0) {
+                    const sd = ESTADO_COLOR.deuda;
+                    badges.push({ text: `Debe S/ ${pendiente.toFixed(2)}`, bg: sd.badge, color: sd.badgeText, icon: true });
+                  }
+                } else {
+                  borderColor = ESTADO_COLOR.normal.vivid;
+                }
               }
 
               return (
                 <div key={c.id} className="overflow-hidden"
                   style={{ border: '0.5px solid var(--border)', borderLeft: '3px solid ' + borderColor }}>
                   <button onClick={() => toggleExpand(c.id)} className="w-full flex items-center gap-3 px-4 py-3 text-left"
-                    style={{ backgroundColor: 'var(--bg)' }}>
+                    style={{ backgroundColor: headerBg, transition: 'background-color 0.2s ease' }}>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2 min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>{c.cliente_nombre}</p>
                         {c.cliente_telefono && (
-                          <span className="text-[11px] shrink-0" style={{ color: 'var(--muted)' }}>{c.cliente_telefono}</span>
+                          <span className="inline-flex items-center gap-1 text-[11px] shrink-0" style={{ color: 'var(--muted)' }}>
+                            <Phone size={10} style={{ opacity: 0.7 }} />
+                            {c.cliente_telefono}
+                          </span>
+                        )}
+                        {c.cliente_dni && (
+                          <span className="inline-flex items-center gap-1 text-[11px] shrink-0 font-mono" style={{ color: 'var(--muted)' }}>
+                            <CreditCard size={10} style={{ opacity: 0.7 }} />
+                            {c.cliente_dni}
+                          </span>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 text-xs mt-1 flex-wrap">
+                        <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+                          <Calendar size={10} style={{ opacity: 0.7 }} />
+                          {fmtFechaCorta(c.fecha_salida)} &mdash; {fmtFecha(c.fecha_devolucion_pactada)}
+                        </span>
                         {c.etiquetas?.length > 0 && (
                           <>
+                            <span className="text-[11px]" style={{ color: 'var(--muted)' }}>&middot;</span>
                             {c.etiquetas.slice(0, 2).map((t) => <TagChip key={t.id} tag={t} />)}
                             {c.etiquetas.length > 2 && (
-                              <span className="text-[9px] font-semibold" style={{ color: 'var(--faint)' }}>+{c.etiquetas.length - 2}</span>
+                              <span className="text-[9px] font-semibold" style={{ color: 'var(--muted)' }}>+{c.etiquetas.length - 2}</span>
                             )}
                           </>
                         )}
-                        {c.cliente_dni && (
-                          <span className="px-2 py-0.5 rounded-[10px] text-[11px] font-mono font-semibold"
-                            style={{ backgroundColor: 'oklch(0.50 0.13 240)', color: '#fff' }}>
-                            DNI {c.cliente_dni}
-                          </span>
-                        )}
-                        <span className="px-1.5 py-0.5 rounded text-[11px]"
-                          style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)' }}>
-                          {fmtFechaCorta(c.fecha_salida)} &mdash; {fmtFecha(c.fecha_devolucion_pactada)}
-                        </span>
                         {badges.length > 0 && (
-                          <span className="inline-flex items-center gap-1.5 flex-wrap">
-                            {badges.map((b, i) => (
-                              <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[10px] text-[11px] font-medium"
-                                style={{ backgroundColor: b.bg, color: b.color }}>
-                                {b.icon && <AlertTriangle size={11} />}
-                                {b.text}
-                              </span>
-                            ))}
-                          </span>
+                          <>
+                            <span className="text-[11px]" style={{ color: 'var(--muted)' }}>&middot;</span>
+                            <span className="inline-flex items-center gap-1.5 flex-wrap">
+                              {badges.map((b, i) => (
+                                <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[10px] text-[11px] font-medium"
+                                  style={{ backgroundColor: b.bg, color: b.color }}>
+                                  {b.icon && <AlertTriangle size={11} />}
+                                  {b.text}
+                                </span>
+                              ))}
+                            </span>
+                          </>
                         )}
                       </div>
                     </div>
@@ -671,8 +693,8 @@ return filas.map((g, gi) => {
                                   {/* Atraso */}
                                   {montoAtraso > 0 && (
                                     <div className="flex justify-between items-baseline text-xs">
-                                      <span style={{ color: 'var(--danger)' }}>Recargos por atraso</span>
-                                      <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {montoAtraso.toFixed(2)}</span>
+                                      <span style={{ color: 'var(--warning)' }}>Recargos por atraso</span>
+                                      <span className="font-mono tabular-nums" style={{ color: 'var(--warning)' }}>+ S/ {montoAtraso.toFixed(2)}</span>
                                     </div>
                                   )}
                                   {/* Daños */}

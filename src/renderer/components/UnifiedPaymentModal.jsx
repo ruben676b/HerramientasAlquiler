@@ -178,7 +178,7 @@ export default function UnifiedPaymentModal({ tipo, contrato, item, itemPendient
                 </div>
                 {(contrato.total_atraso || 0) > 0 && (
                   <div className="flex justify-between items-center">
-                    <span style={{ color: 'var(--danger)' }}>Recargo por atraso</span>
+                    <span style={{ color: 'var(--warning)' }}>Recargo por atraso</span>
                     <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                       <span className="text-[10px]" style={{ color: 'var(--muted)' }}>+ S/</span>
                       <input type="number" step="0.01" min="0"

@@ -1155,8 +1155,8 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
             {/* Mora total (suma de moras por ítem) */}
             {montoAtrasoEfectivo > 0 && (
               <div className="flex justify-between">
-                <span style={{ color: 'var(--danger)' }}>Recargo por atraso</span>
-                <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>
+                <span style={{ color: 'var(--warning)' }}>Recargo por atraso</span>
+                <span className="font-mono tabular-nums" style={{ color: 'var(--warning)' }}>
                   + S/ {montoAtrasoEfectivo.toFixed(2)}
                 </span>
               </div>

@@ -4,10 +4,11 @@ import StarRating from './StarRating';
 
 const ESTADO_STYLES = {
   'alquilado': { bg: 'oklch(0.93 0.04 240)', color: 'oklch(0.45 0.10 240)', label: 'Alquilado' },
-  'reservado': { bg: 'oklch(0.93 0.04 280)', color: 'oklch(0.45 0.10 280)', label: 'Reservado' },
+  'reservado': { bg: 'oklch(0.93 0.04 240)', color: 'oklch(0.45 0.10 240)', label: 'Reservado' },
   'atrasado': { bg: 'oklch(0.93 0.04 25)', color: 'oklch(0.45 0.18 25)', label: 'Atrasado' },
   'devuelto': { bg: 'oklch(0.93 0.06 160)', color: 'oklch(0.40 0.12 160)', label: 'Devuelto' },
-  'devolución incompleta': { bg: 'oklch(0.93 0.05 80)', color: 'oklch(0.50 0.13 80)', label: 'Dev. Incompleta' },
+  'devolución incompleta': { bg: 'oklch(0.93 0.04 55)', color: 'oklch(0.48 0.13 55)', label: 'Dev. Incompleta' },
+  'cancelado': { bg: 'oklch(0.90 0.003 60)', color: 'var(--muted)', label: 'Cancelado' },
 };
 
 const DEVOLUCION_ICONS = {
@@ -175,8 +176,8 @@ export default function DetalleAlquilerModal({ contrato, onClose }) {
                 </div>
                 {total_atraso > 0 && (
                   <div className="flex justify-between">
-                    <span style={{ color: 'var(--danger)' }}>Recargo por atraso</span>
-                    <span className="font-mono" style={{ color: 'var(--danger)' }}>+ S/ {total_atraso.toFixed(2)}</span>
+                    <span style={{ color: 'var(--warning)' }}>Recargo por atraso</span>
+                    <span className="font-mono" style={{ color: 'var(--warning)' }}>+ S/ {total_atraso.toFixed(2)}</span>
                   </div>
                 )}
                 {total_danos > 0 && (

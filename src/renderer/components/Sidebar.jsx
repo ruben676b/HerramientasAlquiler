@@ -27,7 +27,7 @@ const NAV_ITEMS = [
   { id: 'configuracion', label: 'Configuración', icon: Settings },
 ];
 
-const SHOP_NAME = 'Ferretería El Martillo';
+const SHOP_NAME = 'Quispe';
 
 function useTheme() {
   const [theme, setTheme] = useState(() => {
@@ -66,36 +66,40 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggle })
       {/* ===== BRAND ===== */}
       <div className="shrink-0 px-2.5 pt-3 pb-2">
         <div
-          className="rounded-[12px] overflow-hidden"
+          className="rounded-[14px] overflow-hidden"
           style={{
-            backgroundColor: 'var(--sidebar-brand)',
+            background: 'linear-gradient(135deg, var(--sidebar-brand) 0%, oklch(from var(--sidebar-brand) calc(l - 0.03) c h) 100%)',
             border: '1px solid var(--sidebar-border)',
+            boxShadow: '0 1px 3px oklch(0 0 0 / 0.04)',
           }}
         >
           <div
             className={cn(
               'flex items-center',
-              collapsed ? 'justify-center py-3' : 'px-3.5 py-3 gap-3'
+              collapsed ? 'justify-center py-3' : 'px-3.5 py-3.5 gap-3'
             )}
           >
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-              style={{ backgroundColor: 'var(--primary)' }}
+              className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
+              style={{
+                backgroundColor: 'var(--primary)',
+                boxShadow: '0 2px 6px oklch(from var(--primary) l c h / 0.3)',
+              }}
             >
-              <Wrench size={15} style={{ color: 'var(--primary-text)' }} />
+              <Wrench size={16} style={{ color: 'var(--primary-text)' }} strokeWidth={2.25} />
             </div>
 
             {!collapsed && (
               <>
                 <div className="flex-1 min-w-0 leading-tight">
                   <p
-                    className="text-[10px] uppercase tracking-[0.15em] font-medium"
-                    style={{ color: 'var(--sidebar-muted)' }}
+                    className="text-[9.5px] uppercase tracking-[0.18em] font-semibold"
+                    style={{ color: 'var(--sidebar-muted)', opacity: 0.8 }}
                   >
-                    Sistema de Alquiler
+                    Alquiler de Herramientas
                   </p>
                   <p
-                    className="text-[13px] font-semibold mt-0.5"
+                    className="text-[14px] font-bold mt-0.5 tracking-tight"
                     style={{ color: 'var(--sidebar-ink)' }}
                   >
                     {SHOP_NAME}
@@ -104,11 +108,11 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggle })
 
                 <button
                   onClick={onToggle}
-                  className="p-1 rounded-md transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 shrink-0"
+                  className="p-1.5 rounded-lg transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 shrink-0"
                   style={{ color: 'var(--sidebar-muted)' }}
                   aria-label="Colapsar menú"
                 >
-                  <ChevronLeft size={15} />
+                  <ChevronLeft size={14} />
                 </button>
               </>
             )}
