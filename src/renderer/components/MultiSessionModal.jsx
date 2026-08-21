@@ -619,11 +619,6 @@ function SessionForm({ session }) {
         if (desg.meses > 0) {
           const extraRate = item.precio_dia || (item.precio_minimo || 0);
           subCalc = (item.precio_mes * desg.meses + extraRate * desg.diasExtra) * item.cantidad;
-        } else if (diasHabilesItem >= 20) {
-          // Umbral inteligente: 20+ días hábiles con tarifa mensual = 1 mes
-          mesesItem = 1;
-          diasExtraItem = 0;
-          subCalc = item.precio_mes * item.cantidad;
         } else {
           subCalc = (item.precio_dia || 0) * diasHabilesItem * item.cantidad;
         }
@@ -916,6 +911,22 @@ function SessionForm({ session }) {
                 </button>
               )}
             </span>
+          )}
+          {tarifa === 'mes' && item.precio_mes != null && item.meses_item === 0 && item.dias_habiles_item >= 20 && item.total_editado == null && (
+            <button
+              onClick={() => {
+                const totalMes = item.precio_mes * item.cantidad;
+                setItems(items.map((it, i) => i === idx ? { ...it, total_editado: totalMes } : it));
+              }}
+              className="px-1.5 h-5 rounded text-[9px] font-medium transition-all duration-100"
+              style={{
+                backgroundColor: 'oklch(0.50 0.11 155 / 0.12)',
+                color: 'oklch(0.45 0.12 155)',
+                border: '1px solid oklch(0.50 0.11 155 / 0.3)',
+              }}
+              title={`${item.dias_habiles_item} días hábiles → cobrar como 1 mes`}>
+              Cobrar como 1 mes (S/ {item.precio_mes.toFixed(0)})
+            </button>
           )}
         </div>
       </div>
