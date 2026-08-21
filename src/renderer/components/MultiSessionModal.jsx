@@ -10,7 +10,7 @@ import StarRating, { CalificacionBadge } from './StarRating';
 import DetalleClienteModal from './DetalleClienteModal';
 import Button from './ui/button';
 import TagChip from './TagChip';
-import { fmtLocalDate, contarHabiles, desglosarMensual } from '../lib/duracion';
+import { fmtLocalDate, contarHabiles, desglosarMensual, sumarMesCalendario } from '../lib/duracion';
 import DatePicker from './DatePicker';
 
 export default function MultiSessionModal() {
@@ -619,6 +619,11 @@ function SessionForm({ session }) {
         if (desg.meses > 0) {
           const extraRate = item.precio_dia || (item.precio_minimo || 0);
           subCalc = (item.precio_mes * desg.meses + extraRate * desg.diasExtra) * item.cantidad;
+        } else if (diasHabilesItem >= 20) {
+          // Umbral inteligente: 20+ días hábiles con tarifa mensual = 1 mes
+          mesesItem = 1;
+          diasExtraItem = 0;
+          subCalc = item.precio_mes * item.cantidad;
         } else {
           subCalc = (item.precio_dia || 0) * diasHabilesItem * item.cantidad;
         }
@@ -772,9 +777,33 @@ function SessionForm({ session }) {
             <DatePicker compacto value={item.fecha_devolucion_item || fechaDevolucion} onChange={(f) => cambiarFechaItem(idx, f)} min={item.fecha_salida_item || fechaSalida} />
           </span>
           <span className="font-medium" style={{ color: 'var(--info)' }}>
-            {tarifa === 'mes' && item.precio_mes != null && item.meses_item > 0
-              ? `${item.meses_item} mes${item.meses_item !== 1 ? 'es' : ''}${item.dias_extra_item > 0 ? ` + ${item.dias_extra_item} día${item.dias_extra_item !== 1 ? 's' : ''}` : ''} (${item.dias_habiles_item} día${item.dias_habiles_item !== 1 ? 's' : ''} sin dom.)`
-              : `(${item.dias_habiles_item} día${item.dias_habiles_item !== 1 ? 's' : ''} sin dom.)`}
+            {tarifa === 'mes' && item.precio_mes != null && item.meses_item >= 1
+              ? (item.dias_extra_item === 0
+                  ? `${item.meses_item} mes${item.meses_item !== 1 ? 'es' : ''}`
+                  : `${item.meses_item} mes${item.meses_item !== 1 ? 'es' : ''} + ${item.dias_extra_item} día${item.dias_extra_item !== 1 ? 's' : ''}`)
+              : `${item.dias_habiles_item} día${item.dias_habiles_item !== 1 ? 's' : ''}`}
+          </span>
+          {/* Botones +/- mes como chips separados */}
+          <span className="flex gap-px rounded overflow-hidden shrink-0" style={{ border: '1px solid var(--border)' }}>
+            <button
+              onClick={() => {
+                const actual = item.fecha_devolucion_item || fechaDevolucion;
+                const nueva = sumarMesCalendario(actual, -1);
+                if (nueva >= (item.fecha_salida_item || fechaSalida)) cambiarFechaItem(idx, nueva);
+              }}
+              disabled={sumarMesCalendario(item.fecha_devolucion_item || fechaDevolucion, -1) < (item.fecha_salida_item || fechaSalida)}
+              title={`Restar 1 mes → ${sumarMesCalendario(item.fecha_devolucion_item || fechaDevolucion, -1)}`}
+              className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
+              style={{
+                backgroundColor: 'var(--bg)',
+                color: sumarMesCalendario(item.fecha_devolucion_item || fechaDevolucion, -1) < (item.fecha_salida_item || fechaSalida) ? 'var(--faint)' : 'var(--ink)',
+                cursor: sumarMesCalendario(item.fecha_devolucion_item || fechaDevolucion, -1) < (item.fecha_salida_item || fechaSalida) ? 'not-allowed' : 'pointer',
+              }}>&minus;1 mes</button>
+            <button
+              onClick={() => cambiarFechaItem(idx, sumarMesCalendario(item.fecha_devolucion_item || fechaDevolucion, 1))}
+              title={`Sumar 1 mes → ${sumarMesCalendario(item.fecha_devolucion_item || fechaDevolucion, 1)}`}
+              className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
+              style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>+1 mes</button>
           </span>
         </div>
 
@@ -808,7 +837,9 @@ function SessionForm({ session }) {
             )}
           </span>
           <span className="text-[10px]" style={{ color: 'var(--faint)' }}>
-            {refInfo.label === '/mes' ? 'plana por mes' : 'por día'}
+            {refInfo.label === '/mes'
+              ? (item.meses_item >= 1 && item.dias_extra_item > 0 ? '' : 'plana por mes')
+              : (item.dias_habiles_item >= 20 && tarifa === 'dia' ? '≥ 20 días → prueba mensual' : 'por día')}
           </span>
           <span style={{ color: 'var(--border)' }}>|</span>
           <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Total:</span>
@@ -840,11 +871,52 @@ function SessionForm({ session }) {
             const baseCalc = item.sub_calc;
             const diff = item.total_editado - baseCalc;
             return diff !== 0 ? (
-              <span className="text-[9px]" style={{ color: 'var(--danger)' }}>
-                ({diff < 0 ? '\u2013S/ ' + Math.abs(diff).toFixed(0) : '+S/ ' + diff.toFixed(0)})
+              <span className="flex items-center gap-1">
+                <span className="text-[9px]" style={{ color: 'var(--danger)' }}>
+                  ({diff < 0 ? '\u2013S/ ' + Math.abs(diff).toFixed(0) : '+S/ ' + diff.toFixed(0)})
+                </span>
+                <button
+                  onClick={() => setItems(prev => prev.map((it, i) => i === idx ? { ...it, total_editado: undefined } : it))}
+                  className="text-[9px] px-1 py-0.5 rounded transition-all duration-100 hover:opacity-80"
+                  title="Restaurar cálculo automático"
+                  style={{ backgroundColor: 'var(--danger)', color: '#fff' }}>restaurar</button>
               </span>
             ) : null;
           })()}
+          {tarifa === 'mes' && item.precio_mes != null && item.meses_item >= 1 && item.dias_extra_item > 0 && item.total_editado == null && (
+            <span className="flex gap-1">
+              <button
+                onClick={() => {
+                  const totalMes = item.precio_mes * item.meses_item * item.cantidad;
+                  setItems(items.map((it, i) => i === idx ? { ...it, total_editado: totalMes } : it));
+                }}
+                className="px-1.5 h-5 rounded text-[9px] font-medium transition-all duration-100"
+                style={{
+                  backgroundColor: 'oklch(0.50 0.11 155 / 0.12)',
+                  color: 'oklch(0.45 0.12 155)',
+                  border: '1px solid oklch(0.50 0.11 155 / 0.3)',
+                }}
+                title={`Cobrar solo ${item.meses_item} mes${item.meses_item !== 1 ? 'es' : ''} (ignorar ${item.dias_extra_item} día${item.dias_extra_item !== 1 ? 's' : ''} extra)`}>
+                Solo {item.meses_item} mes{item.meses_item !== 1 ? 'es' : ''} (sin extra)
+              </button>
+              {item.dias_extra_item >= 20 && (
+                <button
+                  onClick={() => {
+                    const totalSiguienteMes = item.precio_mes * (item.meses_item + 1) * item.cantidad;
+                    setItems(items.map((it, i) => i === idx ? { ...it, total_editado: totalSiguienteMes } : it));
+                  }}
+                  className="px-1.5 h-5 rounded text-[9px] font-medium transition-all duration-100"
+                  style={{
+                    backgroundColor: 'oklch(0.55 0.12 240 / 0.12)',
+                    color: 'oklch(0.50 0.13 240)',
+                    border: '1px solid oklch(0.55 0.12 240 / 0.3)',
+                  }}
+                  title={`Incluir ${item.dias_extra_item} días extra como mes completo (${item.meses_item}+1 meses)`}>
+                  Incluir como {item.meses_item + 1} meses
+                </button>
+              )}
+            </span>
+          )}
         </div>
       </div>
     );
@@ -1190,6 +1262,29 @@ const itemsData = itemsConDias.map(item => ({
               <span className="text-[11px]" style={{ color: 'var(--faint)' }}>→</span>
               <span className="text-[11px] shrink-0" style={{ color: 'var(--muted)' }}>Devolución</span>
               <DatePicker compacto value={fechaDevolucion} onChange={setFechaDevolucion} min={fechaSalida} error={fechaDevolucion < fechaSalida} />
+              {/* Botones +/- mes */}
+              <span className="flex gap-px rounded overflow-hidden shrink-0" style={{ border: '1px solid var(--border)' }}>
+                <button
+                  onClick={() => {
+                    const nueva = sumarMesCalendario(fechaDevolucion, -1);
+                    if (nueva >= fechaSalida) setFechaDevolucion(nueva);
+                  }}
+                  disabled={sumarMesCalendario(fechaDevolucion, -1) < fechaSalida}
+                  className="px-1.5 h-6 text-[10px] font-medium transition-all duration-100"
+                  style={{
+                    backgroundColor: 'var(--bg)',
+                    color: sumarMesCalendario(fechaDevolucion, -1) < fechaSalida ? 'var(--faint)' : 'var(--ink)',
+                    cursor: sumarMesCalendario(fechaDevolucion, -1) < fechaSalida ? 'not-allowed' : 'pointer',
+                  }}>
+                  &minus;1 mes
+                </button>
+                <button
+                  onClick={() => setFechaDevolucion(sumarMesCalendario(fechaDevolucion, 1))}
+                  className="px-1.5 h-6 text-[10px] font-medium transition-all duration-100"
+                  style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
+                  +1 mes
+                </button>
+              </span>
               {items.length > 0 && (
                 <button onClick={() => setItems(items.map(i => ({
                   ...i,
