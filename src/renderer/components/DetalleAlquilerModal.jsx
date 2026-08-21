@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { X, Calendar, Package, CreditCard, Star, CheckCircle, AlertTriangle, XCircle, Clock } from 'lucide-react';
+import { X, Calendar, Package, CreditCard, Star, CheckCircle, AlertTriangle, XCircle, Clock, Plus } from 'lucide-react';
 import StarRating from './StarRating';
+import AgregarItemModal from './AgregarItemModal';
 
 const ESTADO_STYLES = {
   'alquilado': { bg: 'oklch(0.93 0.04 240)', color: 'oklch(0.45 0.10 240)', label: 'Alquilado' },
@@ -35,6 +36,7 @@ export default function DetalleAlquilerModal({ contrato, onClose }) {
   const [editComentario, setEditComentario] = useState(calificacion?.comentario || '');
   const [guardandoCalif, setGuardandoCalif] = useState(false);
   const [califError, setCalifError] = useState('');
+  const [showAgregarItem, setShowAgregarItem] = useState(false);
 
   const guardarCalificacion = async () => {
     if (editEstrellas === 0) { setCalifError('Seleccione al menos 1 estrella'); return; }
@@ -99,10 +101,19 @@ export default function DetalleAlquilerModal({ contrato, onClose }) {
 
           {/* Items */}
           <div>
-            <h3 className="text-[11px] uppercase tracking-wider font-semibold mb-2" style={{ color: 'var(--muted)' }}>
-              <Package size={12} className="inline mr-1" style={{ verticalAlign: '-2px' }} />
-              Herramientas / Items ({items.length})
-            </h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: 'var(--muted)' }}>
+                <Package size={12} className="inline mr-1" style={{ verticalAlign: '-2px' }} />
+                Herramientas / Items ({items.length})
+              </h3>
+              {(c.estado === 'alquilado' || c.estado === 'atrasado') && (
+                <button onClick={() => setShowAgregarItem(true)}
+                  className="flex items-center gap-1 px-2.5 h-6 rounded-lg text-[10px] font-semibold transition-all duration-150 active:scale-[0.97]"
+                  style={{ backgroundColor: 'oklch(0.50 0.11 155 / 0.12)', color: 'oklch(0.45 0.12 155)', border: '1px solid oklch(0.50 0.11 155 / 0.3)' }}>
+                  <Plus size={11} /> Agregar herramienta
+                </button>
+              )}
+            </div>
             <div className="rounded-lg border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
               <table className="w-full text-xs">
                 <thead>
@@ -320,6 +331,9 @@ export default function DetalleAlquilerModal({ contrato, onClose }) {
           )}
         </div>
       </div>
+      {showAgregarItem && (
+        <AgregarItemModal idContrato={c.id} onClose={() => setShowAgregarItem(false)} onAdded={() => window.location.reload()} />
+      )}
     </div>
   );
 }

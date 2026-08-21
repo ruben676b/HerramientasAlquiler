@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('api', {
   registrarPago: (data) => ipcRenderer.invoke('registrar-pago', data),
   anularPago: (data) => ipcRenderer.invoke('anular-pago', data),
   editarContrato: (id, data) => ipcRenderer.invoke('editar-contrato', id, data),
+  agregarItemContrato: (idContrato, items) => ipcRenderer.invoke('agregar-item-contrato', idContrato, items),
   editarReserva: (id, data) => ipcRenderer.invoke('editar-reserva', id, data),
   eliminarContrato: (id, motivo) => ipcRenderer.invoke('eliminar-contrato', id, motivo),
   restaurarContrato: (id) => ipcRenderer.invoke('restaurar-contrato', id),

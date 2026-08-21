@@ -20,6 +20,7 @@ const {
   eliminarContrato,
   restaurarContrato,
   autoEliminarPapelera,
+  agregarItemContrato,
 } = require('./services/contratoService');
 const { checkActivation, activateLicense, getMachineId } = require('./services/licenseService');
 const { registrarVentaInventario, anularVentaInventario, getVentasInventario } = require('./services/ventaService');
@@ -239,6 +240,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle('editar-contrato', (_e, idContrato, data) => {
     return editarContrato(idContrato, data);
+  });
+
+  ipcMain.handle('agregar-item-contrato', (_e, idContrato, items) => {
+    return agregarItemContrato(idContrato, items);
   });
 
   ipcMain.handle('editar-reserva', (_e, idContrato, data) => {

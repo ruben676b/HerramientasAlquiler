@@ -14,6 +14,7 @@ import AnularPagoModal from '../components/AnularPagoModal';
 import { gruparPagos } from '../lib/gruparPagos';
 import DevolucionInline from '../components/DevolucionInline';
 import CalificarContratoModal from '../components/CalificarContratoModal';
+import AgregarItemModal from '../components/AgregarItemModal';
 import TagChip from '../components/TagChip';
 import { contarHabiles, desglosarMensual } from '../lib/duracion';
 
@@ -82,6 +83,7 @@ export default function Alquileres() {
   const [restaurandoContrato, setRestaurandoContrato] = useState(null);
   const [devGarantiaMonto, setDevGarantiaMonto] = useState('');
   const [devGarantiaMetodo, setDevGarantiaMetodo] = useState('efectivo');
+  const [agregarItemContratoId, setAgregarItemContratoId] = useState(null);
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(0);
   const [cargandoMas, setCargandoMas] = useState(false);
@@ -506,10 +508,20 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
 
                               {/* ===== COLUMNA IZQUIERDA: EQUIPOS ===== */}
                               <div className="px-4 py-3">
-                                <p className="text-[11px] uppercase tracking-wider font-semibold pb-1.5 mb-3"
-                                  style={{ color: 'var(--muted)', borderBottom: '1.5px solid oklch(0.50 0.11 240)' }}>
-                                  Equipos
-                                </p>
+                                <div className="flex items-center justify-between pb-1.5 mb-3"
+                                  style={{ borderBottom: '1.5px solid oklch(0.50 0.11 240)' }}>
+                                  <p className="text-[11px] uppercase tracking-wider font-semibold"
+                                    style={{ color: 'var(--muted)' }}>
+                                    Equipos
+                                  </p>
+                                  {(c.estado === 'alquilado' || c.estado === 'atrasado' || c.estado === 'devolución incompleta') && (
+                                    <button onClick={() => setAgregarItemContratoId(c.id)}
+                                      className="flex items-center gap-1 px-2 h-5 rounded text-[9px] font-semibold transition-all duration-150 active:scale-[0.97]"
+                                      style={{ backgroundColor: 'oklch(0.50 0.11 155 / 0.12)', color: 'oklch(0.45 0.12 155)', border: '1px solid oklch(0.50 0.11 155 / 0.3)' }}>
+                                      <Plus size={10} /> Agregar
+                                    </button>
+                                  )}
+                                </div>
                                 {c.items?.length === 0 ? (
                                   <p className="text-xs" style={{ color: 'var(--faint)' }}>Sin equipos registrados</p>
                                 ) : (
@@ -1115,6 +1127,14 @@ return filas.map((g, gi) => {
             danger
             onConfirm={handleCancelarReserva}
             onCancel={() => setCancelarReservaId(null)}
+          />
+        )}
+
+        {agregarItemContratoId && (
+          <AgregarItemModal
+            idContrato={agregarItemContratoId}
+            onClose={() => setAgregarItemContratoId(null)}
+                                    onAdded={() => { const id = agregarItemContratoId; setAgregarItemContratoId(null); recargar(); setExpandido(id); }}
           />
         )}
       </div>

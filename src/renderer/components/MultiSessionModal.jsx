@@ -933,7 +933,7 @@ function SessionForm({ session }) {
     );
   };
 
-  const totalEquipos = itemsConDias.reduce((a, item) => a + item.sub_calc, 0);
+  const totalEquipos = itemsConDias.reduce((a, item) => a + (item.total_editado != null ? item.total_editado : item.sub_calc), 0);
   const pendiente = Math.max(0, totalEquipos - totalPagado);
   const guardar = async () => {
     if (!window.api) return;
@@ -1468,7 +1468,7 @@ const itemsData = itemsConDias.map(item => ({
                       {itemsConMaximo.length} ítem{itemsConMaximo.length !== 1 ? 's' : ''} (cada uno con su fecha)
                     </span>
                     <span className="text-sm font-mono font-bold" style={{ color: 'var(--ink)' }}>
-                      S/ {itemsConDias.reduce((a, item) => a + item.sub_calc, 0).toFixed(2)}
+                      S/ {itemsConDias.reduce((a, item) => a + (item.total_editado != null ? item.total_editado : item.sub_calc), 0).toFixed(2)}
                     </span>
                   </div>
                 </>
@@ -1493,7 +1493,7 @@ const itemsData = itemsConDias.map(item => ({
                       .replaceAll('[CLIENTE_NOMBRE]', nombre || '—')
                       .replaceAll('[CLIENTE_DNI]', dni || '—')
                       .replaceAll('[CLIENTE_DIRECCION]', '—')
-                      .replaceAll('[TOTAL]', 'S/ ' + itemsConDias.reduce((a, item) => a + item.sub_calc, 0).toFixed(2))
+                      .replaceAll('[TOTAL]', 'S/ ' + itemsConDias.reduce((a, item) => a + (item.total_editado != null ? item.total_editado : item.sub_calc), 0).toFixed(2))
                       .replaceAll('[FECHA_INICIO]', fechaSalida)
                       .replaceAll('[FECHA_DEVOLUCION]', fechaDevolucion)
                       .replaceAll('[DEPOSITO_TEXTO]', '')
@@ -1520,11 +1520,11 @@ const itemsData = itemsConDias.map(item => ({
                   onClick={async () => {
                     if (!window.api) return;
                     try {
-                      const total = itemsConDias.reduce((a, item) => a + item.sub_calc, 0);
+                      const total = itemsConDias.reduce((a, item) => a + (item.total_editado != null ? item.total_editado : item.sub_calc), 0);
                       const pdfPath = await window.api.generarPdfPreview({
                         arrendadora: { nombre: 'SOLEDAD SUPANTA QUISPE', dni: '72094861', ruc: '10720948619', direccion: 'Av. Los Pinos N° 348', telefono: '985618849' },
                         cliente: { nombre: nombre || '—', dni: dni || '—', telefono: telefono || '—', direccion: '', ubicacionObra: ubicacionObra || '' },
-                        items: itemsConDias.map(item => ({ codigo: item.id_herramienta || (item.nombre + ' (' + item.condicion + ')'), nombre: item.nombre, cantidad: item.cantidad, precio_dia: infoTarifa(item).precio, tarifa: item.tarifa || 'dia', snapshot: item.sub_calc, desglose: item._componentes ? item._componentes.map(c => ({ cantidad: c.cantidad * (item.cantidad || 1), nombre: c.nombre })) : undefined, fecha_devolucion_pactada: item.fecha_devolucion_item || fechaDevolucion })),
+                        items: itemsConDias.map(item => ({ codigo: item.id_herramienta || (item.nombre + ' (' + item.condicion + ')'), nombre: item.nombre, cantidad: item.cantidad, precio_dia: infoTarifa(item).precio, tarifa: item.tarifa || 'dia', snapshot: item.total_editado != null ? item.total_editado : item.sub_calc, desglose: item._componentes ? item._componentes.map(c => ({ cantidad: c.cantidad * (item.cantidad || 1), nombre: c.nombre })) : undefined, fecha_devolucion_pactada: item.fecha_devolucion_item || fechaDevolucion })),
                         fechas: { salida: fechaSalida, devolucion: fechaDevolucion },
                         total, firmaBase64: firmaBase64 || null,
                       });
@@ -1609,7 +1609,7 @@ const itemsData = itemsConDias.map(item => ({
                   <hr style={{ borderColor: 'var(--border)', marginTop: 8, marginBottom: 6 }} />
                   <div className="flex justify-between items-baseline">
                     <span className="font-bold text-sm" style={{ color: 'var(--ink)' }}>TOTAL</span>
-                    <span className="font-mono font-bold text-sm" style={{ color: 'var(--success)' }}>S/ {itemsConDias.reduce((a, item) => a + item.sub_calc, 0).toFixed(2)}</span>
+                    <span className="font-mono font-bold text-sm" style={{ color: 'var(--success)' }}>S/ {itemsConDias.reduce((a, item) => a + (item.total_editado != null ? item.total_editado : item.sub_calc), 0).toFixed(2)}</span>
                   </div>
                 </div>
 
