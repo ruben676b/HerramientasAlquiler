@@ -1331,7 +1331,6 @@ const itemsData = itemsConDias.map(item => ({
                       return renderItemCard(item, item._idx, g.key);
                     }
                     const abierto = !!gruposAbiertos[g.key];
-                    const totalGrupo = g.items.reduce((a, it) => a + (it.total_editado != null ? it.total_editado : it.sub_calc), 0);
                     return (
                       <div key={g.key} className="rounded-xl transition-colors duration-150 overflow-hidden"
                         style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg)' }}>
@@ -1345,9 +1344,6 @@ const itemsData = itemsConDias.map(item => ({
                               &times;{g.items.length}
                             </span>
                             <DescripcionPopover text={g.descripcion} />
-                          </span>
-                          <span className="font-mono text-xs font-bold shrink-0" style={{ color: 'var(--ink)' }}>
-                            S/ {totalGrupo.toFixed(2)}
                           </span>
                           <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
                             {abierto ? 'ocultar' : g.items.length + ' unidad' + (g.items.length !== 1 ? 'es' : '')}
