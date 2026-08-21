@@ -828,6 +828,23 @@ function getHistorialUnidad(id) {
   return { mantenimientos, danosPorContrato };
 }
 
+function getAlquilerActivoDeHerramienta(id) {
+  return db.prepare(`
+    SELECT c.id AS contrato_id, c.fecha_salida, c.fecha_devolucion_pactada,
+           c.estado AS estado_contrato, c.deposito_dni, c.deposito_monto,
+           cl.id AS cliente_id, cl.nombre AS cliente_nombre, cl.dni, cl.ruc,
+           cl.telefono, cl.direccion
+    FROM DETALLE_CONTRATO d
+    JOIN CONTRATO c ON c.id = d.id_contrato
+    JOIN CLIENTE cl ON cl.id = c.id_cliente
+    WHERE d.id_herramienta = ?
+      AND d.estado_devolucion = 'pendiente'
+      AND c.estado IN ('reservado', 'alquilado', 'atrasado')
+    ORDER BY c.id DESC
+    LIMIT 1
+  `).get(id);
+}
+
 function getHerramientasPorCategoria() {
   const categorias = db.prepare('SELECT * FROM CATEGORIA_HERRAMIENTA ORDER BY rowid DESC').all();
 
@@ -883,6 +900,7 @@ module.exports = {
   eliminarHerramienta,
   cambiarEstado,
   getHistorialUnidad,
+  getAlquilerActivoDeHerramienta,
   getHerramientasPorCategoria,
   getAuditGranel,
   revertirAuditGranel,

@@ -19,6 +19,7 @@ const {
   editarReserva,
   eliminarContrato,
   restaurarContrato,
+  eliminarContratoPermanente,
   autoEliminarPapelera,
 } = require('./services/contratoService');
 const { checkActivation, activateLicense, getMachineId } = require('./services/licenseService');
@@ -49,6 +50,7 @@ const {
   eliminarHerramienta,
   cambiarEstado,
   getHistorialUnidad,
+  getAlquilerActivoDeHerramienta,
   getHerramientasPorCategoria,
   getAuditGranel,
   revertirAuditGranel,
@@ -251,6 +253,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle('restaurar-contrato', (_e, idContrato) => {
     return restaurarContrato(idContrato);
+  });
+
+  ipcMain.handle('eliminar-contrato-permanente', (_e, idContrato) => {
+    return eliminarContratoPermanente(idContrato);
   });
 
 // --- Kits ---
@@ -529,6 +535,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle('get-historial-unidad', (_e, id) => {
     return getHistorialUnidad(id);
+  });
+
+  ipcMain.handle('get-alquiler-activo-herramienta', (_e, id) => {
+    return getAlquilerActivoDeHerramienta(id);
   });
 
   ipcMain.handle('get-herramientas-por-categoria', () => {

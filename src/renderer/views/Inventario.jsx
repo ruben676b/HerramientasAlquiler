@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Search, Plus, Pencil, Trash2, Wrench, Package, X, History,
   ChevronDown, ChevronRight, CheckCircle, AlertTriangle, MinusCircle, Layers,
-  ImagePlus, Calendar, Clock, ShoppingCart, Tag, Undo2,
+  ImagePlus, Calendar, Clock, ShoppingCart, Tag, Undo2, User,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { SEMANTIC, ESTADOS_HERRAMIENTA } from '../lib/constants';
+import { SEMANTIC } from '../lib/constants';
 import Button from '../components/ui/button';
 import ConfirmModal from '../components/ConfirmModal';
 import KitEditorModal from '../components/KitEditorModal';
@@ -45,6 +45,7 @@ export default function Inventario() {
   const [ventaData, setVentaData] = useState(null);
   const [ventaADevolver, setVentaADevolver] = useState(null);
   const [ventasGranel, setVentasGranel] = useState(null);
+  const [alquilerActivo, setAlquilerActivo] = useState(null);
   const [historial, setHistorial] = useState({});
   const [expanded, setExpanded] = useState({});
   const searchRef = useRef(null);
@@ -87,6 +88,20 @@ export default function Inventario() {
     }
   };
 
+  // Muestra quién tiene alquilada una herramienta
+  const verAlquilerActivo = async (h) => {
+    try {
+      const data = await window.api.getAlquilerActivoHerramienta(h.id);
+      if (data) {
+        setAlquilerActivo({ herramienta: h, alquiler: data });
+      } else {
+        toast('No se encontró un alquiler activo para ' + h.id, 'error');
+      }
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+    }
+  };
+
   const rankTool = (h, q) => {
     const name = (h.nombre || '').toLowerCase();
     const id = (h.id || '').toLowerCase();
@@ -99,9 +114,17 @@ export default function Inventario() {
     return 5;
   };
 
+  // Ordenamiento alfabético
+  const porNombre = (a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es');
+  const familiasOrdenadas = familias
+    .map((f) => ({ ...f, herramientas: [...f.herramientas].sort(porNombre) }))
+    .sort(porNombre);
+  const granelOrdenado = [...granel].sort(porNombre);
+  const kitsOrdenado = [...kits].sort(porNombre);
+
   // Filtrado local con ranking por relevancia
   const familiasFiltradas = busqueda
-    ? familias.map((f) => ({
+    ? familiasOrdenadas.map((f) => ({
         ...f,
         herramientas: f.herramientas
           .filter((h) => rankTool(h, busqueda.toLowerCase()) < 5)
@@ -114,15 +137,15 @@ export default function Inventario() {
           f.nombre.toLowerCase().includes(q) ||
           f.herramientas.length > 0;
       })
-    : familias;
+    : familiasOrdenadas;
 
   const granelFiltrado = busqueda
-    ? granel.filter((g) => g.nombre.toLowerCase().includes(busqueda.toLowerCase()))
-    : granel;
+    ? granelOrdenado.filter((g) => g.nombre.toLowerCase().includes(busqueda.toLowerCase()))
+    : granelOrdenado;
 
   const kitsFiltrado = busqueda
-    ? kits.filter((k) => k.nombre.toLowerCase().includes(busqueda.toLowerCase()))
-    : kits;
+    ? kitsOrdenado.filter((k) => k.nombre.toLowerCase().includes(busqueda.toLowerCase()))
+    : kitsOrdenado;
 
   const [granelExpandido, setGranelExpandido] = useState({});
 
@@ -137,7 +160,7 @@ export default function Inventario() {
   // Teclado
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape') { setModal(null); setConfirm(null); setConfirmUnidad(null); }
+      if (e.key === 'Escape') { setModal(null); setConfirm(null); setConfirmUnidad(null); setAlquilerActivo(null); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); searchRef.current?.focus(); }
     };
     window.addEventListener('keydown', onKey);
@@ -408,17 +431,10 @@ export default function Inventario() {
                         <span>S/ {f.precio_dia?.toFixed(2)}/día</span>
                       </div>
                     </div>
-                    {/* Status bar */}
-                    <div className="hidden sm:flex items-center gap-0.5 shrink-0">
-                      {ESTADOS_HERRAMIENTA.map((e) => {
-                        const c = f.conteo[e] || 0;
-                        const s = sem[e];
-                        if (!c) return null;
-                        return (
-                          <span key={e} className="h-1.5 rounded-full" style={{ width: Math.max(8, c * 10), backgroundColor: s?.color || 'var(--faint)' }} title={e + ': ' + c} />
-                        );
-                      })}
-                    </div>
+                    {/* Indicador numérico */}
+                    <span className="hidden sm:block text-xs font-mono shrink-0" style={{ color: 'var(--muted)' }} title="Disponibles / Total">
+                      {f.conteo.disponible || 0} disp. / {f.total} total
+                    </span>
                     {/* Actions */}
                     <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
@@ -454,6 +470,14 @@ export default function Inventario() {
                               </span>
                             ) : (
                               <EstadoDropdown h={h} s={s} Icon={Icon} onChange={(e) => handleCambiarEstado(h.id, e)} />
+                            )}
+                            {(h.estado === 'alquilado' || h.estado === 'reservado') && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); verAlquilerActivo(h); }}
+                                className="p-1.5 rounded-md transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5 shrink-0 active:scale-90"
+                                style={{ color: s?.variable || 'var(--info)' }}
+                                title="Ver quién tiene esta herramienta"
+                              ><User size={13} /></button>
                             )}
                             {/* Icono de historial de daños */}
                             {historial[h.id]?.mantenimientos?.length > 0 && (
@@ -736,6 +760,14 @@ export default function Inventario() {
       {modal?.tipo === 'historial-granel' && <HistorialGranelModal data={modal.data} onUndo={handleRevertirAudit} onClose={() => setModal(null)} />}
       {modal?.tipo === 'crear-kit' && <KitEditorModal onSave={handleGuardarKit} onClose={() => setModal(null)} />}
       {modal?.tipo === 'editar-kit' && <KitEditorModal kitId={modal.kit.id} onSave={handleGuardarKit} onClose={() => setModal(null)} />}
+
+      {alquilerActivo && (
+        <AlquilerActivoModal
+          herramienta={alquilerActivo.herramienta}
+          alquiler={alquilerActivo.alquiler}
+          onClose={() => setAlquilerActivo(null)}
+        />
+      )}
 
       <ConfirmModal
         open={!!confirm}
@@ -1077,6 +1109,56 @@ function DanadosGranelModal({ data, onSave, onClose }) {
           ))}
         </div>
         <button type="button" onClick={onClose} className="w-full h-9 rounded-lg text-sm font-medium border transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5" style={{ color: 'var(--muted)', borderColor: 'var(--border)' }}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+function AlquilerActivoModal({ herramienta, alquiler, onClose }) {
+  const a = alquiler;
+  const doc = a.dni ? 'DNI ' + a.dni : a.ruc ? 'RUC ' + a.ruc : null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'oklch(0 0 0 / 0.4)' }} onClick={onClose}>
+      <div className="w-full max-w-sm rounded-xl p-5 space-y-3 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold" style={{ color: 'var(--ink)' }}>{herramienta.id} — {herramienta.nombre}</h2>
+          <button onClick={onClose} className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 active:scale-90" style={{ color: 'var(--muted)' }}><X size={15} /></button>
+        </div>
+
+        <div className="rounded-lg p-3 space-y-1.5" style={{ backgroundColor: SEMANTIC.alquilado?.soft || 'var(--surface)' }}>
+          <div className="flex items-center gap-2">
+            <User size={16} style={{ color: SEMANTIC.alquilado?.variable || 'var(--ink)' }} />
+            <span className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{a.cliente_nombre}</span>
+          </div>
+          {doc && <div className="text-xs ml-6" style={{ color: 'var(--muted)' }}>{doc}</div>}
+          {a.telefono && <div className="text-xs ml-6" style={{ color: 'var(--muted)' }}>Tel: {a.telefono}</div>}
+          {a.direccion && <div className="text-xs ml-6" style={{ color: 'var(--muted)' }}>{a.direccion}</div>}
+        </div>
+
+        <div className="space-y-1 text-[12px]">
+          <div className="flex justify-between">
+            <span style={{ color: 'var(--muted)' }}>Contrato N°</span>
+            <span className="font-mono font-medium" style={{ color: 'var(--ink)' }}>#{a.contrato_id}</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: 'var(--muted)' }}>Fecha de salida</span>
+            <span style={{ color: 'var(--ink)' }}>{a.fecha_salida}</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: 'var(--muted)' }}>Devolución pactada</span>
+            <span style={{ color: 'var(--ink)' }}>{a.fecha_devolucion_pactada}</span>
+          </div>
+          {(a.deposito_monto > 0 || a.deposito_dni) && (
+            <div className="flex justify-between">
+              <span style={{ color: 'var(--muted)' }}>Garantía</span>
+              <span style={{ color: 'var(--ink)' }}>
+                {[a.deposito_dni ? 'DNI retenido' : null, a.deposito_monto > 0 ? 'S/ ' + a.deposito_monto.toFixed(2) : null].filter(Boolean).join(' + ')}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <button type="button" onClick={onClose} className="w-full h-9 rounded-lg text-sm font-medium border transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5" style={{ color: 'var(--muted)', borderColor: 'var(--border)' }}>Cerrar</button>
       </div>
     </div>
   );

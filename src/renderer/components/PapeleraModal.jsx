@@ -16,6 +16,7 @@ export default function PapeleraModal({ open, onClose }) {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState(null);
   const [restaurando, setRestaurando] = useState(null);
+  const [eliminando, setEliminando] = useState(null);
   const toast = useToast();
 
   const cargar = useCallback(async () => {
@@ -47,6 +48,19 @@ export default function PapeleraModal({ open, onClose }) {
       window.dispatchEvent(new Event('contrato-creado'));
     } catch (e) {
       toast(e.message || 'Error al restaurar contrato', 'error');
+    }
+  };
+
+  const handleEliminarPermanente = async () => {
+    if (!window.api || !eliminando) return;
+    try {
+      await window.api.eliminarContratoPermanente(eliminando.id);
+      toast('Contrato #' + eliminando.id + ' eliminado permanentemente.');
+      setEliminando(null);
+      cargar();
+      window.dispatchEvent(new Event('contrato-creado'));
+    } catch (e) {
+      toast(e.message || 'Error al eliminar contrato', 'error');
     }
   };
 
@@ -182,6 +196,16 @@ export default function PapeleraModal({ open, onClose }) {
                       >
                         <RotateCcw size={12} /> Restaurar
                       </button>
+                      <button
+                        onClick={() => setEliminando(c)}
+                        className="h-[32px] px-3 rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
+                        style={{ backgroundColor: 'oklch(0.97 0.02 25)', color: 'var(--danger)', border: '0.5px solid oklch(0.85 0.08 25)' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.94 0.04 25)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.97 0.02 25)'; }}
+                        title="Eliminar permanentemente"
+                      >
+                        <Trash2 size={12} /> Eliminar
+                      </button>
                     </div>
                   </div>
                 );
@@ -199,6 +223,18 @@ export default function PapeleraModal({ open, onClose }) {
           confirmLabel="Restaurar"
           onConfirm={handleRestaurar}
           onCancel={() => setRestaurando(null)}
+        />
+      )}
+
+      {eliminando && (
+        <ConfirmModal
+          open={!!eliminando}
+          title="Eliminar permanentemente"
+          message={`¿Eliminar el contrato #${eliminando.id} de forma permanente? Se borrarán también sus pagos, detalles y daños asociados. Esta acción no se puede deshacer.`}
+          confirmLabel="Eliminar para siempre"
+          danger
+          onConfirm={handleEliminarPermanente}
+          onCancel={() => setEliminando(null)}
         />
       )}
     </>

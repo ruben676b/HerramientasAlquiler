@@ -5,7 +5,7 @@ export default function ConfirmModal({ open, title, message, confirmLabel, dange
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'oklch(0 0 0 / 0.4)' }} onClick={onCancel}>
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" style={{ backgroundColor: 'oklch(0 0 0 / 0.4)' }} onClick={onCancel}>
       <div
         className="w-full max-w-sm rounded-xl p-6 space-y-4 text-center"
         style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border)' }}
