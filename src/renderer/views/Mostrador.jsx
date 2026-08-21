@@ -1,36 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, X, Plus, Package, Wrench, Star, Info, Boxes, Eye } from 'lucide-react';
+import { Search, X, Plus, Package, Wrench, Star, Info, Boxes } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { localDate } from '../lib/date';
 import Button from '../components/ui/button';
 import StarRating, { CalificacionBadge } from '../components/StarRating';
 import DetalleClienteModal from '../components/DetalleClienteModal';
-import ImagenVisor from '../components/ImagenVisor';
+import OjoPreview from '../components/OjoPreview';
 import DatePicker from '../components/DatePicker';
 
 /* ================================================================
    MOSTRADOR — Emitir Contrato
    ================================================================ */
-
-function OjoButton({ activo, onClick, titulo }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!activo}
-      title={activo ? (titulo || 'Ver imagen de referencia') : 'Este ítem no tiene imagen'}
-      className="h-10 w-10 shrink-0 flex items-center justify-center rounded-lg border transition-all duration-150 active:scale-95 disabled:cursor-not-allowed"
-      style={{
-        color: activo ? 'var(--muted)' : 'var(--faint)',
-        borderColor: 'var(--border)',
-        backgroundColor: 'var(--bg)',
-        opacity: activo ? 1 : 0.4,
-      }}
-    >
-      <Eye size={15} />
-    </button>
-  );
-}
 
 export default function Mostrador() {
   // --- Cliente ---
@@ -70,7 +50,6 @@ export default function Mostrador() {
   const [error, setError] = useState(null);
   const [exito, setExito] = useState(null);
   const [enviando, setEnviando] = useState(false);
-  const [visor, setVisor] = useState(null);
 
   // ================================================================
   // EFECTOS
@@ -180,23 +159,6 @@ export default function Mostrador() {
   };
 
   const quitar = (i) => setItems((p) => p.filter((_, idx) => idx !== i));
-
-  // Ver imagen de un ítem ya agregado (resuelve la ruta bajo demanda)
-  const verImagenItem = async (item) => {
-    try {
-      const tipo = item.tipo === 'individual' ? 'herramienta' : 'granel';
-      const id = item.tipo === 'individual' ? item.id_herramienta : item.id_item_granel;
-      if (id == null) return;
-      const r = await window.api.getImagenItem(tipo, id);
-      if (r?.ruta) {
-        setVisor({ ruta: r.ruta, titulo: item.nombre });
-      } else {
-        setError(item.nombre + ' no tiene imagen de referencia.');
-      }
-    } catch (e) {
-      setError('No se pudo cargar la imagen: ' + (e.message || e));
-    }
-  };
 
   // ================================================================
   // EMITIR
@@ -622,13 +584,18 @@ export default function Mostrador() {
                     <div className="absolute z-30 top-full left-0 right-0 mt-1 rounded-md border shadow-lg max-h-48 overflow-y-auto"
                       style={{ backgroundColor: 'var(--bg)', borderColor: 'var(--border)' }}>
                       {herramientasFiltradas.slice(0, 12).map(h => (
-                        <button key={h.id}
-                          onMouseDown={() => { setHerrId(h.id); setBuscarHerramienta(''); setMostrarSugerencias(false); }}
-                          className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--surface)] flex justify-between items-center"
-                          style={{ color: 'var(--ink)' }}>
-                          <span><span className="font-mono font-bold" style={{ color: 'var(--primary)' }}>{h.id}</span> — {h.nombre}</span>
-                          <span className="font-mono shrink-0 ml-2" style={{ color: 'var(--muted)' }}>S/ {h.precio_dia.toFixed(2)}/día</span>
-                        </button>
+                        <div key={h.id} className="w-full flex items-center gap-1 pl-3 pr-2 py-1.5 text-xs hover:bg-[var(--surface)]">
+                          <button
+                            onMouseDown={() => { setHerrId(h.id); setBuscarHerramienta(''); setMostrarSugerencias(false); }}
+                            className="flex-1 min-w-0 text-left flex justify-between items-center gap-2"
+                            style={{ color: 'var(--ink)' }}>
+                            <span className="truncate">
+                              <span className="font-mono font-bold" style={{ color: 'var(--primary)' }}>{h.id}</span> — {h.nombre}
+                            </span>
+                            <span className="font-mono shrink-0" style={{ color: 'var(--muted)' }}>S/ {h.precio_dia.toFixed(2)}/día</span>
+                          </button>
+                          <OjoPreview tipo="herramienta" id={h.id} titulo={h.id + ' — ' + h.nombre} />
+                        </div>
                       ))}
                     </div>
                   )}
@@ -636,9 +603,12 @@ export default function Mostrador() {
                     <p className="text-xs mt-1" style={{ color: 'var(--warning)' }}>No hay herramientas disponibles.</p>
                   )}
                 </div>
-                <OjoButton
+                <OjoPreview
                   activo={!!herrSel?.imagen_path}
-                  onClick={() => setVisor({ ruta: herrSel.imagen_path, titulo: herrSel.id + ' — ' + herrSel.nombre })}
+                  ruta={herrSel?.imagen_path}
+                  titulo={herrSel ? herrSel.id + ' — ' + herrSel.nombre : undefined}
+                  variante="boton"
+                  lado="izquierda"
                 />
                 <Button
                   variant="secondary"
@@ -686,9 +656,12 @@ export default function Mostrador() {
                     style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }}
                   />
                 </div>
-                <OjoButton
+                <OjoPreview
                   activo={!!granelSel?.imagen_path}
-                  onClick={() => setVisor({ ruta: granelSel.imagen_path, titulo: granelSel.nombre + ' (' + granelSel.condicion + ')' })}
+                  ruta={granelSel?.imagen_path}
+                  titulo={granelSel ? granelSel.nombre + ' (' + granelSel.condicion + ')' : undefined}
+                  variante="boton"
+                  lado="izquierda"
                 />
                 <Button
                   variant="secondary"
@@ -816,14 +789,11 @@ export default function Mostrador() {
                                   : item.nombre + ' (' + item.condicion + ')'}
                               </span>
                               {(item.tipo === 'individual' || item.tipo === 'granel') && (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); verImagenItem(item); }}
-                                  className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors duration-150 shrink-0"
-                                  style={{ color: 'var(--faint)' }}
-                                  title="Ver imagen de referencia"
-                                >
-                                  <Eye size={12} />
-                                </button>
+                                <OjoPreview
+                                  tipo={item.tipo === 'individual' ? 'herramienta' : 'granel'}
+                                  id={item.tipo === 'individual' ? item.id_herramienta : item.id_item_granel}
+                                  titulo={item.nombre}
+                                />
                               )}
                             </div>
                             {item.tipo === 'kit' && (() => {
@@ -905,14 +875,6 @@ export default function Mostrador() {
         <DetalleClienteModal
           cliente={detalleCliente}
           onClose={() => setDetalleCliente(null)}
-        />
-      )}
-
-      {visor && (
-        <ImagenVisor
-          ruta={visor.ruta}
-          titulo={visor.titulo}
-          onClose={() => setVisor(null)}
         />
       )}
     </div>

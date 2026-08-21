@@ -13,6 +13,7 @@ import DescripcionPopover from '../components/DescripcionPopover';
 import VentaModal from '../components/VentaModal';
 import DevolverVentaModal from '../components/DevolverVentaModal';
 import VentasGranelModal from '../components/VentasGranelModal';
+import OjoPreview from '../components/OjoPreview';
 import { useToast } from '../components/Toast';
 
 /* ================================================================
@@ -431,6 +432,13 @@ export default function Inventario() {
                         <span>S/ {f.precio_dia?.toFixed(2)}/día</span>
                       </div>
                     </div>
+                    {f.imagen_path && (
+                      <OjoPreview
+                        ruta={f.imagen_path}
+                        titulo={f.id_categoria + ' — ' + f.nombre}
+                        lado="izquierda"
+                      />
+                    )}
                     {/* Indicador numérico */}
                     <span className="hidden sm:block text-xs font-mono shrink-0" style={{ color: 'var(--muted)' }} title="Disponibles / Total">
                       {f.conteo.disponible || 0} disp. / {f.total} total
