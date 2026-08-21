@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search, Plus, Pencil, Trash2, Wrench, Package, X, History,
   ChevronDown, ChevronRight, CheckCircle, AlertTriangle, MinusCircle, Layers,
@@ -30,6 +30,13 @@ const ESTADO_ICON = {
   vendido: ShoppingCart,
 };
 
+// Orden alfabético neutro (español)
+const porNombre = (a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es');
+
+// Rendimiento con inventarios grandes
+const MAX_FILAS_VISIBLES = 50;   // filas renderizadas por familia abierta (paginación "Ver más")
+const PRESUPUESTO_EXPAND = 300;  // máximo de filas auto-expandidas al buscar
+
 export default function Inventario() {
   const [tab, setTab] = useState('herramientas');
   const [familias, setFamilias] = useState([]);
@@ -49,6 +56,7 @@ export default function Inventario() {
   const [alquilerActivo, setAlquilerActivo] = useState(null);
   const [historial, setHistorial] = useState({});
   const [expanded, setExpanded] = useState({});
+  const [visibles, setVisibles] = useState({});
   const searchRef = useRef(null);
   const toast = useToast();
 
@@ -103,6 +111,23 @@ export default function Inventario() {
     }
   };
 
+  // Carga el historial de muchas unidades en una sola llamada IPC (evita miles de invocaciones)
+  const cargarHistorialLote = async (unidades) => {
+    const ids = unidades.map((h) => h.id).filter((id) => !historial[id]);
+    if (ids.length === 0 || !window.api?.getHistorialLote) return;
+    try {
+      const data = await window.api.getHistorialLote(ids);
+      setHistorial((p) => ({ ...p, ...data }));
+    } catch { /* silencioso: solo implica no mostrar el icono de historial */ }
+  };
+
+  // Debounce del buscador: evita recalcular/reordenar en cada tecla
+  const [busquedaDeb, setBusquedaDeb] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setBusquedaDeb(busqueda), 250);
+    return () => clearTimeout(t);
+  }, [busqueda]);
+
   const rankTool = (h, q) => {
     const name = (h.nombre || '').toLowerCase();
     const id = (h.id || '').toLowerCase();
@@ -115,48 +140,63 @@ export default function Inventario() {
     return 5;
   };
 
-  // Ordenamiento alfabético
-  const porNombre = (a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es');
-  const familiasOrdenadas = familias
-    .map((f) => ({ ...f, herramientas: [...f.herramientas].sort(porNombre) }))
-    .sort(porNombre);
-  const granelOrdenado = [...granel].sort(porNombre);
-  const kitsOrdenado = [...kits].sort(porNombre);
+  // Ordenamiento alfabético (memoizado: no reordena en cada render)
+  const familiasOrdenadas = useMemo(
+    () => familias
+      .map((f) => ({ ...f, herramientas: [...f.herramientas].sort(porNombre) }))
+      .sort(porNombre),
+    [familias]
+  );
+  const granelOrdenado = useMemo(() => [...granel].sort(porNombre), [granel]);
+  const kitsOrdenado = useMemo(() => [...kits].sort(porNombre), [kits]);
 
-  // Filtrado local con ranking por relevancia
-  const familiasFiltradas = busqueda
-    ? familiasOrdenadas.map((f) => ({
+  // Filtrado local con ranking por relevancia (memoizado)
+  const familiasFiltradas = useMemo(() => {
+    if (!busquedaDeb) return familiasOrdenadas;
+    const q = busquedaDeb.toLowerCase();
+    return familiasOrdenadas
+      .map((f) => ({
         ...f,
         herramientas: f.herramientas
-          .filter((h) => rankTool(h, busqueda.toLowerCase()) < 5)
-          .sort((a, b) => rankTool(a, busqueda.toLowerCase()) - rankTool(b, busqueda.toLowerCase())),
-      })).filter((f) => {
-        const q = busqueda.toLowerCase();
-        const qSinGuion = q.replace('-', '');
-        return f.id_categoria.toLowerCase().includes(q) ||
-          f.categoria_nombre.toLowerCase().includes(q) ||
-          f.nombre.toLowerCase().includes(q) ||
-          f.herramientas.length > 0;
-      })
-    : familiasOrdenadas;
+          .filter((h) => rankTool(h, q) < 5)
+          .sort((a, b) => rankTool(a, q) - rankTool(b, q)),
+      }))
+      .filter((f) =>
+        f.id_categoria.toLowerCase().includes(q) ||
+        f.categoria_nombre.toLowerCase().includes(q) ||
+        f.nombre.toLowerCase().includes(q) ||
+        f.herramientas.length > 0
+      );
+  }, [busquedaDeb, familiasOrdenadas]);
 
-  const granelFiltrado = busqueda
-    ? granelOrdenado.filter((g) => g.nombre.toLowerCase().includes(busqueda.toLowerCase()))
-    : granelOrdenado;
+  const granelFiltrado = useMemo(
+    () => busquedaDeb
+      ? granelOrdenado.filter((g) => g.nombre.toLowerCase().includes(busquedaDeb.toLowerCase()))
+      : granelOrdenado,
+    [busquedaDeb, granelOrdenado]
+  );
 
-  const kitsFiltrado = busqueda
-    ? kitsOrdenado.filter((k) => k.nombre.toLowerCase().includes(busqueda.toLowerCase()))
-    : kitsOrdenado;
+  const kitsFiltrado = useMemo(
+    () => busquedaDeb
+      ? kitsOrdenado.filter((k) => k.nombre.toLowerCase().includes(busquedaDeb.toLowerCase()))
+      : kitsOrdenado,
+    [busquedaDeb, kitsOrdenado]
+  );
 
   const [granelExpandido, setGranelExpandido] = useState({});
 
-  // Auto-expand familias cuando se busca
+  // Auto-expand familias cuando se busca, con presupuesto global de filas
   useEffect(() => {
-    if (!busqueda) { setExpanded({}); return; }
+    if (!busquedaDeb) { setExpanded({}); setVisibles({}); return; }
     const exp = {};
-    familiasFiltradas.forEach((f) => { exp[f.id_categoria] = true; });
+    let presupuesto = PRESUPUESTO_EXPAND;
+    for (const f of familiasFiltradas) {
+      exp[f.id_categoria] = true;
+      presupuesto -= f.herramientas.length;
+      if (presupuesto <= 0) break;
+    }
     setExpanded(exp);
-  }, [busqueda]);
+  }, [busquedaDeb, familiasFiltradas]);
 
   // Teclado
   useEffect(() => {
@@ -402,24 +442,20 @@ export default function Inventario() {
             {familiasFiltradas.map((f) => {
               const isOpen = expanded[f.id_categoria];
               const sem = SEMANTIC;
+              const nVisibles = Math.min(visibles[f.id_categoria] || MAX_FILAS_VISIBLES, f.herramientas.length);
               return (
                 <div key={f.id_categoria} className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
                   {/* Family header */}
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => {
                       const nuevo = !expanded[f.id_categoria];
                       setExpanded(e => ({ ...e, [f.id_categoria]: nuevo }));
-                      if (nuevo) {
-                        f.herramientas.forEach(h => {
-                          if (!historial[h.id] && window.api?.getHistorialUnidad) {
-                            window.api.getHistorialUnidad(h.id)
-                              .then(data => setHistorial(p => ({ ...p, [h.id]: data })))
-                              .catch(() => {});
-                          }
-                        });
-                      }
+                      if (nuevo) cargarHistorialLote(f.herramientas.slice(0, nVisibles));
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-[var(--surface)]"
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-[var(--surface)] cursor-pointer select-none"
                   >
                     <span className="shrink-0">{isOpen ? <ChevronDown size={16} style={{ color: 'var(--muted)' }} /> : <ChevronRight size={16} style={{ color: 'var(--muted)' }} />}</span>
                     <div className="flex-1 min-w-0">
@@ -455,12 +491,12 @@ export default function Inventario() {
                       <button onClick={() => setModal({ tipo: 'danos-familia', familia: f })} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 active:scale-90" style={{ color: 'var(--muted)' }} title="Daños predefinidos"><AlertTriangle size={13} /></button>
                       <button onClick={() => setConfirm({ id: f.id_categoria, nombre: f.nombre, total: f.total })} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-950 active:scale-90" style={{ color: 'var(--muted)' }} title="Eliminar"><Trash2 size={13} /></button>
                     </div>
-                  </button>
+                  </div>
 
-                  {/* Expanded individual units */}
+                  {/* Expanded individual units (paginadas) */}
                   {isOpen && f.herramientas.length > 0 && (
                     <div style={{ borderTop: '1px solid var(--border)' }}>
-                      {f.herramientas.map((h) => {
+                      {f.herramientas.slice(0, nVisibles).map((h) => {
                         const s = sem[h.estado];
                         const Icon = ESTADO_ICON[h.estado] || CheckCircle;
                         return (
@@ -531,6 +567,19 @@ export default function Inventario() {
                           </div>
                         );
                       })}
+                      {nVisibles < f.herramientas.length && (
+                        <button
+                          onClick={() => {
+                            const nuevos = Math.min(nVisibles + MAX_FILAS_VISIBLES, f.herramientas.length);
+                            setVisibles(v => ({ ...v, [f.id_categoria]: nuevos }));
+                            cargarHistorialLote(f.herramientas.slice(0, nuevos));
+                          }}
+                          className="w-full py-2 text-xs font-medium transition-colors duration-150 hover:bg-[var(--surface)]"
+                          style={{ color: 'var(--primary)', borderBottom: '1px solid var(--border)' }}
+                        >
+                          Ver más ({(f.herramientas.length - nVisibles).toLocaleString('es')} restantes)
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

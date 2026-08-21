@@ -72,6 +72,7 @@ contextBridge.exposeInMainWorld('api', {
   eliminarHerramienta: (id) => ipcRenderer.invoke('eliminar-herramienta', id),
   cambiarEstado: (id, estado) => ipcRenderer.invoke('cambiar-estado', id, estado),
   getHistorialUnidad: (id) => ipcRenderer.invoke('get-historial-unidad', id),
+  getHistorialLote: (ids) => ipcRenderer.invoke('get-historial-lote', ids),
   getAlquilerActivoHerramienta: (id) => ipcRenderer.invoke('get-alquiler-activo-herramienta', id),
   getHerramientasPorCategoria: () => ipcRenderer.invoke('get-herramientas-por-categoria'),
   consultarDni: (dni) => ipcRenderer.invoke('consultar-dni', dni),

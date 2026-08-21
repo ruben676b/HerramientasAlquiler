@@ -50,6 +50,7 @@ const {
   eliminarHerramienta,
   cambiarEstado,
   getHistorialUnidad,
+  getHistorialLote,
   getAlquilerActivoDeHerramienta,
   getHerramientasPorCategoria,
   getAuditGranel,
@@ -535,6 +536,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle('get-historial-unidad', (_e, id) => {
     return getHistorialUnidad(id);
+  });
+
+  ipcMain.handle('get-historial-lote', (_e, ids) => {
+    return getHistorialLote(ids);
   });
 
   ipcMain.handle('get-alquiler-activo-herramienta', (_e, id) => {
