@@ -663,7 +663,7 @@ return filas.map((g, gi) => {
           return renderEquipoFila(item, idx, 'u-' + idx, sub);
         }
         const key = c.id + '|' + g.prefix;
-        const abierto = !!gruposEq[key];
+        const abierto = gruposEq[key] !== false;
         const totalGrupo = g.items.reduce((a, { item }) => a + (getBase(item) + (item.monto_atraso_item || 0)), 0);
                                         const pendientes = g.items.filter(({ item }) => !item.estado_devolucion || item.estado_devolucion === 'pendiente').length;
                                         return (
