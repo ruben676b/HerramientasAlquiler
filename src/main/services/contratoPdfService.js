@@ -62,6 +62,8 @@ function agruparItems(items) {
 function generarPdfDesdeDatos(datos) {
   ensureDir();
   const { arrendadora, cliente, fechas, total, numContrato, firmaPath, deposito, firmaBase64 } = datos;
+  const cuenta = datos.cuenta || null;
+  const totalMostrar = cuenta ? cuenta.total_general : total;
   const items = agruparItems(datos.items || []);
 
   // Si hay firma en base64, guardarla temporal para previsualización
@@ -144,7 +146,7 @@ function generarPdfDesdeDatos(datos) {
     .replaceAll('[CLIENTE_NOMBRE]', cliente.nombre)
     .replaceAll('[CLIENTE_DNI]', cliente.dni || '—')
     .replaceAll('[CLIENTE_DIRECCION]', cliente.direccion || '—')
-    .replaceAll('[TOTAL]', `S/ ${total.toFixed(2)}`)
+    .replaceAll('[TOTAL]', `S/ ${totalMostrar.toFixed(2)}`)
     .replaceAll('[FECHA_INICIO]', fechas.salida)
     .replaceAll('[FECHA_DEVOLUCION]', fechas.devolucion)
     .replaceAll('[DEPOSITO_TEXTO]', '').trimEnd();
@@ -236,7 +238,7 @@ function generarPdfDesdeDatos(datos) {
   doc.moveDown(1);
 
   doc.font('Helvetica-Bold').fontSize(8);
-  doc.text(`TOTAL:  S/ ${total.toFixed(2)}`, { align: 'right' });
+  doc.text(`TOTAL:  S/ ${totalMostrar.toFixed(2)}`, { align: 'right' });
   doc.moveDown(0.5);
 
   const MESES = ['enero','febrero','marzo','abril','mayo','junio',
@@ -261,16 +263,40 @@ function generarPdfDesdeDatos(datos) {
   // ===== PAGOS (#6: S/ 0.00, #7: Garantía) =====
   const pagosY = doc.y;
   doc.fontSize(8).font('Helvetica-Bold').text('PAGOS:', 45, pagosY);
-  doc.font('Helvetica').fontSize(8);
-  doc.text(`A CUENTA: S/ ${(deposito?.aCuenta || 0).toFixed(2)}`, 45, pagosY + 14);
-  doc.text(`SALDO:    S/ ${(deposito?.saldo || total).toFixed(2)}`, 250, pagosY + 14);
-  doc.text(`TOTAL:    S/ ${total.toFixed(2)}`, 250, pagosY + 28);
 
   const garantiaText = [];
   if (deposito?.dniRetenido) garantiaText.push(`DNI retenido N° ${cliente.dni}`);
   if (deposito?.monto > 0) garantiaText.push(`S/ ${deposito.monto.toFixed(2)} como depósito`);
   const garantia = garantiaText.length > 0 ? `GARANTÍA: ${garantiaText.join(' + ')}` : 'GARANTÍA: Ninguna';
-  doc.text(garantia, 45, pagosY + 34);
+
+  doc.font('Helvetica').fontSize(8);
+  if (cuenta) {
+    const filasCta = [
+      `A CUENTA: S/ ${cuenta.total_pagado.toFixed(2)}`,
+      `SALDO:    S/ ${cuenta.saldo.toFixed(2)}`,
+    ];
+    if (cuenta.total_atraso > 0) filasCta.push(`MORA POR ATRASO: S/ ${cuenta.total_atraso.toFixed(2)}`);
+    if (cuenta.total_danos > 0) filasCta.push(`REPARACIÓN DE DAÑOS: S/ ${cuenta.total_danos.toFixed(2)}`);
+    if (cuenta.total_perdidas > 0) filasCta.push(`PÉRDIDAS / VENTAS: S/ ${cuenta.total_perdidas.toFixed(2)}`);
+    filasCta.forEach((linea, i) => doc.text(linea, 45, pagosY + 14 + i * 12));
+
+    doc.font('Helvetica-Bold');
+    doc.text(`TOTAL:    S/ ${totalMostrar.toFixed(2)}`, 250, pagosY + 14);
+    doc.font('Helvetica');
+
+    const yGarantia = pagosY + 14 + filasCta.length * 12;
+    doc.text(garantia, 45, yGarantia);
+    if (cuenta.fecha_devolucion_real) {
+      doc.font('Helvetica-Oblique');
+      doc.text(`Devuelto el ${formatFechaLarga(cuenta.fecha_devolucion_real)}`, 45, yGarantia + 12);
+      doc.font('Helvetica');
+    }
+  } else {
+    doc.text(`A CUENTA: S/ ${(deposito?.aCuenta || 0).toFixed(2)}`, 45, pagosY + 14);
+    doc.text(`SALDO:    S/ ${(deposito?.saldo || total).toFixed(2)}`, 250, pagosY + 14);
+    doc.text(`TOTAL:    S/ ${total.toFixed(2)}`, 250, pagosY + 28);
+    doc.text(garantia, 45, pagosY + 34);
+  }
 
   doc.moveDown(6);
 
@@ -374,6 +400,18 @@ function generarPdf(idContrato) {
   }, 0);
   const total = totalItems + (contrato.deposito_monto || 0);
 
+  const { getDetalleContrato } = require('./clienteService');
+  const det = getDetalleContrato(idContrato);
+  const cuenta = {
+    fecha_devolucion_real: contrato.fecha_devolucion_real,
+    total_pagado: det.total_pagado,
+    saldo: Math.max(0, det.total_general - det.total_pagado),
+    total_atraso: det.total_atraso,
+    total_danos: det.total_danos,
+    total_perdidas: det.total_perdidas,
+    total_general: det.total_general,
+  };
+
   return generarPdfDesdeDatos({
     arrendadora,
     cliente: {
@@ -416,6 +454,7 @@ function generarPdf(idContrato) {
     })(),
     fechas: { salida: contrato.fecha_salida, devolucion: contrato.fecha_devolucion_pactada },
     total,
+    cuenta,
     deposito: {
       monto: contrato.deposito_monto || 0,
       dniRetenido: !!contrato.deposito_dni,
