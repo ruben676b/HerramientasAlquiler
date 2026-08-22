@@ -1075,7 +1075,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                 if (g.prefix === null) {
                   return renderItemCard(items[g.indices[0]], g.indices[0]);
                 }
-                const abierto = !!gruposAbiertos[g.prefix];
+                const abierto = gruposAbiertos[g.prefix] !== false;
                 const pendientes = g.indices.filter(i => {
                   const it = items[i];
                   return !it.estado_devolucion || it.estado_devolucion === 'pendiente';

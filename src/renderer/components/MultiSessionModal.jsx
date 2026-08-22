@@ -664,13 +664,6 @@ function SessionForm({ session }) {
   }, [itemsConDias]);
 
   const toggleGrupo = (key) => setGruposAbiertos(p => ({ ...p, [key]: !p[key] }));
-  const quitarUltimaDelGrupo = (g) => {
-    const ultimo = g.items[g.items.length - 1];
-    if (ultimo) quitarItem(ultimo._idx);
-  };
-  const quitarGrupo = (g) => {
-    setItems(items.filter(i => !(i.id_herramienta && i.id_herramienta.split('-')[0] === g.prefix)));
-  };
 
   const renderItemCard = (item, idx, cardKey, sinOjo = false) => {
     const esGranel = !!item.id_item_granel;
@@ -1436,7 +1429,7 @@ const itemsData = itemsConDias.map(item => ({
                       const item = g.items[0];
                       return renderItemCard(item, item._idx, g.key);
                     }
-                    const abierto = !!gruposAbiertos[g.key];
+                    const abierto = gruposAbiertos[g.key] !== false;
                     return (
                       <div key={g.key} className="rounded-xl transition-colors duration-150 overflow-hidden"
                         style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg)' }}>
@@ -1459,14 +1452,6 @@ const itemsData = itemsConDias.map(item => ({
                             id={g.items[0]?.id_herramienta}
                             titulo={g.nombre + ' (' + g.items.length + ' unidad' + (g.items.length !== 1 ? 'es' : '') + ')'}
                           />
-                          <button title="Quitar la última unidad agregada"
-                            onClick={(e) => { e.stopPropagation(); quitarUltimaDelGrupo(g); }}
-                            className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 shrink-0"
-                            style={{ color: 'var(--muted)' }}>&#8722;</button>
-                          <button title="Quitar todas"
-                            onClick={(e) => { e.stopPropagation(); quitarGrupo(g); }}
-                            className="p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-950 shrink-0"
-                            style={{ color: 'var(--muted)' }}><X size={14} /></button>
                         </div>
                         {abierto && (
                           <div className="px-2 pb-2 space-y-2">
