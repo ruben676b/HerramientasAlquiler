@@ -489,28 +489,28 @@ export default function Inventario() {
                       {/* Separador */}
                       <div className="mt-2" style={{ borderTop: '1px solid var(--border)' }} />
                       {/* Fila 2: precios */}
-                      <div className="flex items-center gap-x-3 gap-y-0.5 mt-1.5 flex-wrap text-xs" style={{ color: 'var(--muted)' }}>
+                      <div className="flex items-center gap-x-3 gap-y-0.5 mt-1.5 flex-wrap" style={{ color: 'var(--muted)' }}>
                         {f.precio_dia != null && (
-                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                            <span style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '0.75rem', lineHeight: 1 }}>S/{f.precio_dia.toFixed(2)}</span>
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px]">
+                            <span style={{ color: 'var(--primary)', fontWeight: 600, lineHeight: 1 }}>S/{f.precio_dia.toFixed(2)}</span>
                             <span>día</span>
                           </span>
                         )}
                         {f.precio_minimo != null && (
-                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                            <span style={{ color: 'var(--warning)', fontWeight: 600, fontSize: '0.75rem', lineHeight: 1 }}>S/{f.precio_minimo.toFixed(2)}</span>
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px]">
+                            <span style={{ color: 'var(--warning)', fontWeight: 600, lineHeight: 1 }}>S/{f.precio_minimo.toFixed(2)}</span>
                             <span>mínimo</span>
                           </span>
                         )}
                         {f.precio_mes != null && (
-                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                            <span style={{ color: 'var(--info)', fontWeight: 600, fontSize: '0.75rem', lineHeight: 1 }}>S/{f.precio_mes.toFixed(2)}</span>
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px]">
+                            <span style={{ color: 'var(--info)', fontWeight: 600, lineHeight: 1 }}>S/{f.precio_mes.toFixed(2)}</span>
                             <span>mes</span>
                           </span>
                         )}
                         {f.precio_venta != null && (
-                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                            <span style={{ color: 'var(--success)', fontWeight: 600, fontSize: '0.75rem', lineHeight: 1 }}>S/{f.precio_venta.toFixed(2)}</span>
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px]">
+                            <span style={{ color: 'var(--success)', fontWeight: 600, lineHeight: 1 }}>S/{f.precio_venta.toFixed(2)}</span>
                             <span>venta</span>
                           </span>
                         )}
@@ -652,12 +652,40 @@ export default function Inventario() {
                     <div className="flex-1 min-w-0">
                       <span className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{g.nombre}</span>
                       <DescripcionPopover text={g.variantes[0]?.descripcion || g.variantes[1]?.descripcion} className="ml-1 align-middle" />
-                      <span className="text-xs ml-2" style={{ color: 'var(--muted)' }}>
-                        S/ {g.variantes.find(v=>v.condicion==='nuevo')?.precio_dia?.toFixed(2) || '—'} nuevo · S/ {g.variantes.find(v=>v.condicion==='usado')?.precio_dia?.toFixed(2) || '—'} usado
-                      </span>
+                      {['nuevo', 'usado'].map(cond => {
+                        const v = g.variantes.find(x => x.condicion === cond);
+                        if (!v) return null;
+                        const precios = [
+                          { val: v.precio_dia, label: 'día', color: 'var(--primary)' },
+                          { val: v.precio_minimo, label: 'mínimo', color: 'var(--warning)' },
+                          { val: v.precio_mes, label: 'mes', color: 'var(--info)' },
+                          { val: v.precio_venta, label: 'venta', color: 'var(--success)' },
+                        ].filter(p => p.val != null);
+                        if (precios.length === 0) return null;
+                        const cb = SEMANTIC[cond];
+                        return (
+                          <div key={cond} className="flex items-center gap-x-3 gap-y-0.5 mt-1 flex-wrap" style={{ color: 'var(--muted)' }}>
+                            <span className="inline-flex items-center text-[9px] font-medium px-1.5 py-0.5 rounded-md"
+                              style={{ backgroundColor: cb?.soft, color: cb?.variable }}>
+                              {cond}
+                            </span>
+                            {precios.map(p => (
+                              <span key={p.label} className="inline-flex items-center gap-1 whitespace-nowrap text-[11px]">
+                                <span style={{ color: p.color, fontWeight: 600, lineHeight: 1 }}>S/{p.val.toFixed(2)}</span>
+                                <span>{p.label}</span>
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })}
                     </div>
-                    <span className="text-[10px] font-mono shrink-0" style={{ color: 'var(--muted)' }}>
-                      Disp {g.disponibles} / Total {g.disponibles + (g.alquiladas || 0) + (g.danadas || 0)}
+                    <span className="inline-flex items-center gap-1.5 text-xs shrink-0" style={{ color: 'var(--muted)' }}>
+                      <Package size={12} style={{ flexShrink: 0 }} />
+                      <span style={{ color: 'var(--success)', fontWeight: 600 }}>{g.disponibles}</span>
+                      <span>disp</span>
+                      <span>·</span>
+                      <span style={{ fontWeight: 600 }}>{g.disponibles + (g.alquiladas || 0) + (g.danadas || 0)}</span>
+                      <span>total</span>
                     </span>
                     <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => setModal({ tipo: 'editar-granel', data: g })}
