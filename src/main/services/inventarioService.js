@@ -892,20 +892,22 @@ function getAlquilerActivoDeHerramienta(id) {
 
 function getHerramientasPorCategoria() {
   const categorias = db.prepare('SELECT * FROM CATEGORIA_HERRAMIENTA ORDER BY rowid DESC').all();
+  const countStmt = db.prepare("SELECT estado, COUNT(*) as n FROM HERRAMIENTA WHERE id_categoria = ? AND activo = 1 GROUP BY estado");
 
   return categorias.map((cat) => {
     const herramientas = db
       .prepare("SELECT * FROM HERRAMIENTA WHERE id_categoria = ? AND activo = 1 AND estado NOT IN ('vendido', 'perdida') ORDER BY id")
       .all(cat.id);
 
-    const conteo = { disponible: 0, alquilado: 0, mantenimiento: 0, malogrado: 0 };
-    herramientas.forEach((h) => { conteo[h.estado] = (conteo[h.estado] || 0) + 1; });
+    const conteo = { disponible: 0, alquilado: 0, mantenimiento: 0, malogrado: 0, vendido: 0, perdida: 0 };
+    countStmt.all(cat.id).forEach((r) => { conteo[r.estado] = r.n; });
 
     return {
       id_categoria: cat.id,
       categoria_nombre: cat.nombre,
       categoria_desc: cat.descripcion,
       total: herramientas.length,
+      totalReal: Object.values(conteo).reduce((a, b) => a + b, 0),
       conteo,
       herramientas,
       precio_dia: herramientas[0]?.precio_dia ?? cat.precio_dia ?? 0,

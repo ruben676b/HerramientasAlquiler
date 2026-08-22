@@ -463,9 +463,57 @@ export default function Inventario() {
                         <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-text)' }}>{f.id_categoria}</span>
                         <span className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{f.nombre}</span>
                       </div>
-                      <div className="flex items-center gap-3 mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>
-                        <span>{f.total} unidad{f.total !== 1 ? 'es' : ''}</span>
-                        <span>S/ {f.precio_dia?.toFixed(2)}/día</span>
+                      {/* Fila 1: estados */}
+                      <div className="flex items-center gap-x-3 gap-y-0.5 mt-1.5 flex-wrap text-xs" style={{ color: 'var(--muted)' }}>
+                        {[
+                          { key: 'disponible', label: 'disponible', icon: CheckCircle },
+                          { key: 'alquilado', label: 'alquilado', icon: Package },
+                          { key: 'mantenimiento', label: 'mantenimiento', icon: Wrench },
+                          { key: 'malogrado', label: 'malogrado', icon: AlertTriangle },
+                          { key: 'vendido', label: 'vendido', icon: ShoppingCart },
+                        ].filter(e => (f.conteo[e.key] || 0) > 0).map((e) => {
+                          const s = SEMANTIC[e.key];
+                          const vendidoColor = e.key === 'vendido' ? 'var(--info)' : s.variable;
+                          return (
+                            <span key={e.key} className="inline-flex items-center gap-1 whitespace-nowrap">
+                              <e.icon size={12} style={{ color: vendidoColor, flexShrink: 0 }} />
+                              <span style={{ color: vendidoColor, fontWeight: 600, fontSize: '0.875rem', lineHeight: 1 }}>{f.conteo[e.key]}</span>
+                              <span>{e.label}{f.conteo[e.key] !== 1 ? 's' : ''}</span>
+                            </span>
+                          );
+                        })}
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                          <span style={{ fontWeight: 600, fontSize: '0.75rem', lineHeight: 1, color: 'var(--muted)' }}>{f.totalReal} total</span>
+                        </span>
+                      </div>
+                      {/* Separador */}
+                      <div className="mt-2" style={{ borderTop: '1px solid var(--border)' }} />
+                      {/* Fila 2: precios */}
+                      <div className="flex items-center gap-x-3 gap-y-0.5 mt-1.5 flex-wrap text-xs" style={{ color: 'var(--muted)' }}>
+                        {f.precio_dia != null && (
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                            <span style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '0.75rem', lineHeight: 1 }}>S/{f.precio_dia.toFixed(2)}</span>
+                            <span>día</span>
+                          </span>
+                        )}
+                        {f.precio_minimo != null && (
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                            <span style={{ color: 'var(--warning)', fontWeight: 600, fontSize: '0.75rem', lineHeight: 1 }}>S/{f.precio_minimo.toFixed(2)}</span>
+                            <span>mínimo</span>
+                          </span>
+                        )}
+                        {f.precio_mes != null && (
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                            <span style={{ color: 'var(--info)', fontWeight: 600, fontSize: '0.75rem', lineHeight: 1 }}>S/{f.precio_mes.toFixed(2)}</span>
+                            <span>mes</span>
+                          </span>
+                        )}
+                        {f.precio_venta != null && (
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                            <span style={{ color: 'var(--success)', fontWeight: 600, fontSize: '0.75rem', lineHeight: 1 }}>S/{f.precio_venta.toFixed(2)}</span>
+                            <span>venta</span>
+                          </span>
+                        )}
                       </div>
                     </div>
                     {f.imagen_path && (
@@ -475,10 +523,6 @@ export default function Inventario() {
                         lado="izquierda"
                       />
                     )}
-                    {/* Indicador numérico */}
-                    <span className="hidden sm:block text-xs font-mono shrink-0" style={{ color: 'var(--muted)' }} title="Disponibles / Total">
-                      {f.conteo.disponible || 0} disp. / {f.total} total
-                    </span>
                     {/* Actions */}
                     <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
