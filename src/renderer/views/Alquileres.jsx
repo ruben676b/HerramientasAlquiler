@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Search, Plus, ChevronDown, ChevronRight, Calendar, Clock,
   XCircle, X, CheckCircle, AlertTriangle, FileText, ArrowRight, Star,
-  Ban, RefreshCw, Trash2, Edit, RotateCcw, Phone, CreditCard,
+  Ban, RefreshCw, Trash2, Edit, RotateCcw, Phone, CreditCard, Wrench,
 } from 'lucide-react';
 import { SEMANTIC } from '../lib/constants';
 import Button from '../components/ui/button';
@@ -61,6 +61,7 @@ export default function Alquileres() {
   const [todosContratos, setTodosContratos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
+  const [busquedaHerramienta, setBusquedaHerramienta] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState('');
   const [error, setError] = useState(null);
   const [expandido, setExpandido] = useState(null);
@@ -99,6 +100,7 @@ export default function Alquileres() {
     try {
       const p = paginaNueva || pagina;
       const filtros = { busqueda, limite, pagina: p };
+      if (busquedaHerramienta) filtros.busquedaHerramienta = busquedaHerramienta;
       if (estadoFiltro === 'papelera') filtros.papelera = 1;
       const res = await window.api.getContratos(filtros);
       if (res && res.contratos) {
@@ -211,7 +213,7 @@ export default function Alquileres() {
     }
   };
 
-  useEffect(() => { setPagina(1); setTodosContratos([]); cargar(1, false); }, [busqueda, estadoFiltro, refreshTrigger]);
+  useEffect(() => { setPagina(1); setTodosContratos([]); cargar(1, false); }, [busqueda, busquedaHerramienta, estadoFiltro, refreshTrigger]);
 
   useEffect(() => {
     const onContratoCreado = () => setRefreshTrigger(prev => prev + 1);
@@ -295,13 +297,23 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
           </div>
         )}
 
-        <div className="relative max-w-[400px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--faint)' }} />
-          <input ref={searchRef} type="text" placeholder="Buscar por nombre, DNI o codigo..."
-            value={busqueda} onChange={e => setBusqueda(e.target.value)}
-            className="w-full h-9 pl-9 pr-8 rounded-lg text-[13px] border outline-none transition-colors duration-150 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
-            style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
-          {busqueda && <button onClick={() => setBusqueda('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5" style={{ color: 'var(--faint)' }}>x</button>}
+        <div className="flex gap-2 flex-wrap">
+          <div className="relative max-w-[400px] flex-1 min-w-[240px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--faint)' }} />
+            <input ref={searchRef} type="text" placeholder="Buscar por nombre, DNI o codigo..."
+              value={busqueda} onChange={e => setBusqueda(e.target.value)}
+              className="w-full h-9 pl-9 pr-8 rounded-lg text-[13px] border outline-none transition-colors duration-150 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+              style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+            {busqueda && <button onClick={() => setBusqueda('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5" style={{ color: 'var(--faint)' }}>x</button>}
+          </div>
+          <div className="relative max-w-[320px] flex-1 min-w-[220px]">
+            <Wrench size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--faint)' }} />
+            <input type="text" placeholder="Buscar por herramienta (nombre o codigo)..."
+              value={busquedaHerramienta} onChange={e => setBusquedaHerramienta(e.target.value)}
+              className="w-full h-9 pl-9 pr-8 rounded-lg text-[13px] border outline-none transition-colors duration-150 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+              style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
+            {busquedaHerramienta && <button onClick={() => setBusquedaHerramienta('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5" style={{ color: 'var(--faint)' }}>x</button>}
+          </div>
         </div>
 
         <div className="flex gap-1.5 flex-wrap">
@@ -1004,7 +1016,7 @@ return filas.map((g, gi) => {
                                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)'; }}
                                     >
                                       {devolucionActiva === c.id ? <X size={12} /> : (pendiente > 0 && <AlertTriangle size={12} />)}
-                                      {devolucionActiva === c.id ? 'Cancelar devolución' : 'Devolución' + (pendiente > 0 ? ' (con deuda)' : '')} <ArrowRight size={12} />
+                                      {devolucionActiva === c.id ? 'Cancelar devolución' : 'Devolución'} <ArrowRight size={12} />
                                     </button>
                                   </>
                                 )}

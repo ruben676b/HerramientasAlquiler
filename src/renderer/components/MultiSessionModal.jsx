@@ -8,6 +8,7 @@ import { cn } from '../lib/utils';
 import SignaturePad from './SignaturePad';
 import StarRating, { CalificacionBadge } from './StarRating';
 import DetalleClienteModal from './DetalleClienteModal';
+import OjoPreview from './OjoPreview';
 import Button from './ui/button';
 import TagChip from './TagChip';
 import { fmtLocalDate, contarHabiles, desglosarMensual, sumarMesCalendario } from '../lib/duracion';
@@ -671,7 +672,7 @@ function SessionForm({ session }) {
     setItems(items.filter(i => !(i.id_herramienta && i.id_herramienta.split('-')[0] === g.prefix)));
   };
 
-  const renderItemCard = (item, idx, cardKey) => {
+  const renderItemCard = (item, idx, cardKey, sinOjo = false) => {
     const esGranel = !!item.id_item_granel;
     const esKit = !!item.id_kit;
     const tarifa = item.tarifa || 'dia';
@@ -706,6 +707,13 @@ function SessionForm({ session }) {
             <span className="truncate">{item.nombre}</span>
             <DescripcionPopover text={item.descripcion} />
           </span>
+          {!sinOjo && !esKit && (
+            <OjoPreview
+              tipo={esGranel ? 'granel' : 'herramienta'}
+              id={esGranel ? item.id_item_granel : item.id_herramienta}
+              titulo={esGranel ? item.nombre + ' (' + item.condicion + ')' : item.id_herramienta + ' — ' + item.nombre}
+            />
+          )}
           <button onClick={() => quitarItem(idx)}
             className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-red-50 dark:hover:bg-red-950 shrink-0"
             style={{ color: 'var(--muted)' }}><X size={14} /></button>
@@ -1358,7 +1366,7 @@ const itemsData = itemsConDias.map(item => ({
                     }
                     const destacado = idx === equipoIndex;
                     return (
-                      <button key={esHerr ? r.id : (r._tipo === 'kit' ? 'k' + r.id : 'g' + r.id)} disabled={!disponible}
+                      <div key={esHerr ? r.id : (r._tipo === 'kit' ? 'k' + r.id : 'g' + r.id)}
                         title={tooltip}
                         onClick={() => {
                           if (!disponible) {
@@ -1367,7 +1375,7 @@ const itemsData = itemsConDias.map(item => ({
                           }
                           esHerr ? agregarHerramienta(r) : (r._tipo === 'kit' ? agregarKit(r) : agregarGranel(r));
                         }}
-                        className="w-full text-left px-3 py-2 text-xs transition-colors duration-150 flex items-center gap-3 disabled:opacity-40"
+                        className="w-full text-left px-3 py-2 text-xs transition-colors duration-150 flex items-center gap-3"
                         style={{
                           cursor: disponible ? 'pointer' : 'not-allowed',
                           backgroundColor: destacado ? 'var(--surface)' : 'var(--bg)',
@@ -1398,10 +1406,17 @@ const itemsData = itemsConDias.map(item => ({
                           color: enLista ? 'var(--info)' : (disponible ? 'oklch(0.40 0.10 160)' : 'oklch(0.40 0.15 25)'),
                         }}>{enLista ? 'Agregado' : (esHerr ? (r.estado === 'disponible' ? 'Disp.' : r.estado) : (r._dispEfectivo > 0 ? r._dispEfectivo + ' disp.' : 'Sin stock'))}</span>
                         {!esHerr && enLista && r._dispEfectivo > 0 && (
-                          <span className="text-[11px] px-2 py-0.5 rounded font-semibold shrink-0"
+                          <span className="text-[11px] px-1.5 py-0.5 rounded font-semibold shrink-0"
                             style={{ backgroundColor: 'oklch(0.93 0.07 160)', color: 'oklch(0.40 0.10 160)' }}>{r._dispEfectivo} disp.</span>
                         )}
-                      </button>
+                        {r._tipo !== 'kit' && (
+                          <OjoPreview
+                            tipo={esHerr ? 'herramienta' : 'granel'}
+                            id={r.id}
+                            titulo={esHerr ? r.id + ' — ' + r.nombre : r.nombre + ' (' + r.condicion + ')'}
+                          />
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -1422,7 +1437,6 @@ const itemsData = itemsConDias.map(item => ({
                       return renderItemCard(item, item._idx, g.key);
                     }
                     const abierto = !!gruposAbiertos[g.key];
-                    const totalGrupo = g.items.reduce((a, it) => a + (it.total_editado != null ? it.total_editado : it.sub_calc), 0);
                     return (
                       <div key={g.key} className="rounded-xl transition-colors duration-150 overflow-hidden"
                         style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg)' }}>
@@ -1437,12 +1451,14 @@ const itemsData = itemsConDias.map(item => ({
                             </span>
                             <DescripcionPopover text={g.descripcion} />
                           </span>
-                          <span className="font-mono text-xs font-bold shrink-0" style={{ color: 'var(--ink)' }}>
-                            S/ {totalGrupo.toFixed(2)}
-                          </span>
                           <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
                             {abierto ? 'ocultar' : g.items.length + ' unidad' + (g.items.length !== 1 ? 'es' : '')}
                           </span>
+                          <OjoPreview
+                            tipo="herramienta"
+                            id={g.items[0]?.id_herramienta}
+                            titulo={g.nombre + ' (' + g.items.length + ' unidad' + (g.items.length !== 1 ? 'es' : '') + ')'}
+                          />
                           <button title="Quitar la última unidad agregada"
                             onClick={(e) => { e.stopPropagation(); quitarUltimaDelGrupo(g); }}
                             className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 shrink-0"
@@ -1454,7 +1470,7 @@ const itemsData = itemsConDias.map(item => ({
                         </div>
                         {abierto && (
                           <div className="px-2 pb-2 space-y-2">
-                            {g.items.map(it => renderItemCard(it, it._idx, it.id_herramienta || ('u-' + (it.id_item_granel || it.id_kit || it._idx))))}
+                            {g.items.map(it => renderItemCard(it, it._idx, it.id_herramienta || ('u-' + (it.id_item_granel || it.id_kit || it._idx)), true))}
                           </div>
                         )}
                       </div>

@@ -1013,8 +1013,11 @@ function getContratos(filtros = {}) {
     FROM CONTRATO c
     JOIN CLIENTE cl ON c.id_cliente = cl.id
     LEFT JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id
-    WHERE 1=1
   `;
+  if (filtros.busquedaHerramienta) {
+    sql += ' LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id';
+  }
+  sql += ' WHERE 1=1';
   const params = [];
 
   if (filtros.papelera === 1) {
@@ -1026,6 +1029,16 @@ function getContratos(filtros = {}) {
   if (filtros.estado) {
     sql += ' AND c.estado = ?';
     params.push(filtros.estado);
+  }
+  if (filtros.busquedaHerramienta) {
+    const p = '%' + filtros.busquedaHerramienta + '%';
+    const pSinGuion = '%' + filtros.busquedaHerramienta.replace('-', '') + '%';
+    sql += ` AND (
+      h.nombre LIKE ? OR
+      d.id_herramienta LIKE ? OR
+      REPLACE(d.id_herramienta, '-', '') LIKE ?
+    )`;
+    params.push(p, p, pSinGuion);
   }
   if (filtros.busqueda) {
     const p = '%' + filtros.busqueda + '%';
@@ -1207,7 +1220,11 @@ function getContratos(filtros = {}) {
   let total = 0;
   if (filtros.limite && filtros.limite > 0) {
     // Construir COUNT aparte (sin regex que se rompe con subconsultas)
-    let countSql = `SELECT COUNT(DISTINCT c.id) AS cnt FROM CONTRATO c JOIN CLIENTE cl ON c.id_cliente = cl.id LEFT JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id WHERE 1=1`;
+    let countSql = `SELECT COUNT(DISTINCT c.id) AS cnt FROM CONTRATO c JOIN CLIENTE cl ON c.id_cliente = cl.id LEFT JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id`;
+    if (filtros.busquedaHerramienta) {
+      countSql += ' LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id';
+    }
+    countSql += ' WHERE 1=1';
     const countParams = [];
     if (filtros.papelera === 1) {
       countSql += ' AND c.papelera = 1';
@@ -1217,6 +1234,12 @@ function getContratos(filtros = {}) {
     if (filtros.estado) {
       countSql += ' AND c.estado = ?';
       countParams.push(filtros.estado);
+    }
+    if (filtros.busquedaHerramienta) {
+      const p = '%' + filtros.busquedaHerramienta + '%';
+      const pSinGuion = '%' + filtros.busquedaHerramienta.replace('-', '') + '%';
+      countSql += ` AND (h.nombre LIKE ? OR d.id_herramienta LIKE ? OR REPLACE(d.id_herramienta, '-', '') LIKE ?)`;
+      countParams.push(p, p, pSinGuion);
     }
     if (filtros.busqueda) {
       const p = '%' + filtros.busqueda + '%';
@@ -2028,6 +2051,32 @@ function restaurarContrato(idContrato) {
 }
 
 /**
+ * Elimina permanentemente un contrato que este en la papelera.
+ * Borra el contrato y todos sus registros asociados (pagos, detalles, danos, etc).
+ */
+function eliminarContratoPermanente(idContrato) {
+  const contrato = db.prepare('SELECT * FROM CONTRATO WHERE id = ?').get(idContrato);
+  if (!contrato) throw new Error('Contrato no encontrado.');
+  if (contrato.papelera !== 1) {
+    throw new Error('El contrato no esta en la papelera.');
+  }
+
+  const ejecutar = db.transaction(() => {
+    db.prepare('DELETE FROM DAÑO_DEVOLUCION WHERE id_contrato = ?').run(idContrato);
+    db.prepare('DELETE FROM DEVOLUCION_GRANEL WHERE id_contrato = ?').run(idContrato);
+    db.prepare('DELETE FROM PAGO WHERE id_contrato = ?').run(idContrato);
+    db.prepare('DELETE FROM CALIFICACION_CLIENTE WHERE id_contrato = ?').run(idContrato);
+    db.prepare('DELETE FROM MANTENIMIENTO WHERE id_contrato = ?').run(idContrato);
+    db.prepare('DELETE FROM DETALLE_CONTRATO WHERE id_contrato = ?').run(idContrato);
+    db.prepare('DELETE FROM CONTRATO WHERE id = ?').run(idContrato);
+  });
+  ejecutar();
+
+  log('[papelera] Contrato #' + idContrato + ' eliminado permanentemente.');
+  return { ok: true };
+}
+
+/**
  * Elimina permanentemente contratos que llevan mas de 7 dias en papelera.
  * Se ejecuta al iniciar la aplicacion.
  */
@@ -2224,4 +2273,4 @@ function agregarItemContrato(idContrato, items) {
   return ejecutar();
 }
 
-module.exports = { crearContrato, crearReserva, convertirReserva, cancelarReserva, autoCancelarReservas, registrarDevolucion, getContratos, registrarPagoAdicional, revertirDevolucionItem, revertirDevolucionGranel, getDevolucionesGranel, anularPago, editarContrato, editarReserva, eliminarContrato, restaurarContrato, autoEliminarPapelera, agregarItemContrato };
+module.exports = { crearContrato, crearReserva, convertirReserva, cancelarReserva, autoCancelarReservas, registrarDevolucion, getContratos, registrarPagoAdicional, revertirDevolucionItem, revertirDevolucionGranel, getDevolucionesGranel, anularPago, editarContrato, editarReserva, eliminarContrato, restaurarContrato, eliminarContratoPermanente, autoEliminarPapelera, agregarItemContrato };

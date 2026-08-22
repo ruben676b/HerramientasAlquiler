@@ -828,6 +828,68 @@ function getHistorialUnidad(id) {
   return { mantenimientos, danosPorContrato };
 }
 
+/**
+ * Historial de daños/mantenimiento para muchas unidades en una sola llamada.
+ * Devuelve un mapa { id_herramienta: { mantenimientos[], danosPorContrato{} } }
+ * Solo incluye unidades que tienen al menos un registro (las demás quedan ausentes).
+ */
+function getHistorialLote(ids) {
+  const out = {};
+  const lista = Array.isArray(ids) ? ids.filter(Boolean) : [];
+  if (lista.length === 0) return out;
+
+  const CH = 500; // evita exceder el límite de parámetros por consulta
+  for (let i = 0; i < lista.length; i += CH) {
+    const chunk = lista.slice(i, i + CH);
+    const ph = chunk.map(() => '?').join(',');
+
+    const ms = db.prepare(`
+      SELECT m.id, m.id_herramienta, m.fecha_inicio, m.fecha_fin, m.descripcion, m.tipo, m.costo, m.id_contrato,
+             cl.nombre AS cliente_nombre
+      FROM MANTENIMIENTO m
+      LEFT JOIN CONTRATO c ON m.id_contrato = c.id
+      LEFT JOIN CLIENTE cl ON c.id_cliente = cl.id
+      WHERE m.id_herramienta IN (${ph})
+      ORDER BY m.id DESC
+    `).all(...chunk);
+    for (const m of ms) {
+      const o = out[m.id_herramienta] || (out[m.id_herramienta] = { mantenimientos: [], danosPorContrato: {} });
+      if (o.mantenimientos.length < 5) o.mantenimientos.push(m);
+    }
+
+    const ds = db.prepare(`
+      SELECT id_herramienta, id_contrato, nombre, costo, fecha
+      FROM DAÑO_DEVOLUCION
+      WHERE id_herramienta IN (${ph}) AND revertido = 0
+      ORDER BY fecha DESC
+    `).all(...chunk);
+    for (const dd of ds) {
+      const o = out[dd.id_herramienta] || (out[dd.id_herramienta] = { mantenimientos: [], danosPorContrato: {} });
+      if (!o.danosPorContrato[dd.id_contrato]) o.danosPorContrato[dd.id_contrato] = [];
+      o.danosPorContrato[dd.id_contrato].push({ nombre: dd.nombre, costo: dd.costo });
+    }
+  }
+
+  return out;
+}
+
+function getAlquilerActivoDeHerramienta(id) {
+  return db.prepare(`
+    SELECT c.id AS contrato_id, c.fecha_salida, c.fecha_devolucion_pactada,
+           c.estado AS estado_contrato, c.deposito_dni, c.deposito_monto,
+           cl.id AS cliente_id, cl.nombre AS cliente_nombre, cl.dni, cl.ruc,
+           cl.telefono, cl.direccion
+    FROM DETALLE_CONTRATO d
+    JOIN CONTRATO c ON c.id = d.id_contrato
+    JOIN CLIENTE cl ON cl.id = c.id_cliente
+    WHERE d.id_herramienta = ?
+      AND d.estado_devolucion = 'pendiente'
+      AND c.estado IN ('reservado', 'alquilado', 'atrasado')
+    ORDER BY c.id DESC
+    LIMIT 1
+  `).get(id);
+}
+
 function getHerramientasPorCategoria() {
   const categorias = db.prepare('SELECT * FROM CATEGORIA_HERRAMIENTA ORDER BY rowid DESC').all();
 
@@ -883,6 +945,8 @@ module.exports = {
   eliminarHerramienta,
   cambiarEstado,
   getHistorialUnidad,
+  getHistorialLote,
+  getAlquilerActivoDeHerramienta,
   getHerramientasPorCategoria,
   getAuditGranel,
   revertirAuditGranel,

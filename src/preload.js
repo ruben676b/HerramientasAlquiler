@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('api', {
   editarReserva: (id, data) => ipcRenderer.invoke('editar-reserva', id, data),
   eliminarContrato: (id, motivo) => ipcRenderer.invoke('eliminar-contrato', id, motivo),
   restaurarContrato: (id) => ipcRenderer.invoke('restaurar-contrato', id),
+  eliminarContratoPermanente: (id) => ipcRenderer.invoke('eliminar-contrato-permanente', id),
 
   // Sistema
   closeApp: () => ipcRenderer.send('force-quit'),
@@ -72,6 +73,8 @@ contextBridge.exposeInMainWorld('api', {
   eliminarHerramienta: (id) => ipcRenderer.invoke('eliminar-herramienta', id),
   cambiarEstado: (id, estado) => ipcRenderer.invoke('cambiar-estado', id, estado),
   getHistorialUnidad: (id) => ipcRenderer.invoke('get-historial-unidad', id),
+  getHistorialLote: (ids) => ipcRenderer.invoke('get-historial-lote', ids),
+  getAlquilerActivoHerramienta: (id) => ipcRenderer.invoke('get-alquiler-activo-herramienta', id),
   getHerramientasPorCategoria: () => ipcRenderer.invoke('get-herramientas-por-categoria'),
   consultarDni: (dni) => ipcRenderer.invoke('consultar-dni', dni),
   generarContratoPdf: (idContrato) => ipcRenderer.invoke('generar-contrato-pdf', idContrato),
