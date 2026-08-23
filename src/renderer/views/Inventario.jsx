@@ -479,7 +479,7 @@ export default function Inventario() {
                           { key: 'mantenimiento', label: 'mantenimiento', icon: Wrench },
                           { key: 'malogrado', label: 'malogrado', icon: AlertTriangle },
                           { key: 'vendido', label: 'vendido', icon: ShoppingCart },
-                        ].filter(e => (f.conteo[e.key] || 0) > 0).map((e) => {
+                        ].filter(e => e.key === 'disponible' || (f.conteo[e.key] || 0) > 0).map((e) => {
                           const s = SEMANTIC[e.key];
                           const vendidoColor = e.key === 'vendido' ? 'var(--info)' : s.variable;
                           return (
