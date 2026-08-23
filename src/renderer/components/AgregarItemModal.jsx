@@ -301,10 +301,10 @@ export default function AgregarItemModal({ idContrato, onClose, onAdded }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-        style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border)', maxHeight: '92vh' }}
+      <div className="relative w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-full"
+        style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border)' }}
         onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
@@ -336,7 +336,7 @@ export default function AgregarItemModal({ idContrato, onClose, onAdded }) {
               <button onClick={() => setBusqueda('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-black/5" style={{ color: 'var(--faint)' }}>✕</button>
             )}
             {foco && busqueda && resultados.length > 0 && (
-              <div className="absolute z-[100] mt-1 bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-lg max-h-56 overflow-y-auto w-full">
+              <div className="absolute z-[100] mt-1 bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-lg max-h-72 overflow-y-auto w-full">
                 {resultados.map((r, idx) => {
                   const esHerr = r._tipo === 'herramienta';
                   const disponible = esHerr ? r.estado === 'disponible' && !r._enLista : r._dispEfectivo > 0;
@@ -344,27 +344,45 @@ export default function AgregarItemModal({ idContrato, onClose, onAdded }) {
                   return (
                     <button key={esHerr ? r.id : (r._tipo === 'kit' ? 'k' + r.id : 'g' + r.id)} disabled={!disponible}
                       onClick={() => { if (disponible) { agregar(r); setIndex(-1); } else { toast(esHerr ? r.estado : 'Sin stock', 'warning'); } }}
-                      className="w-full text-left px-3 py-2 text-xs transition-colors duration-150 flex items-center gap-3 disabled:opacity-40"
+                      className="w-full text-left px-3 py-2 text-xs transition-colors duration-150 flex flex-col gap-1 disabled:opacity-40"
                       style={{ cursor: disponible ? 'pointer' : 'not-allowed', backgroundColor: destacado ? 'var(--surface)' : 'var(--bg)' }}>
-                      {esHerr ? (
-                        <span className="font-mono font-medium shrink-0 w-14" style={{ color: 'var(--primary)' }}>{r.id}</span>
-                      ) : (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                          style={{ backgroundColor: r.condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)', color: r.condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)' }}>{r.condicion}</span>
-                      )}
-                      <span className="flex-1 flex items-center gap-1.5 min-w-0" style={{ color: 'var(--ink)' }}>
-                        <span className="truncate">{r.nombre}</span>
-                        <DescripcionPopover text={r.descripcion} />
+                      <span className="flex items-center gap-3">
+                        {esHerr ? (
+                          <span className="font-mono font-medium shrink-0 w-14" style={{ color: 'var(--primary)' }}>{r.id}</span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                            style={{ backgroundColor: r.condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)', color: r.condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)' }}>{r.condicion}</span>
+                        )}
+                        <span className="flex-1 flex items-center gap-1.5 min-w-0" style={{ color: 'var(--ink)' }}>
+                          <span className="truncate">{r.nombre}</span>
+                          <DescripcionPopover text={r.descripcion} />
+                        </span>
+                        <span className="text-[9px] px-1 py-0.5 rounded font-medium shrink-0"
+                          style={{ backgroundColor: esHerr ? 'oklch(0.55 0.08 240 / 0.10)' : (r._tipo === 'kit' ? 'oklch(0.50 0.11 155 / 0.10)' : 'oklch(0.62 0.13 75 / 0.10)'), color: esHerr ? 'var(--info)' : (r._tipo === 'kit' ? 'var(--success)' : 'var(--warning)') }}>
+                          {esHerr ? 'Herr.' : (r._tipo === 'kit' ? 'Kit' : 'Mat.')}
+                        </span>
+                        <span className="text-[11px] px-2 py-0.5 rounded font-semibold shrink-0" style={{
+                          backgroundColor: r._enLista ? 'oklch(0.93 0.04 240)' : (disponible ? 'oklch(0.93 0.07 160)' : 'oklch(0.93 0.05 25)'),
+                          color: r._enLista ? 'var(--info)' : (disponible ? 'oklch(0.40 0.10 160)' : 'oklch(0.40 0.15 25)'),
+                        }}>{r._enLista ? 'Agregado' : (esHerr ? (r.estado === 'disponible' ? 'Disp.' : r.estado) : (r._dispEfectivo > 0 ? r._dispEfectivo + ' disp.' : 'Sin stock'))}</span>
                       </span>
-                      <span className="text-[9px] px-1 py-0.5 rounded font-medium shrink-0"
-                        style={{ backgroundColor: esHerr ? 'oklch(0.55 0.08 240 / 0.10)' : (r._tipo === 'kit' ? 'oklch(0.50 0.11 155 / 0.10)' : 'oklch(0.62 0.13 75 / 0.10)'), color: esHerr ? 'var(--info)' : (r._tipo === 'kit' ? 'var(--success)' : 'var(--warning)') }}>
-                        {esHerr ? 'Herr.' : (r._tipo === 'kit' ? 'Kit' : 'Mat.')}
-                      </span>
-                      <span className="text-xs font-mono shrink-0" style={{ color: 'var(--muted)' }}>S/ {r.precio_dia?.toFixed(2) || '0.00'}</span>
-                      <span className="text-[11px] px-2 py-0.5 rounded font-semibold shrink-0" style={{
-                        backgroundColor: r._enLista ? 'oklch(0.93 0.04 240)' : (disponible ? 'oklch(0.93 0.07 160)' : 'oklch(0.93 0.05 25)'),
-                        color: r._enLista ? 'var(--info)' : (disponible ? 'oklch(0.40 0.10 160)' : 'oklch(0.40 0.15 25)'),
-                      }}>{r._enLista ? 'Agregado' : (esHerr ? (r.estado === 'disponible' ? 'Disp.' : r.estado) : (r._dispEfectivo > 0 ? r._dispEfectivo + ' disp.' : 'Sin stock'))}</span>
+                      {(() => {
+                        const precios = [
+                          { val: r.precio_dia, label: 'día', color: 'var(--primary)' },
+                          { val: r.precio_minimo, label: 'mínimo', color: 'var(--warning)' },
+                          { val: r.precio_venta, label: 'venta', color: 'var(--success)' },
+                        ].filter(p => p.val != null);
+                        return precios.length > 0 && (
+                          <span className="flex items-center gap-x-3 gap-y-0.5 pl-[4.5rem] text-[10px]" style={{ color: 'var(--muted)' }}>
+                            {precios.map(p => (
+                              <span key={p.label} className="inline-flex items-center gap-0.5 whitespace-nowrap">
+                                <span style={{ color: p.color, fontWeight: 600, lineHeight: 1 }}>S/{p.val.toFixed(2)}</span>
+                                <span>{p.label}</span>
+                              </span>
+                            ))}
+                          </span>
+                        );
+                      })()}
                     </button>
                   );
                 })}
@@ -374,13 +392,13 @@ export default function AgregarItemModal({ idContrato, onClose, onAdded }) {
         </div>
 
         {/* Items list */}
-        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2" style={{ minHeight: 120 }}>
+        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
           {items.length === 0 ? (
             <div className="flex items-center justify-center h-full min-h-[80px]">
               <p className="text-xs" style={{ color: 'var(--faint)' }}>Busque y agregue herramientas o materiales al contrato</p>
             </div>
           ) : (
-            itemsConDias.map((item, idx) => renderItemCard(item, idx))
+            [...itemsConDias].reverse().map((item, idx) => renderItemCard(item, idx))
           )}
         </div>
 

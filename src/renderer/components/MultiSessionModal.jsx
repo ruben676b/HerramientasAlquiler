@@ -1368,47 +1368,65 @@ const itemsData = itemsConDias.map(item => ({
                           }
                           esHerr ? agregarHerramienta(r) : (r._tipo === 'kit' ? agregarKit(r) : agregarGranel(r));
                         }}
-                        className="w-full text-left px-3 py-2 text-xs transition-colors duration-150 flex items-center gap-3"
+                        className="w-full text-left px-3 py-2 text-xs transition-colors duration-150 flex flex-col gap-1"
                         style={{
                           cursor: disponible ? 'pointer' : 'not-allowed',
                           backgroundColor: destacado ? 'var(--surface)' : 'var(--bg)',
                         }}>
-                        {esHerr ? (
-                          <span className="font-mono font-medium shrink-0 w-14" style={{ color: 'var(--primary)' }}>{r.id}</span>
-                        ) : (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                            style={{ backgroundColor: r.condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)', color: r.condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)' }}>{r.condicion}</span>
-                        )}
-                        <span className="flex-1 flex items-center gap-1.5 min-w-0" style={{ color: 'var(--ink)' }}>
-                          <span className="truncate">{r.nombre}</span>
-                          <DescripcionPopover text={r.descripcion} />
-                        </span>
-                        <span className="text-[9px] px-1 py-0.5 rounded font-medium shrink-0"
-                          style={{ backgroundColor: esHerr ? 'oklch(0.55 0.08 240 / 0.10)' : (r._tipo === 'kit' ? 'oklch(0.50 0.11 155 / 0.10)' : 'oklch(0.62 0.13 75 / 0.10)'), color: esHerr ? 'var(--info)' : (r._tipo === 'kit' ? 'var(--success)' : 'var(--warning)') }}>
-                          {esHerr ? 'Herr.' : (r._tipo === 'kit' ? 'Kit' : 'Mat.')}
-                        </span>
-                        <span className="text-xs font-mono shrink-0" style={{ color: 'var(--muted)' }}>S/ {r.precio_dia.toFixed(2)}</span>
-                        {enOtraSesion && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                            style={{ backgroundColor: 'oklch(0.93 0.04 240)', color: 'var(--info)' }}>
-                            En otro alquiler
+                        <span className="flex items-center gap-3">
+                          {esHerr ? (
+                            <span className="font-mono font-medium shrink-0 w-14" style={{ color: 'var(--primary)' }}>{r.id}</span>
+                          ) : (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                              style={{ backgroundColor: r.condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)', color: r.condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)' }}>{r.condicion}</span>
+                          )}
+                          <span className="flex-1 flex items-center gap-1.5 min-w-0" style={{ color: 'var(--ink)' }}>
+                            <span className="truncate">{r.nombre}</span>
+                            <DescripcionPopover text={r.descripcion} />
                           </span>
-                        )}
-                        <span className="text-[11px] px-2 py-0.5 rounded font-semibold shrink-0" style={{
-                          backgroundColor: enLista ? 'oklch(0.93 0.04 240)' : (disponible ? 'oklch(0.93 0.07 160)' : 'oklch(0.93 0.05 25)'),
-                          color: enLista ? 'var(--info)' : (disponible ? 'oklch(0.40 0.10 160)' : 'oklch(0.40 0.15 25)'),
-                        }}>{enLista ? 'Agregado' : (esHerr ? (r.estado === 'disponible' ? 'Disp.' : r.estado) : (r._dispEfectivo > 0 ? r._dispEfectivo + ' disp.' : 'Sin stock'))}</span>
-                        {!esHerr && enLista && r._dispEfectivo > 0 && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded font-semibold shrink-0"
-                            style={{ backgroundColor: 'oklch(0.93 0.07 160)', color: 'oklch(0.40 0.10 160)' }}>{r._dispEfectivo} disp.</span>
-                        )}
-                        {r._tipo !== 'kit' && (
-                          <OjoPreview
-                            tipo={esHerr ? 'herramienta' : 'granel'}
-                            id={r.id}
-                            titulo={esHerr ? r.id + ' — ' + r.nombre : r.nombre + ' (' + r.condicion + ')'}
-                          />
-                        )}
+                          <span className="text-[9px] px-1 py-0.5 rounded font-medium shrink-0"
+                            style={{ backgroundColor: esHerr ? 'oklch(0.55 0.08 240 / 0.10)' : (r._tipo === 'kit' ? 'oklch(0.50 0.11 155 / 0.10)' : 'oklch(0.62 0.13 75 / 0.10)'), color: esHerr ? 'var(--info)' : (r._tipo === 'kit' ? 'var(--success)' : 'var(--warning)') }}>
+                            {esHerr ? 'Herr.' : (r._tipo === 'kit' ? 'Kit' : 'Mat.')}
+                          </span>
+                          {enOtraSesion && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                              style={{ backgroundColor: 'oklch(0.93 0.04 240)', color: 'var(--info)' }}>
+                              En otro alquiler
+                            </span>
+                          )}
+                          <span className="text-[11px] px-2 py-0.5 rounded font-semibold shrink-0" style={{
+                            backgroundColor: enLista ? 'oklch(0.93 0.04 240)' : (disponible ? 'oklch(0.93 0.07 160)' : 'oklch(0.93 0.05 25)'),
+                            color: enLista ? 'var(--info)' : (disponible ? 'oklch(0.40 0.10 160)' : 'oklch(0.40 0.15 25)'),
+                          }}>{enLista ? 'Agregado' : (esHerr ? (r.estado === 'disponible' ? 'Disp.' : r.estado) : (r._dispEfectivo > 0 ? r._dispEfectivo + ' disp.' : 'Sin stock'))}</span>
+                          {!esHerr && enLista && r._dispEfectivo > 0 && (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded font-semibold shrink-0"
+                              style={{ backgroundColor: 'oklch(0.93 0.07 160)', color: 'oklch(0.40 0.10 160)' }}>{r._dispEfectivo} disp.</span>
+                          )}
+                          {r._tipo !== 'kit' && (
+                            <OjoPreview
+                              tipo={esHerr ? 'herramienta' : 'granel'}
+                              id={r.id}
+                              titulo={esHerr ? r.id + ' — ' + r.nombre : r.nombre + ' (' + r.condicion + ')'}
+                            />
+                          )}
+                        </span>
+                        {(() => {
+                          const precios = [
+                            { val: r.precio_dia, label: 'día', color: 'var(--primary)' },
+                            { val: r.precio_minimo, label: 'mínimo', color: 'var(--warning)' },
+                            { val: r.precio_venta, label: 'venta', color: 'var(--success)' },
+                          ].filter(p => p.val != null);
+                          return precios.length > 0 && (
+                            <span className="flex items-center gap-x-3 gap-y-0.5 pl-[4.5rem] text-[10px]" style={{ color: 'var(--muted)' }}>
+                              {precios.map(p => (
+                                <span key={p.label} className="inline-flex items-center gap-0.5 whitespace-nowrap">
+                                  <span style={{ color: p.color, fontWeight: 600, lineHeight: 1 }}>S/{p.val.toFixed(2)}</span>
+                                  <span>{p.label}</span>
+                                </span>
+                              ))}
+                            </span>
+                          );
+                        })()}
                       </div>
                     );
                   })}
@@ -1424,7 +1442,7 @@ const itemsData = itemsConDias.map(item => ({
                 </div>
               ) : (
                 <>
-                  {grupos.map((g) => {
+                  {[...grupos].reverse().map((g) => {
                     if (g.tipo === 'unidad') {
                       const item = g.items[0];
                       return renderItemCard(item, item._idx, g.key);
