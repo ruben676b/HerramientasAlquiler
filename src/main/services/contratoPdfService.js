@@ -34,6 +34,7 @@ function agruparItems(items) {
       item.nombre || '',
       item.precio_dia,
       item.tarifa || 'dia',
+      item.fecha_salida_item || '',
       item.fecha_devolucion_pactada || '',
       desgloseKey,
     ].join('|');
@@ -138,6 +139,19 @@ function generarPdfDesdeDatos(datos) {
   doc.moveDown(0.5);
 
   // ===== CLÁUSULAS (#10: [TOTAL] sin S/ duplicado) =====
+  const MESES = ['enero','febrero','marzo','abril','mayo','junio',
+                 'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+  const formatFechaLarga = (f) => {
+    if (!f) return '';
+    const p = f.split('-');
+    if (p.length !== 3) return f;
+    const dia = parseInt(p[2], 10);
+    const mes = MESES[parseInt(p[1], 10) - 1];
+    const anio = p[0];
+    return `${dia} de ${mes} del ${anio}`;
+  };
+
   const clausulasRaw = getConfig('contrato_clausulas');
   const clausulas = clausulasRaw
     .replaceAll('[ARRENDADORA_NOMBRE]', arrendadora.nombre)
@@ -145,10 +159,8 @@ function generarPdfDesdeDatos(datos) {
     .replaceAll('[ARRENDADORA_DIRECCION]', arrendadora.direccion)
     .replaceAll('[CLIENTE_NOMBRE]', cliente.nombre)
     .replaceAll('[CLIENTE_DNI]', cliente.dni || '—')
-    .replaceAll('[CLIENTE_DIRECCION]', cliente.direccion || '—')
-    .replaceAll('[TOTAL]', `S/ ${totalMostrar.toFixed(2)}`)
-    .replaceAll('[FECHA_INICIO]', fechas.salida)
-    .replaceAll('[FECHA_DEVOLUCION]', fechas.devolucion)
+    .replaceAll('[CLIENTE_DIRECCION_TEXTO]', cliente.direccion ? `con domicilio en ${cliente.direccion}` : 'sin domicilio registrado')
+    .replaceAll('[TOTAL]', totalMostrar.toFixed(2))
     .replaceAll('[DEPOSITO_TEXTO]', '').trimEnd();
 
   doc.fontSize(7).font('Helvetica');
@@ -172,10 +184,19 @@ function generarPdfDesdeDatos(datos) {
   doc.fontSize(9).font('Helvetica-Bold').text('EQUIPOS ALQUILADOS:');
   doc.moveDown(0.3);
 
-  const colX = [45, 90, 325, 450];
-  const colWidths = [40, 230, 120, 90];
-  const headers = ['Cant.', 'Descripción', 'Precio', 'Subtotal'];
-  const headerAlign = ['center', 'left', 'right', 'right'];
+  const formatFechaCorta = (f) => {
+    if (!f) return '—';
+    const p = f.split('-');
+    if (p.length !== 3) return f;
+    const dia = parseInt(p[2], 10);
+    const mes = MESES[parseInt(p[1], 10) - 1].substring(0, 3);
+    return `${dia} ${mes} ${p[0]}`;
+  };
+
+  const colX = [45, 80, 310, 395, 480];
+  const colWidths = [30, 225, 80, 80, 65];
+  const headers = ['Cant.', 'Descripción', 'Salida', 'Entrega', 'Subtotal'];
+  const headerAlign = ['center', 'left', 'center', 'center', 'right'];
   const tableTop = doc.y;
 
   doc.fontSize(6.5).font('Helvetica-Bold');
@@ -202,20 +223,23 @@ function generarPdfDesdeDatos(datos) {
           : item.precio_dia * contarHabiles(fechaSalidaItem, fechaDevItem) * item.cantidad);
     const esGranel = item.codigo && item.codigo.includes('(') && !/^[A-Z]+-\d/.test(item.codigo);
     const descripcion = (esGranel ? 'Material: ' : '') + (item.nombre || '—');
-    const precioTxt = `S/ ${item.precio_dia.toFixed(2)}/${tarifa === 'mes' ? 'mes' : 'día'}`;
     const subTxt = `S/ ${sub.toFixed(2)}`;
+    const salidaTxt = formatFechaCorta(fechaSalidaItem);
+    const entregaTxt = formatFechaCorta(fechaDevItem);
 
     if (y > 720) { doc.addPage(); y = 45; }
 
     const hDesc = doc.heightOfString(descripcion, { width: colWidths[1] });
-    const hPrecio = doc.heightOfString(precioTxt, { width: colWidths[2] });
-    const hSub = doc.heightOfString(subTxt, { width: colWidths[3] });
-    const altoFila = Math.max(hDesc, hPrecio, hSub) + 2;
+    const hSalida = doc.heightOfString(salidaTxt, { width: colWidths[2] });
+    const hEntrega = doc.heightOfString(entregaTxt, { width: colWidths[3] });
+    const hSub = doc.heightOfString(subTxt, { width: colWidths[4] });
+    const altoFila = Math.max(hDesc, hSalida, hEntrega, hSub) + 2;
 
     doc.text(String(item.cantidad), colX[0], y, { width: colWidths[0], align: 'center' });
     doc.text(descripcion, colX[1], y, { width: colWidths[1] });
-    doc.text(precioTxt, colX[2], y, { width: colWidths[2], align: 'right' });
-    doc.text(subTxt, colX[3], y, { width: colWidths[3], align: 'right' });
+    doc.text(salidaTxt, colX[2], y, { width: colWidths[2], align: 'center' });
+    doc.text(entregaTxt, colX[3], y, { width: colWidths[3], align: 'center' });
+    doc.text(subTxt, colX[4], y, { width: colWidths[4], align: 'right' });
     y += altoFila;
     if (item.desglose) {
       const lineas = Array.isArray(item.desglose)
@@ -238,64 +262,93 @@ function generarPdfDesdeDatos(datos) {
   doc.moveDown(1);
 
   doc.font('Helvetica-Bold').fontSize(8);
-  doc.text(`TOTAL:  S/ ${totalMostrar.toFixed(2)}`, { align: 'right' });
+  doc.text(`TOTAL:  S/ ${totalItems.toFixed(2)}`, { align: 'right' });
   doc.moveDown(0.5);
 
-  const MESES = ['enero','febrero','marzo','abril','mayo','junio',
-                 'julio','agosto','septiembre','octubre','noviembre','diciembre'];
-
-  const formatFechaLarga = (f) => {
-    if (!f) return '';
-    const p = f.split('-');
-    if (p.length !== 3) return f;
-    const dia = parseInt(p[2], 10);
-    const mes = MESES[parseInt(p[1], 10) - 1];
-    const anio = p[0];
-    return `${dia} de ${mes} del ${anio}`;
-  };
-
   doc.moveDown(0.5);
-  doc.font('Helvetica').fontSize(9);
-  const textoPeriodo = `Fecha del ${formatFechaLarga(fechas.salida)} hasta el ${formatFechaLarga(fechas.devolucion)} (${dias} día${dias !== 1 ? 's' : ''})`;
-  doc.text(textoPeriodo, 45, doc.y, { width: 505, align: 'right' });
-  doc.moveDown(1);
 
-  // ===== PAGOS (#6: S/ 0.00, #7: Garantía) =====
+  // ===== PAGOS =====
   const pagosY = doc.y;
-  doc.fontSize(8).font('Helvetica-Bold').text('PAGOS:', 45, pagosY);
 
-  const garantiaText = [];
-  if (deposito?.dniRetenido) garantiaText.push(`DNI retenido N° ${cliente.dni}`);
-  if (deposito?.monto > 0) garantiaText.push(`S/ ${deposito.monto.toFixed(2)} como depósito`);
-  const garantia = garantiaText.length > 0 ? `GARANTÍA: ${garantiaText.join(' + ')}` : 'GARANTÍA: Ninguna';
+  // Cálculos
+  const totalBase = totalItems;
+  const mora = cuenta?.total_atraso || 0;
+  const danos = cuenta?.total_danos || 0;
+  const perdidas = cuenta?.total_perdidas || 0;
+  const totalAPagar = totalBase + mora + danos + perdidas;
+  const pagado = cuenta?.total_pagado || 0;
+  const saldo = Math.max(0, totalAPagar - pagado);
 
+  // Columna izquierda: PAGOS
+  const pagosX = 45;
+  const pagosAncho = 260;
+  const colDerX = 320;
+  const lineH = 12;
+  let py = pagosY;
+
+  // Título PAGOS
+  doc.fontSize(8).font('Helvetica-Bold').text('PAGOS:', pagosX, py);
+  py += 14;
+
+  // Título GARANTÍA (columna derecha)
+  doc.text('GARANTÍA:', colDerX, pagosY);
+
+  // Garantía (columna derecha)
   doc.font('Helvetica').fontSize(8);
-  if (cuenta) {
-    const filasCta = [
-      `A CUENTA: S/ ${cuenta.total_pagado.toFixed(2)}`,
-      `SALDO:    S/ ${cuenta.saldo.toFixed(2)}`,
-    ];
-    if (cuenta.total_atraso > 0) filasCta.push(`MORA POR ATRASO: S/ ${cuenta.total_atraso.toFixed(2)}`);
-    if (cuenta.total_danos > 0) filasCta.push(`REPARACIÓN DE DAÑOS: S/ ${cuenta.total_danos.toFixed(2)}`);
-    if (cuenta.total_perdidas > 0) filasCta.push(`PÉRDIDAS / VENTAS: S/ ${cuenta.total_perdidas.toFixed(2)}`);
-    filasCta.forEach((linea, i) => doc.text(linea, 45, pagosY + 14 + i * 12));
-
-    doc.font('Helvetica-Bold');
-    doc.text(`TOTAL:    S/ ${totalMostrar.toFixed(2)}`, 250, pagosY + 14);
-    doc.font('Helvetica');
-
-    const yGarantia = pagosY + 14 + filasCta.length * 12;
-    doc.text(garantia, 45, yGarantia);
-    if (cuenta.fecha_devolucion_real) {
-      doc.font('Helvetica-Oblique');
-      doc.text(`Devuelto el ${formatFechaLarga(cuenta.fecha_devolucion_real)}`, 45, yGarantia + 12);
-      doc.font('Helvetica');
-    }
+  const garantiaMonto = deposito?.monto || 0;
+  if (garantiaMonto > 0) {
+    doc.text(`S/ ${garantiaMonto.toFixed(2)} como depósito`, colDerX, pagosY + 14);
   } else {
-    doc.text(`A CUENTA: S/ ${(deposito?.aCuenta || 0).toFixed(2)}`, 45, pagosY + 14);
-    doc.text(`SALDO:    S/ ${(deposito?.saldo || total).toFixed(2)}`, 250, pagosY + 14);
-    doc.text(`TOTAL:    S/ ${total.toFixed(2)}`, 250, pagosY + 28);
-    doc.text(garantia, 45, pagosY + 34);
+    doc.text('Ninguna', colDerX, pagosY + 14);
+  }
+
+  // Total base
+  doc.font('Helvetica').text('Total', pagosX, py);
+  doc.font('Helvetica-Bold').text(`S/ ${totalBase.toFixed(2)}`, pagosX, py + 10);
+  py += 24;
+
+  // Mora (solo si > 0)
+  if (mora > 0) {
+    doc.font('Helvetica').text('Mora', pagosX, py);
+    doc.font('Helvetica-Bold').text(`+ S/ ${mora.toFixed(2)}`, pagosX, py + 10);
+    py += 24;
+  }
+
+  // Daños (solo si > 0)
+  if (danos > 0) {
+    doc.font('Helvetica').text('Daños', pagosX, py);
+    doc.font('Helvetica-Bold').text(`+ S/ ${danos.toFixed(2)}`, pagosX, py + 10);
+    py += 24;
+  }
+
+  // Pérdidas (solo si > 0)
+  if (perdidas > 0) {
+    doc.font('Helvetica').text('Pérdidas', pagosX, py);
+    doc.font('Helvetica-Bold').text(`+ S/ ${perdidas.toFixed(2)}`, pagosX, py + 10);
+    py += 24;
+  }
+
+  // Total a pagar
+  doc.font('Helvetica').text('Total a pagar', pagosX, py);
+  doc.font('Helvetica-Bold').text(`S/ ${totalAPagar.toFixed(2)}`, pagosX, py + 10);
+  py += 24;
+
+  // Pagado a la fecha
+  if (cuenta) {
+    doc.font('Helvetica').text('Pagado a la fecha', pagosX, py);
+    doc.font('Helvetica-Bold').text(`- S/ ${pagado.toFixed(2)}`, pagosX, py + 10);
+    py += 24;
+  }
+
+  // SALDO PENDIENTE
+  doc.font('Helvetica-Bold').text('SALDO PENDIENTE', pagosX, py);
+  doc.text(`S/ ${saldo.toFixed(2)}`, pagosX, py + 12);
+
+  // Fecha de devolución real
+  if (cuenta?.fecha_devolucion_real) {
+    doc.font('Helvetica-Oblique').fontSize(7);
+    doc.text(`Devuelto el ${formatFechaLarga(cuenta.fecha_devolucion_real)}`, colDerX, pagosY + 28);
+    doc.font('Helvetica').fontSize(8);
   }
 
   doc.moveDown(6);
@@ -424,6 +477,7 @@ function generarPdf(idContrato) {
     items: (() => {
       const filas = [];
       for (const d of detalles) {
+        const fechaSalidaItem = d.fecha_salida_item || contrato.fecha_salida;
         const fechaDevItem = d.fecha_devolucion_pactada_item || contrato.fecha_devolucion_pactada;
         if (d.tipo_item === 'kit') {
           const hijos = detalles.filter(x => x.id_kit === d.id_kit && x.tipo_item !== 'kit');
@@ -433,6 +487,7 @@ function generarPdf(idContrato) {
             nombre: d.item_nombre,
             cantidad: d.cantidad,
             precio_dia: d.precio_dia_aplicado,
+            fecha_salida_item: fechaSalidaItem,
             fecha_devolucion_pactada: fechaDevItem,
             tarifa: d.tarifa_aplicada || 'dia',
             snapshot: d.total_item_snapshot,
@@ -444,6 +499,7 @@ function generarPdf(idContrato) {
             nombre: d.item_nombre,
             cantidad: d.cantidad,
             precio_dia: d.precio_dia_aplicado,
+            fecha_salida_item: fechaSalidaItem,
             fecha_devolucion_pactada: fechaDevItem,
             tarifa: d.tarifa_aplicada || 'dia',
             snapshot: d.total_item_snapshot,

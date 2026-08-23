@@ -601,7 +601,7 @@ estado TEXT NOT NULL CHECK (estado IN ('disponible', 'reservado', 'alquilado', '
 
   // Siempre actualizar cláusulas (pueden cambiar entre versiones)
   db.prepare(`INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion) VALUES (?, ?, ?)`)
-    .run('contrato_clausulas', `Conste por el presente documento que celebra de una parte como ARRENDADORA la Sr(a). [ARRENDADORA_NOMBRE], identificada con DNI N° [ARRENDADORA_DNI], con domicilio en [ARRENDADORA_DIRECCION], y de la otra parte como ARRENDATARIO el Sr(a). [CLIENTE_NOMBRE], identificado con DNI N° [CLIENTE_DNI], con domicilio en [CLIENTE_DIRECCION], quienes convienen de mutuo acuerdo y regulado por las leyes vigentes sobre la materia, en los términos y condiciones siguientes:
+    .run('contrato_clausulas', `Conste por el presente documento que celebra de una parte como ARRENDADORA la Sr(a). [ARRENDADORA_NOMBRE], identificada con DNI N° [ARRENDADORA_DNI], con domicilio en [ARRENDADORA_DIRECCION], y de la otra parte como ARRENDATARIO el Sr(a). [CLIENTE_NOMBRE], identificado con DNI N° [CLIENTE_DNI], [CLIENTE_DIRECCION_TEXTO], quienes convienen de mutuo acuerdo y regulado por las leyes vigentes sobre la materia, en los términos y condiciones siguientes:
 
 PRIMERO: EL ARRENDADOR es propietario de los equipos y maquinarias de construcción civil ubicado en [ARRENDADORA_DIRECCION], del distrito y provincia de Andahuaylas.
 
@@ -609,7 +609,7 @@ SEGUNDO: EL ARRENDADOR deja constancia que los equipos a que se refiere la cláu
 
 TERCERO: Mediante el presente contrato el ARRENDADOR da en alquiler al ARRENDATARIO los equipos descritos en la cláusula primera para destinarlo únicamente como alquiler de maquinarias de construcción civil, en el cual es recibido en perfecto estado de operatividad conforme a lo señalado en la cláusula segunda. Por su parte el ARRENDATARIO se obliga a pagar al arrendador el monto de la renta pactada en la cláusula siguiente en la forma y oportunidad convenidas.
 
-CUARTO: Las partes acuerdan que el monto de la renta que pagará el ARRENDATARIO en calidad de contraprestación por el alquiler de equipos y maquinarias de construcción civil asciende a la suma de S/ [TOTAL], por el período comprendido entre [FECHA_INICIO] y [FECHA_DEVOLUCION].
+CUARTO: Las partes acuerdan que el monto de la renta que pagará el ARRENDATARIO en calidad de contraprestación por el alquiler de equipos y maquinarias de construcción civil asciende a la suma de S/ [TOTAL], conforme al detalle de equipos y períodos indicados en la tabla precedente.
 
 QUINTO: El pago del monto total del alquiler se realizará al momento de la entrega de los equipos o según lo acordado entre las partes. En caso de atraso en la devolución, se aplicará una mora según lo indicado en el detalle de equipos.
 
@@ -929,7 +929,7 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     ['arrendadora_telefono2', '936719836', 'Teléfono secundario'],
     ['arrendadora_firma_base64', '', 'Firma de la arrendadora en base64'],
     ['api_reniec_key', '', 'Token de DECOLECTA para consulta RENIEC (configurar en opciones)'],
-    ['contrato_clausulas', `Conste por el presente documento que celebra de una parte como ARRENDADORA la Sr(a). [ARRENDADORA_NOMBRE], identificada con DNI N° [ARRENDADORA_DNI], con domicilio en [ARRENDADORA_DIRECCION], y de la otra parte como ARRENDATARIO el Sr(a). [CLIENTE_NOMBRE], identificado con DNI N° [CLIENTE_DNI], con domicilio en [CLIENTE_DIRECCION], quienes convienen de mutuo acuerdo y regulado por las leyes vigentes sobre la materia, en los términos y condiciones siguientes:
+    ['contrato_clausulas', `Conste por el presente documento que celebra de una parte como ARRENDADORA la Sr(a). [ARRENDADORA_NOMBRE], identificada con DNI N° [ARRENDADORA_DNI], con domicilio en [ARRENDADORA_DIRECCION], y de la otra parte como ARRENDATARIO el Sr(a). [CLIENTE_NOMBRE], identificado con DNI N° [CLIENTE_DNI], [CLIENTE_DIRECCION_TEXTO], quienes convienen de mutuo acuerdo y regulado por las leyes vigentes sobre la materia, en los términos y condiciones siguientes:
 
 PRIMERO: EL ARRENDADOR es propietario de los equipos y maquinarias de construcción civil ubicado en [ARRENDADORA_DIRECCION], del distrito y provincia de Andahuaylas.
 
@@ -937,7 +937,7 @@ SEGUNDO: EL ARRENDADOR deja constancia que los equipos a que se refiere la cláu
 
 TERCERO: Mediante el presente contrato el ARRENDADOR da en alquiler al ARRENDATARIO los equipos descritos en la cláusula primera para destinarlo únicamente como alquiler de maquinarias de construcción civil, en el cual es recibido en perfecto estado de operatividad conforme a lo señalado en la cláusula segunda. Por su parte el ARRENDATARIO se obliga a pagar al arrendador el monto de la renta pactada en la cláusula siguiente en la forma y oportunidad convenidas.
 
-CUARTO: Las partes acuerdan que el monto de la renta que pagará el ARRENDATARIO en calidad de contraprestación por el alquiler de equipos y maquinarias de construcción civil asciende a la suma de S/ [TOTAL], por el período comprendido entre [FECHA_INICIO] y [FECHA_DEVOLUCION].
+CUARTO: Las partes acuerdan que el monto de la renta que pagará el ARRENDATARIO en calidad de contraprestación por el alquiler de equipos y maquinarias de construcción civil asciende a la suma de S/ [TOTAL], conforme al detalle de equipos y períodos indicados en la tabla precedente.
 
 QUINTO: El pago del monto total del alquiler se realizará al momento de la entrega de los equipos o según lo acordado entre las partes. En caso de atraso en la devolución, se aplicará una mora según lo indicado en el detalle de equipos.
 

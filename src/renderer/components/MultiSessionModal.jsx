@@ -1543,9 +1543,10 @@ const itemsData = itemsConDias.map(item => ({
                       const pdfPath = await window.api.generarPdfPreview({
                         arrendadora: { nombre: 'SOLEDAD SUPANTA QUISPE', dni: '72094861', ruc: '10720948619', direccion: 'Av. Los Pinos N° 348', telefono: '985618849' },
                         cliente: { nombre: nombre || '—', dni: dni || '—', telefono: telefono || '—', direccion: '', ubicacionObra: ubicacionObra || '' },
-                        items: itemsConDias.map(item => ({ codigo: item.id_herramienta || (item.nombre + ' (' + item.condicion + ')'), nombre: item.nombre, cantidad: item.cantidad, precio_dia: infoTarifa(item).precio, tarifa: item.tarifa || 'dia', snapshot: item.total_editado != null ? item.total_editado : item.sub_calc, desglose: item._componentes ? item._componentes.map(c => ({ cantidad: c.cantidad * (item.cantidad || 1), nombre: c.nombre })) : undefined, fecha_devolucion_pactada: item.fecha_devolucion_item || fechaDevolucion })),
+                        items: itemsConDias.map(item => ({ codigo: item.id_herramienta || (item.nombre + ' (' + item.condicion + ')'), nombre: item.nombre, cantidad: item.cantidad, precio_dia: infoTarifa(item).precio, tarifa: item.tarifa || 'dia', snapshot: item.total_editado != null ? item.total_editado : item.sub_calc, desglose: item._componentes ? item._componentes.map(c => ({ cantidad: c.cantidad * (item.cantidad || 1), nombre: c.nombre })) : undefined, fecha_salida_item: item.fecha_salida_item || undefined, fecha_devolucion_pactada: item.fecha_devolucion_item || fechaDevolucion })),
                         fechas: { salida: fechaSalida, devolucion: fechaDevolucion },
                         total, firmaBase64: firmaBase64 || null,
+                        deposito: { monto: depositoMonto || 0, dniRetenido: depositoDni },
                       });
                       setPdfPreviewPath(pdfPath);
                       const b64 = await window.api.leerArchivoBase64(pdfPath);
