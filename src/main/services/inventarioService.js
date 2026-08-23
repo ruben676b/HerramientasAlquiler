@@ -1,5 +1,6 @@
 const db = require('../db/database');
 const { localDate } = require('../utils/date');
+const { borrarArchivoSiExiste } = require('./imagenService');
 
 /* ================================================================
    HERRAMIENTAS
@@ -270,17 +271,56 @@ function eliminarVariante(id) {
   const item = db.prepare('SELECT * FROM ITEM_GRANEL WHERE id = ? AND activo = 1').get(id);
   if (!item) throw new Error('Material no encontrado.');
 
-  // Verificar que no esté en uso
-  const enUso = db.prepare('SELECT COUNT(*) AS c FROM DETALLE_CONTRATO WHERE id_item_granel = ?').get(id);
-  if (enUso.c > 0) throw new Error('No se puede eliminar: tiene historial de alquiler.');
+  const tx = db.transaction(() => {
+    // Bloquear solo si hay contratos vivos (fuera de la papelera) que lo contengan
+    const bloqueantes = db.prepare(`
+      SELECT DISTINCT c.id, c.estado
+      FROM CONTRATO c
+      INNER JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id
+      WHERE d.id_item_granel = ? AND c.papelera = 0
+      ORDER BY c.id
+    `).all(id);
 
-  db.prepare('DELETE FROM ITEM_GRANEL WHERE id = ?').run(id);
+    if (bloqueantes.length > 0) {
+      const lista = bloqueantes.map(c => '#' + c.id + ' (' + c.estado + ')').join(', ');
+      throw new Error(
+        'No se puede eliminar: los contratos ' + lista + ' todavía contienen este material. Elimínalos definitivamente desde la Papelera e inténtalo de nuevo.'
+      );
+    }
 
-  // Si era la última variante, eliminar también la otra
-  const restantes = db.prepare('SELECT COUNT(*) AS c FROM ITEM_GRANEL WHERE nombre = ? AND activo = 1').get(item.nombre);
-  if (restantes.c === 1) {
-    db.prepare('DELETE FROM ITEM_GRANEL WHERE nombre = ?').run(item.nombre);
-  }
+    // Purgar referencias de contratos que ya están en la papelera
+    const detallesPapelera = db.prepare(`
+      SELECT d.id
+      FROM DETALLE_CONTRATO d
+      INNER JOIN CONTRATO c ON c.id = d.id_contrato
+      WHERE d.id_item_granel = ? AND c.papelera = 1
+    `).all(id);
+
+    for (const d of detallesPapelera) {
+      db.prepare('DELETE FROM PAGO WHERE id_detalle = ?').run(d.id);
+    }
+    db.prepare(`
+      DELETE FROM DAÑO_DEVOLUCION
+      WHERE id_item_granel = ? AND id_contrato IN (SELECT id FROM CONTRATO WHERE papelera = 1)
+    `).run(id);
+    db.prepare(`
+      DELETE FROM DEVOLUCION_GRANEL
+      WHERE id_item_granel = ? AND id_contrato IN (SELECT id FROM CONTRATO WHERE papelera = 1)
+    `).run(id);
+    for (const d of detallesPapelera) {
+      db.prepare('DELETE FROM DETALLE_CONTRATO WHERE id = ?').run(d.id);
+    }
+
+    // Quitar el material de los kits y borrar su bitácora de auditoría
+    db.prepare('DELETE FROM KIT_COMPONENTE WHERE id_item_granel = ?').run(id);
+    db.prepare('DELETE FROM AUDIT_GRANEL WHERE item_id = ?').run(id);
+
+    db.prepare('DELETE FROM ITEM_GRANEL WHERE id = ?').run(id);
+
+    // Limpiar filas inactivas residuales del mismo material
+    db.prepare('DELETE FROM ITEM_GRANEL WHERE nombre = ? AND activo = 0').run(item.nombre);
+  });
+  tx();
 
   return { id };
 }
@@ -695,37 +735,65 @@ function editarFamilia(id_categoria, { nombre, precio_dia, precio_minimo, precio
 }
 
 function eliminarFamilia(id_categoria) {
-  // Verificar si alguna herramienta tiene historial de alquiler
-  const conHistorial = db.prepare(`
-    SELECT DISTINCT h.id, h.estado
-    FROM HERRAMIENTA h
-    INNER JOIN DETALLE_CONTRATO d ON d.id_herramienta = h.id
-    WHERE h.id_categoria = ? AND h.activo = 1
-  `).all(id_categoria);
+  const cat = db.prepare('SELECT * FROM CATEGORIA_HERRAMIENTA WHERE id = ?').get(id_categoria);
+  if (!cat) throw new Error('Familia no encontrada: ' + id_categoria);
 
-  if (conHistorial.length > 0) {
-    const ids = conHistorial.map(h => h.id).join(', ');
-    throw new Error(
-      'No se puede eliminar: ' + conHistorial.length + ' herramienta(s) tienen historial de alquiler (' + ids + ').'
-    );
-  }
+  const total = db.prepare('SELECT COUNT(*) AS c FROM HERRAMIENTA WHERE id_categoria = ?').get(id_categoria).c;
 
-  // Verificar alquiladas activas (sin historial pero en uso)
-  const alquiladas = db.prepare(
-    "SELECT COUNT(*) AS c FROM HERRAMIENTA WHERE id_categoria = ? AND estado = 'alquilado' AND activo = 1"
-  ).get(id_categoria);
+  const tx = db.transaction(() => {
+    const bloqueantes = db.prepare(`
+      SELECT DISTINCT c.id, c.estado
+      FROM CONTRATO c
+      INNER JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id
+      INNER JOIN HERRAMIENTA h ON h.id = d.id_herramienta
+      WHERE h.id_categoria = ? AND c.papelera = 0
+      ORDER BY c.id
+    `).all(id_categoria);
 
-  if (alquiladas.c > 0) {
-    throw new Error('No se puede eliminar: hay ' + alquiladas.c + ' herramienta(s) alquilada(s) actualmente.');
-  }
+    if (bloqueantes.length > 0) {
+      const lista = bloqueantes.map(c => '#' + c.id + ' (' + c.estado + ')').join(', ');
+      throw new Error(
+        'No se puede eliminar: los contratos ' + lista + ' todavía contienen herramientas de esta familia. Elimínalos definitivamente desde la Papelera e inténtalo de nuevo.'
+      );
+    }
 
-  // Eliminar herramientas sin historial
-  const r = db.prepare('DELETE FROM HERRAMIENTA WHERE id_categoria = ? AND activo = 1').run(id_categoria);
+    const detallesPapelera = db.prepare(`
+      SELECT d.id
+      FROM DETALLE_CONTRATO d
+      INNER JOIN HERRAMIENTA h ON h.id = d.id_herramienta
+      INNER JOIN CONTRATO c ON c.id = d.id_contrato
+      WHERE h.id_categoria = ? AND c.papelera = 1
+    `).all(id_categoria);
 
-  // Eliminar categoría
-  db.prepare('DELETE FROM CATEGORIA_HERRAMIENTA WHERE id = ?').run(id_categoria);
+    for (const d of detallesPapelera) {
+      db.prepare('DELETE FROM PAGO WHERE id_detalle = ?').run(d.id);
+      db.prepare('DELETE FROM DAÑO_DEVOLUCION WHERE id_detalle = ?').run(d.id);
+      db.prepare('DELETE FROM DEVOLUCION_GRANEL WHERE id_detalle = ?').run(d.id);
+      db.prepare('DELETE FROM DETALLE_CONTRATO WHERE id = ?').run(d.id);
+    }
 
-  return { eliminadas: r.changes };
+    db.prepare(`
+      DELETE FROM MANTENIMIENTO WHERE id_herramienta IN (
+        SELECT id FROM HERRAMIENTA WHERE id_categoria = ?
+      )
+    `).run(id_categoria);
+
+    db.prepare(`
+      DELETE FROM KIT_COMPONENTE WHERE id_herramienta IN (
+        SELECT id FROM HERRAMIENTA WHERE id_categoria = ?
+      )
+    `).run(id_categoria);
+
+    db.prepare('DELETE FROM HERRAMIENTA WHERE id_categoria = ?').run(id_categoria);
+    db.prepare('DELETE FROM DAÑO_PREDEFINIDO WHERE id_categoria = ?').run(id_categoria);
+    db.prepare('DELETE FROM CATEGORIA_HERRAMIENTA WHERE id = ?').run(id_categoria);
+  });
+
+  tx();
+
+  if (cat.imagen_path) borrarArchivoSiExiste(cat.imagen_path);
+
+  return { eliminadas: total };
 }
 
 /* ================================================================

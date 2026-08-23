@@ -139,6 +139,7 @@ function leerImagen(ruta) {
 
 module.exports = {
   IMAGENES_DIR,
+  borrarArchivoSiExiste,
   guardarImagenHerramienta,
   eliminarImagenHerramienta,
   guardarImagenGranel,

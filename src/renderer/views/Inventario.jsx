@@ -265,12 +265,20 @@ export default function Inventario() {
     if (!confirm) return;
     try {
       if (confirm.tipo === 'material') {
-        // Eliminar todo el material (ambas variantes)
+        // Eliminar todo el material (ambas variantes), reportando fallos reales
         const g = granel.find(x => x.nombre === confirm.id);
+        const errores = [];
         if (g) {
           for (const v of g.variantes) {
-            try { await window.api.eliminarVariante(v.id); } catch {}
+            try { await window.api.eliminarVariante(v.id); }
+            catch (e) { errores.push(e.message || String(e)); }
           }
+        }
+        setConfirm(null);
+        if (errores.length > 0) {
+          setError(errores.join(' · '));
+          await cargar();
+          return;
         }
         toast(confirm.nombre + ' eliminado');
       } else {
