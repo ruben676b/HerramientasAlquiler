@@ -127,13 +127,18 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const items = c.items || [];
   useEffect(() => {
     const init = {};
+    const initEstados = {};
     items.forEach((item, idx) => {
-      if (!item.id_item_granel && item.estado_devolucion && item.estado_devolucion !== 'pendiente') {
+      if (!item.id_herramienta) return;
+      if (item.estado_devolucion && item.estado_devolucion !== 'pendiente') {
         init[idx] = true;
         guardadosRef.current[idx] = true;
+      } else {
+        initEstados[idx] = 'bien';
       }
     });
     if (Object.keys(init).length) setGuardados(init);
+    if (Object.keys(initEstados).length) setEstados(p => ({ ...initEstados, ...p }));
   }, []);
   const pagos = c.pagos || [];
   const totalPagado = c.total_pagado || 0;
@@ -258,6 +263,27 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
     }
     setEstados(p => ({ ...p, [idx]: e }));
     if (e === 'dañado') cargarDañosItem(idx, items[idx]);
+  };
+
+  const marcarTodasBien = () => {
+    const nuevos = {};
+    items.forEach((item, idx) => {
+      if (!item.id_herramienta) return;
+      if (guardadosRef.current[idx]) return;
+      if (item.estado_devolucion && item.estado_devolucion !== 'pendiente') return;
+      if (estados[idx] !== 'bien') nuevos[idx] = true;
+    });
+    if (Object.keys(nuevos).length === 0) return;
+    setEstados(p => {
+      const n = { ...p };
+      Object.keys(nuevos).forEach(idx => { n[idx] = 'bien'; });
+      return n;
+    });
+    Object.keys(nuevos).forEach(idx => {
+      setDañosAgregados(p => { const n2 = { ...p }; delete n2[idx]; return n2; });
+      setDañosAcordeon(p => { const n2 = { ...p }; delete n2[idx]; return n2; });
+      setListaAcordeon(p => { const n2 = { ...p }; delete n2[idx]; return n2; });
+    });
   };
 
   const guardarDevolucionBatch = async () => {
@@ -618,7 +644,18 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
     <div className="space-y-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
       {/* Encabezado con botón cancelar */}
       <div className="flex items-center justify-between px-1">
-        <p className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: 'var(--danger)' }}>Modo devolución</p>
+        <div className="flex items-center gap-2">
+          <p className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: 'var(--danger)' }}>Modo devolución</p>
+          {individualesPendientes > 0 && (
+            <button onClick={marcarTodasBien} disabled={cobrando}
+              className="flex items-center gap-1 px-2 h-6 rounded text-[10px] font-semibold transition-all duration-150 disabled:opacity-50"
+              style={{ backgroundColor: 'oklch(0.50 0.13 155 / 0.10)', color: 'oklch(0.42 0.14 155)', border: '0.5px solid oklch(0.50 0.13 155 / 0.35)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.50 0.13 155 / 0.18)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.50 0.13 155 / 0.10)'; }}>
+              <CheckCircle size={11} /> Todas bien
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-1.5">
           <button onClick={() => setCalificarModal(true)}
             className="flex items-center gap-1 px-2 h-6 rounded text-[10px] font-semibold transition-all duration-150"
@@ -626,13 +663,6 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.2)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.12)'; }}>
             <Star size={11} /> Calificar
-          </button>
-          <button onClick={closeDevMode}
-            className="flex items-center gap-1 px-2 h-6 rounded text-[10px] font-medium transition-all duration-150"
-            style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)', border: '0.5px solid var(--border)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}>
-            <X size={12} /> Salir
           </button>
         </div>
       </div>
@@ -1109,18 +1139,25 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
               });
             })()
           )}
-          {individualesPendientes > 0 && (
-            <div className="px-4 pb-2">
+          <div className="flex gap-2 px-4 pb-2">
+            {individualesPendientes > 0 && (
               <button onClick={guardarDevolucionBatch} disabled={cobrando}
-                className="w-full h-9 rounded-lg text-xs font-bold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex-1 h-9 rounded-lg text-xs font-bold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-2 disabled:opacity-50"
                 style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}>
                 <CheckCircle size={14} />
-                {cobrando ? 'Procesando...' : `Confirmar devolución (${individualesPendientes} herramienta${individualesPendientes !== 1 ? 's' : ''})`}
+                {cobrando ? 'Procesando...' : 'Confirmar devolución'}
               </button>
-            </div>
-          )}
+            )}
+            <button onClick={closeDevMode}
+              className="h-9 px-4 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-1.5"
+              style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)', border: '0.5px solid var(--border)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}>
+              <X size={14} /> Cancelar devolución
+            </button>
+          </div>
         </div>
         
         {/* COLUMNA DERECHA: Caja en devolución */}
