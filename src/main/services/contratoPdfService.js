@@ -511,10 +511,15 @@ function generarPdf(idContrato) {
     fechas: { salida: contrato.fecha_salida, devolucion: contrato.fecha_devolucion_pactada },
     total,
     cuenta,
-    deposito: {
-      monto: contrato.deposito_monto || 0,
-      dniRetenido: !!contrato.deposito_dni,
-    },
+    deposito: (() => {
+      let monto = contrato.deposito_monto || 0;
+      // Fallback: si deposito_monto es 0, consultar pagos tipo 'deposito'
+      if (monto === 0) {
+        const row = db.prepare("SELECT COALESCE(SUM(monto), 0) AS total FROM PAGO WHERE id_contrato = ? AND tipo = 'deposito'").get(idContrato);
+        if (row && row.total > 0) monto = row.total;
+      }
+      return { monto, dniRetenido: !!contrato.deposito_dni };
+    })(),
     numContrato: String(idContrato).padStart(6, '0'),
     firmaPath: contrato.firma_digital_path,
   });
