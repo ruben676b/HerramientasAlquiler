@@ -1036,9 +1036,10 @@ function getContratos(filtros = {}) {
     sql += ` AND (
       h.nombre LIKE ? OR
       d.id_herramienta LIKE ? OR
-      REPLACE(d.id_herramienta, '-', '') LIKE ?
+      REPLACE(d.id_herramienta, '-', '') LIKE ? OR
+      d.item_snapshot LIKE ?
     )`;
-    params.push(p, p, pSinGuion);
+    params.push(p, p, pSinGuion, p);
   }
   if (filtros.busqueda) {
     const p = '%' + filtros.busqueda + '%';
@@ -1048,9 +1049,10 @@ function getContratos(filtros = {}) {
       cl.dni LIKE ? OR
       CAST(c.id AS TEXT) LIKE ? OR
       d.id_herramienta LIKE ? OR
-      REPLACE(d.id_herramienta, '-', '') LIKE ?
+      REPLACE(d.id_herramienta, '-', '') LIKE ? OR
+      d.item_snapshot LIKE ?
     )`;
-    params.push(p, p, p, p, pSinGuion);
+    params.push(p, p, p, p, pSinGuion, p);
   }
 
   sql += ` ORDER BY c.fecha_modificacion DESC`;
@@ -1075,8 +1077,8 @@ function getContratos(filtros = {}) {
   const todosItems = db.prepare(`
     SELECT d.*, d.id_contrato AS _ct,
            CASE WHEN d.tipo_item = 'kit' THEN 'KIT-' || d.id_kit
-                ELSE COALESCE(h.id, 'MAT') END AS item_codigo,
-           COALESCE(h.nombre, i.nombre, k.nombre) AS item_nombre,
+                ELSE COALESCE(h.id, json_extract(d.item_snapshot, '$.codigo'), 'MAT') END AS item_codigo,
+           COALESCE(h.nombre, json_extract(d.item_snapshot, '$.nombre'), i.nombre, k.nombre) AS item_nombre,
            COALESCE(h.descripcion, i.descripcion, k.descripcion) AS item_descripcion,
            k.nombre AS kit_nombre,
            i.condicion AS item_condicion,
@@ -1238,14 +1240,14 @@ function getContratos(filtros = {}) {
     if (filtros.busquedaHerramienta) {
       const p = '%' + filtros.busquedaHerramienta + '%';
       const pSinGuion = '%' + filtros.busquedaHerramienta.replace('-', '') + '%';
-      countSql += ` AND (h.nombre LIKE ? OR d.id_herramienta LIKE ? OR REPLACE(d.id_herramienta, '-', '') LIKE ?)`;
-      countParams.push(p, p, pSinGuion);
+      countSql += ` AND (h.nombre LIKE ? OR d.id_herramienta LIKE ? OR REPLACE(d.id_herramienta, '-', '') LIKE ? OR d.item_snapshot LIKE ?)`;
+      countParams.push(p, p, pSinGuion, p);
     }
     if (filtros.busqueda) {
       const p = '%' + filtros.busqueda + '%';
       const pSinGuion = '%' + filtros.busqueda.replace('-', '') + '%';
-      countSql += ` AND (cl.nombre LIKE ? OR cl.dni LIKE ? OR CAST(c.id AS TEXT) LIKE ? OR d.id_herramienta LIKE ? OR REPLACE(d.id_herramienta, '-', '') LIKE ?)`;
-      countParams.push(p, p, p, p, pSinGuion);
+      countSql += ` AND (cl.nombre LIKE ? OR cl.dni LIKE ? OR CAST(c.id AS TEXT) LIKE ? OR d.id_herramienta LIKE ? OR REPLACE(d.id_herramienta, '-', '') LIKE ? OR d.item_snapshot LIKE ?)`;
+      countParams.push(p, p, p, p, pSinGuion, p);
     }
     total = (db.prepare(countSql).get(...countParams) || {}).cnt || 0;
   }
@@ -2000,6 +2002,9 @@ function restaurarContrato(idContrato) {
 
     for (const d of detalles) {
       if (d.tipo_item === 'individual') {
+        // Herramienta eliminada del inventario (solo queda el snapshot histórico): nada que restaurar
+        if (!d.id_herramienta) continue;
+
         const herramienta = db.prepare(
           'SELECT estado FROM HERRAMIENTA WHERE id = ?'
         ).get(d.id_herramienta);

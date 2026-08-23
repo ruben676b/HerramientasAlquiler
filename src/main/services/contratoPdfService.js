@@ -369,8 +369,9 @@ function generarPdf(idContrato) {
   if (!contrato) throw new Error('Contrato no encontrado.');
 
   const detalles = db.prepare(`
-    SELECT d.*, COALESCE(h.nombre, i.nombre, k.nombre) AS item_nombre,
-           COALESCE(h.id, i.nombre || ' (' || i.condicion || ')', k.nombre) AS item_codigo
+    SELECT d.*,
+           COALESCE(h.nombre, json_extract(d.item_snapshot, '$.nombre'), i.nombre, k.nombre) AS item_nombre,
+           COALESCE(h.id, json_extract(d.item_snapshot, '$.codigo'), i.nombre || ' (' || i.condicion || ')', k.nombre) AS item_codigo
     FROM DETALLE_CONTRATO d
     LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id
     LEFT JOIN ITEM_GRANEL i ON d.id_item_granel = i.id

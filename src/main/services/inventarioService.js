@@ -804,20 +804,48 @@ function eliminarHerramienta(id) {
   const h = db.prepare('SELECT * FROM HERRAMIENTA WHERE id = ? AND activo = 1').get(id);
   if (!h) throw new Error('Herramienta no encontrada: ' + id);
 
-  // Verificar historial de alquiler
-  const enContrato = db.prepare(
-    'SELECT COUNT(*) AS c FROM DETALLE_CONTRATO WHERE id_herramienta = ?'
-  ).get(id);
-
-  if (enContrato.c > 0) {
-    throw new Error('No se puede eliminar ' + id + ': tiene historial de alquiler.');
-  }
-
   if (h.estado === 'alquilado') {
     throw new Error('No se puede eliminar ' + id + ': está alquilada actualmente.');
   }
 
-  db.prepare('DELETE FROM HERRAMIENTA WHERE id = ?').run(id);
+  // Bloquear solo si la herramienta está pendiente de devolución en algún contrato vivo.
+  // El historial (contratos devueltos, cancelados o papelizados) no impide el borrado:
+  // esas líneas se conservan mediante item_snapshot y quedan desvinculadas del inventario.
+  const bloqueantes = db.prepare(`
+    SELECT DISTINCT c.id, c.estado
+    FROM CONTRATO c
+    INNER JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id
+    WHERE d.id_herramienta = ? AND d.estado_devolucion = 'pendiente' AND c.papelera = 0
+    ORDER BY c.id
+  `).all(id);
+
+  if (bloqueantes.length > 0) {
+    const lista = bloqueantes.map(c => '#' + c.id + ' (' + c.estado + ')').join(', ');
+    throw new Error(
+      'No se puede eliminar ' + id + ': los contratos ' + lista + ' la tienen alquilada o pendiente de devolución.'
+    );
+  }
+
+  const tx = db.transaction(() => {
+    // Rellenar el snapshot en las líneas que aún no lo tienen (registros previos a la migración)
+    db.prepare(`
+      UPDATE DETALLE_CONTRATO
+      SET item_snapshot = json_object('codigo', ?, 'nombre', ?)
+      WHERE id_herramienta = ?
+        AND (item_snapshot IS NULL OR item_snapshot = '')
+    `).run(id, h.nombre, id);
+
+    // Desvincular las líneas históricas (libera la FK; el CHECK permite NULL con snapshot presente)
+    db.prepare('UPDATE DETALLE_CONTRATO SET id_herramienta = NULL WHERE id_herramienta = ?').run(id);
+
+    // Limpiar tablas satélite con FK hacia HERRAMIENTA
+    db.prepare('DELETE FROM MANTENIMIENTO WHERE id_herramienta = ?').run(id);
+    db.prepare('DELETE FROM KIT_COMPONENTE WHERE id_herramienta = ?').run(id);
+
+    db.prepare('DELETE FROM HERRAMIENTA WHERE id = ?').run(id);
+  });
+  tx();
+
   return { id };
 }
 

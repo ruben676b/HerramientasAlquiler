@@ -222,8 +222,8 @@ function getDetalleContrato(idContrato) {
   if (!contrato) throw new Error('Contrato no encontrado.');
 
   const items = db.prepare(`
-    SELECT d.*, COALESCE(h.nombre, ig.nombre) AS item_nombre,
-           COALESCE(h.id, 'MAT') AS item_codigo,
+    SELECT d.*, COALESCE(h.nombre, json_extract(d.item_snapshot, '$.nombre'), ig.nombre) AS item_nombre,
+           COALESCE(h.id, json_extract(d.item_snapshot, '$.codigo'), 'MAT') AS item_codigo,
            ig.condicion AS item_condicion,
            COALESCE(ig.precio_venta, h.precio_venta, cat.precio_venta) AS item_precio_venta,
            COALESCE(h.valor_reposicion, h.precio_venta, ig.precio_venta, cat.precio_venta) AS item_valor_reposicion

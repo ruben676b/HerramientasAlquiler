@@ -152,7 +152,7 @@ function obtenerContratosCompletados(fechaCorte, fechaFin) {
     const items = db.prepare(`
       SELECT d.*,
         CASE
-          WHEN d.tipo_item = 'individual' THEN COALESCE(h.nombre, d.id_herramienta)
+          WHEN d.tipo_item = 'individual' THEN COALESCE(h.nombre, json_extract(d.item_snapshot, '$.nombre'), d.id_herramienta, json_extract(d.item_snapshot, '$.codigo'), 'Ítem eliminado')
           WHEN d.tipo_item = 'granel' THEN COALESCE(g.nombre, 'Ítem granel #' || d.id_item_granel)
           WHEN d.tipo_item = 'kit' THEN COALESCE(k.nombre, 'Kit #' || d.id_kit)
           ELSE 'Ítem'

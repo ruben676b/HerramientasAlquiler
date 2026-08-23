@@ -837,6 +837,74 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     console.error('[DB] Error en migración fecha_salida_item:', err);
   }
 
+  // Migración: item_snapshot en DETALLE_CONTRATO (permite eliminar herramientas del inventario
+  // conservando las líneas históricas de contratos devueltos mediante un snapshot JSON)
+  try {
+    const colsDetalleSnap = db.prepare("PRAGMA table_info('DETALLE_CONTRATO')").all();
+    const tieneSnapshot = colsDetalleSnap.some(c => c.name === 'item_snapshot');
+    if (!tieneSnapshot) {
+      console.log('[DB] Migración: recreando tabla DETALLE_CONTRATO para agregar item_snapshot...');
+      db.pragma('foreign_keys = OFF');
+      db.transaction(() => {
+        db.exec(`
+          CREATE TABLE DETALLE_CONTRATO_NUEVA (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_contrato INTEGER NOT NULL,
+            tipo_item TEXT NOT NULL CHECK (tipo_item IN ('individual', 'granel', 'kit')),
+            id_herramienta TEXT,
+            id_item_granel INTEGER,
+            id_kit INTEGER,
+            cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+            precio_dia_aplicado REAL NOT NULL CHECK (precio_dia_aplicado >= 0),
+            estado_devolucion TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_devolucion IN ('pendiente', 'bien', 'dañado', 'no devuelto', 'perdido', 'vendido')),
+            fecha_devolucion_real TEXT,
+            fecha_devolucion_pactada_item TEXT,
+            total_item_snapshot REAL,
+            tarifa_aplicada TEXT NOT NULL DEFAULT 'dia' CHECK (tarifa_aplicada IN ('dia', 'minimo', 'mes')),
+            fecha_salida_item TEXT,
+            costo_perdida REAL CHECK (costo_perdida >= 0),
+            descuento_mora REAL NOT NULL DEFAULT 0,
+            item_snapshot TEXT,
+            FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id),
+            FOREIGN KEY (id_herramienta) REFERENCES HERRAMIENTA(id),
+            FOREIGN KEY (id_item_granel) REFERENCES ITEM_GRANEL(id),
+            FOREIGN KEY (id_kit) REFERENCES KIT(id),
+            CHECK (
+              (tipo_item = 'individual' AND id_herramienta NOT NULL AND id_item_granel IS NULL AND cantidad = 1) OR
+              (tipo_item = 'individual' AND id_herramienta IS NULL AND id_item_granel IS NULL AND item_snapshot IS NOT NULL) OR
+              (tipo_item = 'granel' AND id_item_granel NOT NULL AND id_herramienta IS NULL) OR
+              (tipo_item = 'kit' AND id_kit NOT NULL AND id_herramienta IS NULL AND id_item_granel IS NULL)
+            )
+          );
+          INSERT INTO DETALLE_CONTRATO_NUEVA (
+            id, id_contrato, tipo_item, id_herramienta, id_item_granel, id_kit,
+            cantidad, precio_dia_aplicado, estado_devolucion, fecha_devolucion_real,
+            fecha_devolucion_pactada_item, total_item_snapshot, tarifa_aplicada,
+            fecha_salida_item, costo_perdida, descuento_mora, item_snapshot
+          )
+          SELECT d.id, d.id_contrato, d.tipo_item, d.id_herramienta, d.id_item_granel, d.id_kit,
+                 d.cantidad, d.precio_dia_aplicado, d.estado_devolucion, d.fecha_devolucion_real,
+                 d.fecha_devolucion_pactada_item, d.total_item_snapshot, d.tarifa_aplicada,
+                 d.fecha_salida_item, d.costo_perdida, d.descuento_mora,
+                 CASE WHEN d.id_herramienta IS NOT NULL THEN json_object('codigo', h.id, 'nombre', h.nombre) END
+          FROM DETALLE_CONTRATO d
+          LEFT JOIN HERRAMIENTA h ON h.id = d.id_herramienta;
+          DROP TABLE DETALLE_CONTRATO;
+          ALTER TABLE DETALLE_CONTRATO_NUEVA RENAME TO DETALLE_CONTRATO;
+          UPDATE sqlite_sequence SET seq = (SELECT MAX(id) FROM DETALLE_CONTRATO) WHERE name = 'DETALLE_CONTRATO';
+          CREATE INDEX IF NOT EXISTS idx_detalle_contrato ON DETALLE_CONTRATO(id_contrato);
+          CREATE INDEX IF NOT EXISTS idx_detalle_herramienta ON DETALLE_CONTRATO(id_herramienta);
+          CREATE INDEX IF NOT EXISTS idx_detalle_granel ON DETALLE_CONTRATO(id_item_granel);
+        `);
+      })();
+      db.pragma('foreign_keys = ON');
+      console.log('[DB] Migración: tabla DETALLE_CONTRATO recreada con item_snapshot.');
+    }
+  } catch (err) {
+    console.error('[DB] Error en migración item_snapshot:', err);
+    try { db.pragma('foreign_keys = ON'); } catch (e) {}
+  }
+
   // Migración: propagar descripción de categoría a herramientas individuales con descripción vacía
   try {
     const updated = db.prepare(`
