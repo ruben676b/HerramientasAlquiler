@@ -31,7 +31,9 @@ function getClientesConCalificacion() {
  * @returns {Array}
  */
 function buscarClientesConCalificacion(termino) {
-  const patron = termino + '%';
+  // Escape de comodines LIKE para evitar que % / _ del usuario actúen como wildcard
+  const escaparLike = (s) => String(s).replace(/[%_\\]/g, '\\$&');
+  const patron = '%' + escaparLike(termino) + '%';
   const clientes = db.prepare(`
     SELECT c.id, c.tipo, c.nombre, c.dni, c.ruc, c.telefono, c.direccion, c.email,
            c.en_lista_negra, c.fecha_registro,
@@ -40,7 +42,7 @@ function buscarClientesConCalificacion(termino) {
            (SELECT COUNT(*) FROM CONTRATO ct WHERE ct.id_cliente = c.id) AS total_alquileres
     FROM CLIENTE c
     LEFT JOIN CALIFICACION_CLIENTE cal ON cal.id_cliente = c.id
-    WHERE c.activo = 1 AND (c.nombre LIKE ? OR c.dni LIKE ?)
+    WHERE c.activo = 1 AND (c.nombre LIKE ? ESCAPE '\\' OR c.dni LIKE ? ESCAPE '\\')
     GROUP BY c.id
     ORDER BY c.nombre ASC
   `).all(patron, patron);
