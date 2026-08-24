@@ -6,6 +6,7 @@
 :root {
   --bg:             oklch(1.000 0.000 0);
   --surface:        oklch(0.968 0.003 60);
+  --surface-alt:    oklch(0.935 0.004 60);
   --border:         oklch(0.890 0.005 60);
   --ink:            oklch(0.150 0.005 50);
   --muted:          oklch(0.500 0.005 50);
@@ -37,6 +38,7 @@
 [data-theme="dark"] {
   --bg:             oklch(0.135 0.003 45);
   --surface:        oklch(0.180 0.004 45);
+  --surface-alt:    oklch(0.155 0.003 45);
   --border:         oklch(0.230 0.004 45);
   --ink:            oklch(0.920 0.002 60);
   --muted:          oklch(0.610 0.004 50);
