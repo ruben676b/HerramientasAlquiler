@@ -80,6 +80,8 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const [detalleDañosAbierto, setDetalleDañosAbierto] = useState(undefined);
   // Confirmación para deshacer devolución: null | { tipo, idx, idDevolucion?, nombre }
   const [confirmDeshacer, setConfirmDeshacer] = useState(null);
+  // Modo excepción: activado tras "Todas bien", permite clic directo a "dañado"
+  const [modoExcepcion, setModoExcepcion] = useState(false);
 
   const verImagenItem = async (item) => {
     try {
@@ -249,6 +251,12 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
   const seleccionarEstado = (idx, e) => {
     if (guardadosRef.current[idx]) return;
     const actual = estados[idx];
+    // Modo excepción: clic en item "bien" → cambia directo a "dañado"
+    if (modoExcepcion && actual === 'bien') {
+      setEstados(p => ({ ...p, [idx]: 'dañado' }));
+      cargarDañosItem(idx, items[idx]);
+      return;
+    }
     if (actual === e) {
       // Toggle off: limpiar estado y selección de daños
       setEstados(p => ({ ...p, [idx]: null }));
@@ -280,6 +288,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
       setDañosAcordeon(p => { const n2 = { ...p }; delete n2[idx]; return n2; });
       setListaAcordeon(p => { const n2 = { ...p }; delete n2[idx]; return n2; });
     });
+    setModoExcepcion(true);
   };
 
   const guardarDevolucionBatch = async () => {
@@ -342,6 +351,9 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
   ).length;
   const itemsSeleccionables = items.filter((item, idx) =>
     !item.id_item_granel && !guardadosRef.current[idx]
+  ).length;
+  const marcados = items.filter((item, idx) =>
+    !item.id_item_granel && !guardadosRef.current[idx] && estados[idx]
   ).length;
 
   const actualizarCostoDanos = async (idx, costo) => {
@@ -655,6 +667,15 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
               <CheckCircle size={11} /> Todas bien
             </button>
           )}
+          {marcados > 0 && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium tabular-nums"
+              style={{
+                backgroundColor: marcados === itemsSeleccionables ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.02 240 / 0.15)',
+                color: marcados === itemsSeleccionables ? 'var(--success)' : 'var(--info)',
+              }}>
+              {marcados}/{itemsSeleccionables}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           <button onClick={() => setCalificarModal(true)}
@@ -670,7 +691,16 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
       {error && (
         <div className="px-3 py-2 rounded-lg text-xs" style={{ backgroundColor: 'oklch(0.94 0.02 25)', color: 'var(--danger)' }}>{error}</div>
       )}
-      
+
+      {modoExcepcion && itemsSeleccionables > 0 && (
+        <div className="flex items-center gap-2 px-3 py-1.5 mx-1 rounded-lg text-[10px]"
+          style={{ backgroundColor: 'oklch(0.93 0.05 55 / 0.15)', color: 'oklch(0.45 0.13 55)', border: '0.5px solid oklch(0.55 0.13 55 / 0.3)' }}>
+          <AlertTriangle size={12} className="shrink-0" />
+          <span className="flex-1">Todas marcadas como bien. ¿Alguna con problemas? Haz clic en ella para cambiar.</span>
+          <button onClick={() => setModoExcepcion(false)} className="font-bold shrink-0 px-1 hover:opacity-70" style={{ color: 'oklch(0.45 0.13 55)' }}>✕</button>
+        </div>
+      )}
+
       <div className="grid grid-cols-[3fr_2fr] gap-0 min-h-0">
         {/* COLUMNA IZQUIERDA: Items en devolución */}
         <div className="px-4 py-2 space-y-3 min-w-0">
@@ -744,15 +774,16 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                       <div className="flex gap-0.5 shrink-0">
                         {ESTADOS_OPC.map(op => {
                           const sel = est === op.id;
+                          const esExcepcion = modoExcepcion && est === 'bien' && op.id === 'bien';
                           return (
                             <button key={op.id} onClick={() => seleccionarEstado(idx, op.id)}
                               className="flex items-center gap-0.5 px-1.5 h-5 rounded text-[9px] font-medium transition-all duration-150"
                               style={{
-                                backgroundColor: sel ? op.bg : 'var(--bg)',
-                                color: sel ? op.ink : 'var(--muted)',
-                                border: sel ? 'none' : '0.5px solid var(--border)',
+                                backgroundColor: esExcepcion ? 'oklch(0.55 0.13 70)' : (sel ? op.bg : 'var(--bg)'),
+                                color: esExcepcion ? '#fff' : (sel ? op.ink : 'var(--muted)'),
+                                border: esExcepcion ? 'none' : (sel ? 'none' : '0.5px solid var(--border)'),
                               }}>
-                              <op.icon size={10} /> {op.label}
+                              <op.icon size={10} /> {esExcepcion ? '¿Problema?' : op.label}
                             </button>
                           );
                         })}
@@ -844,6 +875,25 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                         {pend > 0 && (
                           <div className="rounded-md p-2 space-y-1.5"
                             style={{ backgroundColor: 'oklch(0.98 0.005 240)', border: '0.5px solid var(--border)' }}>
+                            {/* Botones preset rápidos */}
+                            <div className="flex items-center gap-1 pb-1.5" style={{ borderBottom: '0.5px solid var(--border)' }}>
+                              <span className="text-[9px] font-medium shrink-0" style={{ color: 'var(--muted)' }}>Marcar:</span>
+                              <button onClick={() => { setBuen(idx, pend); setDan(idx, 0); setPerd(idx, 0); }}
+                                className="px-1.5 py-0.5 rounded text-[9px] font-medium transition-all duration-150 active:scale-95"
+                                style={{ backgroundColor: 'oklch(0.50 0.13 155 / 0.10)', color: 'oklch(0.42 0.14 155)', border: '0.5px solid oklch(0.50 0.13 155 / 0.3)' }}>
+                                Todo bien
+                              </button>
+                              <button onClick={() => { setDan(idx, pend); setBuen(idx, 0); setPerd(idx, 0); }}
+                                className="px-1.5 py-0.5 rounded text-[9px] font-medium transition-all duration-150 active:scale-95"
+                                style={{ backgroundColor: 'oklch(0.55 0.13 70 / 0.10)', color: 'oklch(0.50 0.12 70)', border: '0.5px solid oklch(0.55 0.13 70 / 0.3)' }}>
+                                Todo dañado
+                              </button>
+                              <button onClick={() => { setPerd(idx, pend); setBuen(idx, 0); setDan(idx, 0); }}
+                                className="px-1.5 py-0.5 rounded text-[9px] font-medium transition-all duration-150 active:scale-95"
+                                style={{ backgroundColor: 'oklch(0.55 0.19 30 / 0.10)', color: 'oklch(0.50 0.18 30)', border: '0.5px solid oklch(0.55 0.19 30 / 0.3)' }}>
+                                Todo perdido
+                              </button>
+                            </div>
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] font-medium" style={{ color: 'var(--success)' }}>Buen estado:</span>
                               <button onClick={() => setBuen(idx, Math.max(0, (buenas[idx] || 0) - 1))}
@@ -1142,7 +1192,8 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
               });
             })()
           )}
-          <div className="flex gap-2 px-4 pb-2">
+          <div className="flex gap-2 px-4 pb-2 sticky bottom-0 z-10"
+            style={{ backgroundColor: 'oklch(0.95 0.02 55)' }}>
             {individualesPendientes > 0 && (
               <button onClick={guardarDevolucionBatch} disabled={cobrando}
                 className="flex-1 h-9 rounded-lg text-xs font-bold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-2 disabled:opacity-50"
