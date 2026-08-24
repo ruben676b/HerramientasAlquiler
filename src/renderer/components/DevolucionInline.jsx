@@ -127,18 +127,14 @@ export default function DevolucionInline({ contrato, onClose, onRecargar }) {
   const items = c.items || [];
   useEffect(() => {
     const init = {};
-    const initEstados = {};
     items.forEach((item, idx) => {
       if (!item.id_herramienta) return;
       if (item.estado_devolucion && item.estado_devolucion !== 'pendiente') {
         init[idx] = true;
         guardadosRef.current[idx] = true;
-      } else {
-        initEstados[idx] = 'bien';
       }
     });
     if (Object.keys(init).length) setGuardados(init);
-    if (Object.keys(initEstados).length) setEstados(p => ({ ...initEstados, ...p }));
   }, []);
   const pagos = c.pagos || [];
   const totalPagado = c.total_pagado || 0;
@@ -343,6 +339,9 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
 
   const individualesPendientes = items.filter((item, idx) =>
     !item.id_item_granel && !guardadosRef.current[idx] && estados[idx]
+  ).length;
+  const itemsSeleccionables = items.filter((item, idx) =>
+    !item.id_item_granel && !guardadosRef.current[idx]
   ).length;
 
   const actualizarCostoDanos = async (idx, costo) => {
@@ -641,12 +640,13 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
       }
       .dev-nospin { -moz-appearance: textfield !important; }
     `}</style>
-    <div className="space-y-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+    <div className="space-y-3 pt-3" style={{ borderTop: '3px solid oklch(0.53 0.135 55)', backgroundColor: 'oklch(0.95 0.02 55)' }}>
       {/* Encabezado con botón cancelar */}
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <p className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: 'var(--danger)' }}>Modo devolución</p>
-          {individualesPendientes > 0 && (
+          <p className="text-[11px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded"
+            style={{ backgroundColor: 'oklch(0.53 0.135 55 / 0.12)', color: 'oklch(0.53 0.135 55)' }}>Modo devolución</p>
+          {itemsSeleccionables > 0 && (
             <button onClick={marcarTodasBien} disabled={cobrando}
               className="flex items-center gap-1 px-2 h-6 rounded text-[10px] font-semibold transition-all duration-150 disabled:opacity-50"
               style={{ backgroundColor: 'oklch(0.50 0.13 155 / 0.10)', color: 'oklch(0.42 0.14 155)', border: '0.5px solid oklch(0.50 0.13 155 / 0.35)' }}
@@ -703,13 +703,13 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
               }, 0);
               return (
                 <>
-                  {/* Fila 1: Badge + nombre + botones estado + precio */}
-                  <div className={esKit ? 'flex flex-wrap items-center gap-2 mb-1' : 'flex items-center gap-2 mb-1'}>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
+                  {/* Línea 1: Badge + Nombre (wrap) + Eye */}
+                  <div className="flex items-start gap-1.5 mb-0.5">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0 leading-none mt-0.5"
                       style={{ backgroundColor: esKit ? 'oklch(0.45 0.13 160)' : 'oklch(0.40 0.12 240)', color: '#fff' }}>
                       {esKit ? 'Kit ×' + (item.cantidad || 1) : (esGranel ? 'x' + (item.cantidad || 1) : item.item_codigo || item.id)}
                     </span>
-                    <span className={esKit ? 'font-semibold text-[13px]' : 'font-medium text-[13px] truncate flex-1'} style={{ color: 'var(--ink)' }}>{item.item_nombre || item.nombre}</span>
+                    <span className="text-[13px] leading-snug font-semibold min-w-0 flex-1 break-words" style={{ color: 'var(--ink)' }}>{item.item_nombre || item.nombre}</span>
                     {(item.id_herramienta || item.id_item_granel) && (
                       <button
                         onClick={() => verImagenItem(item)}
@@ -720,7 +720,26 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                         <Eye size={12} />
                       </button>
                     )}
-                    {/* Botones Bien/Dañado + desplegable No devuelto (solo individuales no guardados) */}
+                  </div>
+                  {/* Línea 2: Fechas + Precio + Mora */}
+                  <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                    {!esHijo && (
+                      <span className="text-[9px] px-1 py-0.5 rounded shrink-0" style={{ backgroundColor: 'oklch(0.93 0.02 240 / 0.15)', color: 'var(--info)' }}>
+                        {fmtFecha(item.fecha_salida_item || c.fecha_salida)} → {fmtFecha(fechaPactadaItem)} · {diasItem}d
+                      </span>
+                    )}
+                    <span className="text-[9px] shrink-0" style={{ color: 'var(--muted)' }}>
+                      S/ {item.precio_dia_aplicado?.toFixed(2)}/día{esGranel ? ' c/u' : ''}
+                    </span>
+                    {(item.dias_atraso_item || 0) > 0 && (
+                      <span className="text-[8px] px-1.5 py-0.5 rounded font-semibold shrink-0 leading-none"
+                        style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>
+                        +{item.dias_atraso_item}d atraso
+                      </span>
+                    )}
+                  </div>
+                  {/* Línea 3: Acciones + Badges + Kit */}
+                  <div className="flex items-center gap-1 flex-wrap">
                     {!esGranel && !esKit && !yaGuardado && (
                       <div className="flex gap-0.5 shrink-0">
                         {ESTADOS_OPC.map(op => {
@@ -738,15 +757,6 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                           );
                         })}
                       </div>
-                    )}
-                    <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
-                      S/ {item.precio_dia_aplicado?.toFixed(2)}/día{esGranel ? ' c/u' : ''}
-                    </span>
-                    {(item.dias_atraso_item || 0) > 0 && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                        style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>
-                        &#9888; +{item.dias_atraso_item} día{item.dias_atraso_item !== 1 ? 's' : ''}
-                      </span>
                     )}
                     {yaGuardado && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
@@ -778,13 +788,6 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                       </button>
                     )}
                   </div>
-                  {/* Fila 2: Fechas del ítem (heredadas del kit en componentes) */}
-                  {!esHijo && (
-                  <div className="text-[10px] mb-1" style={{ color: 'var(--muted)' }}>
-                    Salida: {fmtFecha(item.fecha_salida_item || c.fecha_salida)} &middot; Pactada: {fmtFecha(fechaPactadaItem)}
-                    <span style={{ color: 'var(--muted)' }}> &middot; Base: {diasItem} día{diasItem !== 1 ? 's' : ''}</span>
-                  </div>
-                  )}
                   {/* Desglose de daños en individuales guardados */}
                   {!esGranel && !esKit && yaGuardado && item.estado_devolucion === 'dañado' && item.danos_devueltos && item.danos_devueltos.length > 0 && (
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]" style={{ color: 'var(--faint)' }}>
@@ -1045,7 +1048,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                     : (estK ? ((ESTADOS_OPC.find(o => o.id === estK)?.bg || (estK === 'perdido' ? 'oklch(0.55 0.19 30)' : 'oklch(0.45 0.15 250)')) + '60') : 'var(--border)'),
                   backgroundColor: yaG
                     ? 'oklch(0.95 0.05 155)'
-                    : (estK ? (ESTADOS_OPC.find(o => o.id === estK) ? 'oklch(0.97 0.04 70)' : 'oklch(0.96 0.04 260)') : 'var(--surface)'),
+                    : (estK ? (ESTADOS_OPC.find(o => o.id === estK) ? 'oklch(0.97 0.04 70)' : 'oklch(0.96 0.04 260)') : 'var(--bg)'),
                 };
                 const cardBody = (
                   <div className="rounded-lg border px-3 py-2 text-xs transition-all duration-150"
@@ -1074,7 +1077,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                                   : (estH ? ESTADOS_OPC.find(o => o.id === estH)?.bg + '60' : 'var(--border)'),
                                 backgroundColor: yaH
                                   ? 'oklch(0.95 0.05 155)'
-                                  : (estH ? 'oklch(0.97 0.04 70)' : 'var(--surface)'),
+                                  : (estH ? 'oklch(0.97 0.04 70)' : 'var(--bg)'),
                               }}>
                               {renderItemBody(hi, hIdx, false, true)}
                             </div>
@@ -1112,11 +1115,11 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                 }).length;
                 return (
                   <div key={'g-' + g.prefix} className="rounded-xl transition-all duration-150 mb-1.5"
-                    style={{ border: '1px solid var(--border)', backgroundColor: 'var(--surface)' }}>
+                    style={{ border: '1px solid var(--border)', backgroundColor: 'oklch(0.96 0.015 240 / 0.12)' }}>
                     <div className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none"
                       onClick={() => setGruposAbiertos(p => ({ ...p, [g.prefix]: !p[g.prefix] }))}>
                       <ChevronRight size={14} className="shrink-0" style={{ color: 'var(--muted)', transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform 150ms' }} />
-                      <span className="flex-1 min-w-0 text-[13px] font-semibold truncate" style={{ color: 'var(--ink)' }}>
+                      <span className="flex-1 min-w-0 text-[13px] font-semibold break-words" style={{ color: 'var(--ink)' }}>
                         {g.nombre}
                         <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-lg font-bold align-middle"
                           style={{ backgroundColor: 'oklch(0.40 0.12 240 / 0.12)', color: 'var(--info)' }}>&times;{g.indices.length}</span>
@@ -1161,7 +1164,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
         </div>
         
         {/* COLUMNA DERECHA: Caja en devolución */}
-        <div className="px-4 py-2 space-y-3" style={{ borderLeft: '0.5px solid var(--border)' }}>
+        <div className="px-4 py-2 space-y-3" style={{ borderLeft: '2px solid oklch(0.53 0.135 55)' }}>
           <p className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: 'var(--muted)' }}>Cierre de devolución</p>
           
           <div className="space-y-1.5 text-xs">
