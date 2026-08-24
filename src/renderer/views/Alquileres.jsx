@@ -506,23 +506,19 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                       <div className="flex items-baseline gap-2 min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>{c.cliente_nombre}</p>
                         {c.cliente_telefono && (
-                          <span className="inline-flex items-center gap-1 text-[11px] shrink-0" style={{ color: 'var(--muted)' }}>
-                            <Phone size={10} style={{ opacity: 0.7 }} />
+                          <span className="inline-flex items-center gap-1 text-[11px] shrink-0" style={{ color: 'oklch(0.40 0.02 240 / 0.75)' }}>
+                            <Phone size={10} />
                             {c.cliente_telefono}
                           </span>
                         )}
                         {c.cliente_dni && (
-                          <span className="inline-flex items-center gap-1 text-[11px] shrink-0 font-mono" style={{ color: 'var(--muted)' }}>
-                            <CreditCard size={10} style={{ opacity: 0.7 }} />
+                          <span className="inline-flex items-center gap-1 text-[11px] shrink-0 font-mono" style={{ color: 'oklch(0.40 0.02 240 / 0.75)' }}>
+                            <CreditCard size={10} />
                             {c.cliente_dni}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 text-xs mt-1 flex-wrap">
-                        <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: 'var(--muted)' }}>
-                          <Calendar size={10} style={{ opacity: 0.7 }} />
-                          {fmtFechaCorta(c.fecha_salida)} &mdash; {fmtFecha(c.fecha_devolucion_pactada)}
-                        </span>
                         {c.etiquetas?.length > 0 && (
                           <>
                             <span className="text-[11px]" style={{ color: 'var(--muted)' }}>&middot;</span>
@@ -556,7 +552,7 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                   {/* ACORDEON CON ANIMACION GRID */}
                   <div style={{ display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', transition: 'grid-template-rows 0.25s ease' }}>
                     <div style={{ overflow: 'hidden' }}>
-                      <div style={{ borderTop: '0.5px solid var(--border)', backgroundColor: 'var(--surface)' }}>
+                      <div style={{ borderTop: '0.5px solid var(--border)', backgroundColor: 'var(--surface-alt)' }}>
                         {devolucionActiva === c.id ? (
                           <DevolucionInline contrato={c} onClose={() => setDevolucionActiva(null)} onRecargar={recargar} />
                         ) : (
@@ -565,8 +561,8 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                             <div className="grid grid-cols-[3fr_2fr] min-h-0">
 
                               {/* ===== COLUMNA IZQUIERDA: EQUIPOS ===== */}
-                              <div className="px-4 py-3">
-                                <div className="flex items-center justify-between pb-1.5 mb-3"
+                              <div className="px-3 py-2.5">
+                                <div className="flex items-center justify-between pb-1 mb-2"
                                   style={{ borderBottom: '1.5px solid oklch(0.50 0.11 240)' }}>
                                   <p className="text-[11px] uppercase tracking-wider font-semibold"
                                     style={{ color: 'var(--muted)' }}>
@@ -583,10 +579,7 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                                 {c.items?.length === 0 ? (
                                   <p className="text-xs" style={{ color: 'var(--faint)' }}>Sin equipos registrados</p>
                                 ) : (
-                                  <div className="space-y-2">
-                                    <p className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>
-                                      Tarifa diaria total: S/ {(c.subtotal_diario || 0).toFixed(2)}
-                                    </p>
+                                  <div className="space-y-1.5">
 {(() => {
                                           const baseCache = {};
                                           const getBase = (item) => {
@@ -595,123 +588,106 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                                           };
                                           const renderEquipoFila = (item, idx, filaKey, sub) => {
                                             const esGranel = !!item.item_condicion;
+                                            const diasItem = item.dias_habiles_item || item.dias_item || 0;
+                                            const precio = item.precio_dia_aplicado || 0;
+                                            const montoMora = item.monto_atraso_item || 0;
+                                            const atraso = item.dias_atraso_item || 0;
+                                            const tarifaMes = item.tarifa_aplicada === 'mes';
+                                            const fSalida = fmtFechaCorta(item.fecha_salida_item || c.fecha_salida);
+                                            const fDev = fmtFechaCorta(item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada);
+                                            const cardBg = item.estado_devolucion === 'bien' ? 'oklch(0.96 0.03 160)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'oklch(0.96 0.02 25)' : item.estado_devolucion === 'vendido' ? 'oklch(0.96 0.03 250)' : item.estado_devolucion === 'dañado' ? 'oklch(0.96 0.03 75)' : 'var(--bg)';
                                             return (
-                                          <div key={filaKey} className="space-y-0.5">
-                                            {/* Fila 1: Badge + Nombre + Tarifa + Atraso badge */}
-                                            <div className="flex items-center gap-1 flex-wrap">
-                                              {!esGranel ? (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
-                                                  style={{ backgroundColor: 'oklch(0.40 0.12 240)', color: '#fff' }}>
-                                                  {item.item_codigo}
-                                                </span>
-                                              ) : (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                                                  style={{
-                                                    backgroundColor: item.item_condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)',
-                                                    color: item.item_condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)',
-                                                  }}>x{item.cantidad}</span>
-                                              )}
-                                              <span className="text-[13px] leading-tight font-semibold" style={{ color: 'var(--ink)' }}>{item.item_nombre}</span>
-                                              <span className="text-[10px] shrink-0" style={{ color: 'var(--faint)' }}>
-                                                S/ {(item.precio_dia_aplicado || 0).toFixed(2)}{item.tarifa_aplicada === 'mes' ? '/mes' : '/día'}{esGranel ? ' c/u' : ''}
-                                              </span>
-                                              {(item.dias_atraso_item || 0) > 0 && (
-                                                <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                                                  style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>
-                                                  &#9888; +{item.dias_atraso_item} d&iacute;a{item.dias_atraso_item !== 1 ? 's' : ''}
-                                                </span>
-                                              )}
-                                              {item.estado_devolucion && item.estado_devolucion !== 'pendiente' && (
-                                                <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                                                  style={{
-                                                    backgroundColor: item.estado_devolucion === 'bien' ? 'oklch(0.93 0.05 160)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'oklch(0.95 0.03 25)' : item.estado_devolucion === 'vendido' ? 'oklch(0.93 0.05 250)' : 'oklch(0.93 0.05 75)',
-                                                    color: item.estado_devolucion === 'bien' ? 'var(--success)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'var(--danger)' : item.estado_devolucion === 'vendido' ? 'oklch(0.45 0.13 250)' : 'var(--warning)',
-                                                  }}>
-                                                  {item.estado_devolucion === 'bien' ? '\u2713 Devuelto' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'Perdido' : item.estado_devolucion === 'vendido' ? 'Vendido' : 'Da\u00f1ado'}
-                                                  {item.danos_devueltos && item.danos_devueltos.length > 0 && (
-                                                    <span className="ml-1" style={{ color: 'var(--faint)' }}>
-                                                      {item.danos_devueltos.map(d => d.nombre).join(', ')}
+                                              <div key={filaKey} className="rounded-lg px-2.5 py-2" style={{ backgroundColor: cardBg, border: '0.5px solid var(--border)' }}>
+                                                {/* Línea 1: Código + Nombre (wrap libre) */}
+                                                <div className="flex items-start gap-1.5">
+                                                  {!esGranel ? (
+                                                    <span className="text-[9px] px-1 py-0.5 rounded font-mono font-bold shrink-0 leading-none mt-0.5"
+                                                      style={{ backgroundColor: 'oklch(0.40 0.12 240)', color: '#fff' }}>
+                                                      {item.item_codigo}
+                                                    </span>
+                                                  ) : (
+                                                    <span className="text-[9px] px-1 py-0.5 rounded font-medium shrink-0 leading-none mt-0.5"
+                                                      style={{
+                                                        backgroundColor: item.item_condicion === 'nuevo' ? 'oklch(0.93 0.05 160)' : 'oklch(0.93 0.04 75)',
+                                                        color: item.item_condicion === 'nuevo' ? 'var(--success)' : 'var(--warning)',
+                                                      }}>x{item.cantidad}</span>
+                                                  )}
+                                                  <span className="text-[12px] leading-snug font-semibold min-w-0 flex-1 break-words" style={{ color: 'var(--ink)' }}>{item.item_nombre}</span>
+                                                </div>
+                                                {/* Línea 2a: Info operativa */}
+                                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                                  <span className="text-[9px] px-1 py-0.5 rounded shrink-0" style={{ backgroundColor: 'oklch(0.93 0.02 240 / 0.15)', color: 'var(--info)' }}>
+                                                    {fSalida} → {fDev}
+                                                  </span>
+                                                  <span className="text-[9px] shrink-0" style={{ color: 'var(--muted)' }}>
+                                                    {tarifaMes
+                                                      ? `${item.meses_item || 0}m${(item.dias_extra_item || 0) > 0 ? '+' + item.dias_extra_item + 'd' : ''}`
+                                                      : `${precio.toFixed(0)}/d × ${diasItem}d`}
+                                                  </span>
+                                                  {atraso > 0 && (
+                                                    <span className="text-[8px] px-1.5 py-0.5 rounded font-semibold shrink-0 leading-none"
+                                                      style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>
+                                                      +{atraso}d atraso · S/ {montoMora.toFixed(0)}
                                                     </span>
                                                   )}
-                                                </span>
-                                              )}
-                                              {item.estado_devolucion === 'pendiente' && (c.estado === 'alquilado' || c.estado === 'atrasado' || c.estado === 'devolución incompleta' || c.estado === 'reservado') && (
-                                                <div className="flex gap-1 ml-auto shrink-0">
-                                                  <button onClick={() => setItemAEditar({ item, idContrato: c.id, contrato: c, isGranelOrKit: esGranel || item.tipo_item === 'kit' })} className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition-colors" title="Editar ítem">
-                                                    <Edit size={12} />
-                                                  </button>
-                                                  <button onClick={() => setItemAEliminar({ item, idContrato: c.id })} className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" title="Eliminar ítem">
-                                                    <Trash2 size={12} />
-                                                  </button>
+                                                  {item.estado_devolucion && item.estado_devolucion !== 'pendiente' && (
+                                                    <span className="text-[8px] px-1 py-0.5 rounded font-semibold shrink-0 leading-none"
+                                                      style={{
+                                                        backgroundColor: item.estado_devolucion === 'bien' ? 'oklch(0.93 0.05 160)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'oklch(0.95 0.03 25)' : item.estado_devolucion === 'vendido' ? 'oklch(0.93 0.05 250)' : 'oklch(0.93 0.05 75)',
+                                                        color: item.estado_devolucion === 'bien' ? 'var(--success)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'var(--danger)' : item.estado_devolucion === 'vendido' ? 'oklch(0.45 0.13 250)' : 'var(--warning)',
+                                                      }}>
+                                                      {item.estado_devolucion === 'bien' ? '\u2713 Dev.' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'Perdido' : item.estado_devolucion === 'vendido' ? 'Vendido' : 'Da\u00f1ado'}
+                                                      {item.danos_devueltos && item.danos_devueltos.length > 0 && (
+                                                        <span className="ml-0.5" style={{ color: 'var(--faint)' }}>
+                                                          {item.danos_devueltos.map(d => d.nombre).join(', ')}
+                                                        </span>
+                                                      )}
+                                                    </span>
+                                                  )}
+                                                  {esGranel && (item.granel_dev_bien || item.granel_dev_danada || item.granel_dev_perdida || 0) > 0 && (
+                                                    <span className="text-[9px] shrink-0" style={{ color: 'var(--muted)' }}>
+                                                      Dev:{(item.granel_dev_bien || 0) > 0 && <span style={{ color: 'var(--success)' }}> {item.granel_dev_bien}✓</span>}{(item.granel_dev_danada || 0) > 0 && <span style={{ color: 'oklch(0.55 0.13 70)' }}> {item.granel_dev_danada}⚠</span>}{(item.granel_dev_perdida || 0) > 0 && <span style={{ color: 'var(--danger)' }}> {item.granel_dev_perdida}✗</span>}{(item.granel_pendiente || 0) > 0 && <span style={{ color: 'var(--faint)' }}> pend:{item.granel_pendiente}</span>}
+                                                    </span>
+                                                  )}
+                                                  {item.estado_devolucion === 'vendido' && item.costo_perdida > 0 && (
+                                                    <span className="text-[9px] shrink-0 font-medium" style={{ color: 'oklch(0.45 0.13 250)' }}>
+                                                      Venta S/ {(item.costo_perdida || 0).toFixed(2)}
+                                                    </span>
+                                                  )}
                                                 </div>
-                                              )}
-                                            </div>
-                                            {/* Fila 2: Fechas */}
-                                            <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
-                                              <span />
-                                              <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                                                Salida: {fmtFechaCorta(item.fecha_salida_item || c.fecha_salida)} &middot; Pactada: {fmtFechaCorta(item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada)}
-                                                &middot; Base: {item.tarifa_aplicada === 'mes' && (item.meses_item || 0) > 0
-                                                  ? `${item.meses_item} mes${item.meses_item !== 1 ? 'es' : ''}${(item.dias_extra_item || 0) > 0 ? ` + ${item.dias_extra_item} día${item.dias_extra_item !== 1 ? 's' : ''}` : ''} (${item.dias_habiles_item || item.dias_item || 0} día${(item.dias_habiles_item || item.dias_item || 0) !== 1 ? 's' : ''} sin dom.)`
-                                                  : (item.dias_habiles_item || item.dias_item || 0) + ' día' + ((item.dias_habiles_item || item.dias_item || 0) !== 1 ? 's' : '') + ' sin dom.'}
-                                              </span>
-                                            </div>
-                                            {/* Granel: resumen devolución */}
-                                            {esGranel && (item.granel_dev_bien || item.granel_dev_danada || item.granel_dev_perdida || 0) > 0 && (
-                                              <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
-                                                <span />
-                                                <span className="text-[11px] flex items-center gap-2">
-                                                  <span style={{ color: 'var(--muted)' }}>Dev:</span>
-                                                  {(item.granel_dev_bien || 0) > 0 && <span style={{ color: 'var(--success)' }}>{item.granel_dev_bien} bien</span>}
-                                                  {(item.granel_dev_danada || 0) > 0 && <span style={{ color: 'oklch(0.55 0.13 70)' }}>{item.granel_dev_danada} dañ</span>}
-                                                  {(item.granel_dev_perdida || 0) > 0 && <span style={{ color: 'var(--danger)' }}>{item.granel_dev_perdida} perd</span>}
-                                                  {(item.granel_pendiente || 0) > 0 && <span style={{ color: 'var(--faint)' }}>pend: {item.granel_pendiente}</span>}
-                                                  {(item.granel_pendiente === 0) && <span className="font-medium" style={{ color: 'var(--success)' }}>Completo</span>}
-                                                </span>
-                                                <span />
+                                                {/* Línea 2b: Total + Acciones */}
+                                                <div className="flex items-center gap-1.5 mt-1">
+                                                  <span className="font-mono text-[11px] font-bold shrink-0 tabular-nums" style={{ color: 'var(--ink)' }}>
+                                                    S/ {sub.toFixed(2)}
+                                                  </span>
+                                                  {item.estado_devolucion === 'pendiente' && (c.estado === 'alquilado' || c.estado === 'atrasado' || c.estado === 'devolución incompleta' || c.estado === 'reservado') && (
+                                                    <div className="flex gap-0.5 ml-auto shrink-0">
+                                                      <button onClick={() => setItemAEditar({ item, idContrato: c.id, contrato: c, isGranelOrKit: esGranel || item.tipo_item === 'kit' })} className="p-0.5 rounded hover:bg-black/5 transition-colors" style={{ color: 'var(--faint)' }} title="Editar">
+                                                        <Edit size={11} />
+                                                      </button>
+                                                      <button onClick={() => setItemAEliminar({ item, idContrato: c.id })} className="p-0.5 rounded hover:bg-black/5 transition-colors" style={{ color: 'var(--faint)' }} title="Eliminar">
+                                                        <Trash2 size={11} />
+                                                      </button>
+                                                    </div>
+                                                  )}
+                                                </div>
                                               </div>
-                                            )}
-                                            {item.estado_devolucion === 'vendido' && item.costo_perdida > 0 && (
-  <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
-    <span />
-    <span className="text-[11px]" style={{ color: 'oklch(0.45 0.13 250)' }}>
-      Venta: S/ {(item.costo_perdida || 0).toFixed(0)}
-    </span>
-    <span className="font-mono tabular-nums text-[12px] font-bold" style={{ color: 'oklch(0.45 0.13 250)' }}>
-      S/ {(item.costo_perdida || 0).toFixed(2)}
-    </span>
-  </div>
-)}
-{/* Fila 3: Base S/ + Mora + Total */}
-<div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
-                                              <span />
-                                              <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                                                Base S/ {getBase(item).toFixed(0)}
-                                                {(item.dias_atraso_item || 0) > 0 && (
-                                                  <span style={{ color: 'var(--danger)' }}> + Mora S/ {(item.monto_atraso_item || 0).toFixed(0)}</span>
-                                                )}
-                                              </span>
-                                              <span className="font-mono tabular-nums text-[12px] font-bold" style={{ color: 'var(--ink)' }}>
-                                                S/ {sub.toFixed(2)}
-                                              </span>
-                                            </div>
-                                          </div>
-                                        );
-                                      };
-                                      const filas = [];
-                                      const porPrefijo = new Map();
-                                      (c.items || []).forEach((item, idx) => {
-                                        const esGranelI = !!item.item_condicion;
-                                        const esIndividual = !esGranelI && item.item_codigo && /^[A-Za-z]+\-\d+/.test(item.item_codigo);
-                                        if (esIndividual) {
-                                          const prefix = item.item_codigo.split('-')[0];
-                                          let g = porPrefijo.get(prefix);
-                                          if (!g) { g = { prefix, nombre: item.item_nombre, items: [] }; porPrefijo.set(prefix, g); filas.push(g); }
-                                          g.items.push({ item, idx });
-                                        } else {
-                                          filas.push({ prefix: null, items: [{ item, idx }] });
-                                        }
-                                      });
+                                            );
+                                          };
+                                          const filas = [];
+                                          const porPrefijo = new Map();
+                                          (c.items || []).forEach((item, idx) => {
+                                            const esGranelI = !!item.item_condicion;
+                                            const esIndividual = !esGranelI && item.item_codigo && /^[A-Za-z]+\-\d+/.test(item.item_codigo);
+                                            if (esIndividual) {
+                                              const prefix = item.item_codigo.split('-')[0];
+                                              let g = porPrefijo.get(prefix);
+                                              if (!g) { g = { prefix, nombre: item.item_nombre, items: [] }; porPrefijo.set(prefix, g); filas.push(g); }
+                                              g.items.push({ item, idx });
+                                            } else {
+                                              filas.push({ prefix: null, items: [{ item, idx }] });
+                                            }
+                                          });
 return filas.map((g, gi) => {
         if (g.prefix === null) {
           const { item, idx } = g.items[0];
@@ -723,27 +699,27 @@ return filas.map((g, gi) => {
         const totalGrupo = g.items.reduce((a, { item }) => a + (getBase(item) + (item.monto_atraso_item || 0)), 0);
                                         const pendientes = g.items.filter(({ item }) => !item.estado_devolucion || item.estado_devolucion === 'pendiente').length;
                                         return (
-                                          <div key={gi} className="rounded-xl transition-colors duration-150 overflow-hidden"
-                                            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg)' }}>
-                                            <div className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none"
+                                          <div key={gi} className="rounded-lg"
+                                            style={{ border: '0.5px solid var(--border)', backgroundColor: 'oklch(0.96 0.015 240 / 0.12)' }}>
+                                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer select-none"
                                               onClick={() => setGruposEq(p => ({ ...p, [key]: !p[key] }))}>
-                                              <ChevronRight size={14} className="shrink-0" style={{ color: 'var(--muted)', transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform 150ms' }} />
-                                              <span className="flex-1 min-w-0 text-[13px] font-semibold truncate" style={{ color: 'var(--ink)' }}>
+                                              <ChevronRight size={12} className="shrink-0" style={{ color: 'var(--muted)', transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform 150ms' }} />
+                                              <span className="flex-1 min-w-0 text-[12px] font-semibold break-words" style={{ color: 'var(--ink)' }}>
                                                 {g.nombre}
-                                                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-lg font-bold align-middle"
+                                                <span className="ml-1 text-[9px] px-1 py-0.5 rounded font-bold align-middle inline-block"
                                                   style={{ backgroundColor: 'oklch(0.40 0.12 240 / 0.12)', color: 'var(--info)' }}>&times;{g.items.length}</span>
                                               </span>
                                               {pendientes > 0 ? (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                                                  style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>{pendientes} pendiente{pendientes !== 1 ? 's' : ''}</span>
+                                                <span className="text-[9px] px-1 py-0.5 rounded font-medium shrink-0"
+                                                  style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>{pendientes} pend.</span>
                                               ) : (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                                                  style={{ backgroundColor: 'oklch(0.93 0.05 160)', color: 'var(--success)' }}>Completo</span>
+                                                <span className="text-[9px] px-1 py-0.5 rounded font-medium shrink-0"
+                                                  style={{ backgroundColor: 'oklch(0.93 0.05 160)', color: 'var(--success)' }}>OK</span>
                                               )}
-                                              <span className="font-mono text-[11px] font-bold shrink-0" style={{ color: 'var(--ink)' }}>S/ {totalGrupo.toFixed(2)}</span>
+                                              <span className="font-mono text-[11px] font-bold shrink-0 tabular-nums" style={{ color: 'var(--ink)' }}>S/ {totalGrupo.toFixed(2)}</span>
                                             </div>
                                             {abierto && (
-                                              <div className="px-2 pb-2 space-y-1.5">
+                                              <div className="px-1.5 pb-1.5 space-y-1">
                                                 {g.items.map(({ item, idx }) => {
                     const sub = getBase(item) + (item.monto_atraso_item || 0);
                     return renderEquipoFila(item, idx, g.prefix + '-' + idx, sub);
@@ -759,100 +735,84 @@ return filas.map((g, gi) => {
                               </div>
 
                               {/* ===== COLUMNA DERECHA: CAJA ===== */}
-                              <div className="px-4 py-3" style={{ borderLeft: '0.5px solid var(--border)' }}>
-                                <p className="text-[11px] uppercase tracking-wider font-semibold pb-1.5 mb-3"
+                              <div className="px-3 py-2.5" style={{ borderLeft: '0.5px solid var(--border)' }}>
+                                <p className="text-[11px] uppercase tracking-wider font-semibold pb-1 mb-2"
                                   style={{ color: 'var(--muted)', borderBottom: '1.5px solid oklch(0.53 0.135 55)' }}>
                                   Caja
                                 </p>
-                                <div className="space-y-1.5 mb-3">
-                                  {/* Alquiler base */}
-                                  <div className="flex justify-between items-baseline text-xs">
-                                    <span style={{ color: 'var(--muted)' }}>Alquiler base ({dias} d&iacute;a{dias !== 1 ? 's' : ''})</span>
+                                <div className="space-y-1 mb-2">
+                                  <div className="flex justify-between items-baseline text-[11px]">
+                                    <span style={{ color: 'var(--muted)' }}>Base ({dias}d)</span>
                                     <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {(montoBase || 0).toFixed(2)}</span>
                                   </div>
-                                  {/* Atraso */}
                                   {montoAtraso > 0 && (
-                                    <div className="flex justify-between items-baseline text-xs">
-                                      <span style={{ color: 'var(--warning)' }}>Recargos por atraso</span>
+                                    <div className="flex justify-between items-baseline text-[11px]">
+                                      <span style={{ color: 'var(--warning)' }}>Mora</span>
                                       <span className="font-mono tabular-nums" style={{ color: 'var(--warning)' }}>+ S/ {montoAtraso.toFixed(2)}</span>
                                     </div>
                                   )}
-                                  {/* Daños */}
                                   {totalDanos > 0 && (
-                                    <div className="flex justify-between items-baseline text-xs">
-                                      <span style={{ color: 'var(--warning)' }}>Cobro por daños</span>
+                                    <div className="flex justify-between items-baseline text-[11px]">
+                                      <span style={{ color: 'var(--warning)' }}>Da&ntilde;os</span>
                                       <span className="font-mono tabular-nums" style={{ color: 'var(--warning)' }}>+ S/ {totalDanos.toFixed(2)}</span>
                                     </div>
                                   )}
-                                  {/* Ventas */}
                                   {totalVentas > 0 && (
-                                    <div className="flex justify-between items-baseline text-xs">
-                                      <span style={{ color: 'oklch(0.45 0.15 250)' }}>Cobro por venta de herramienta</span>
+                                    <div className="flex justify-between items-baseline text-[11px]">
+                                      <span style={{ color: 'oklch(0.45 0.15 250)' }}>Venta</span>
                                       <span className="font-mono tabular-nums" style={{ color: 'oklch(0.45 0.15 250)' }}>+ S/ {totalVentas.toFixed(2)}</span>
                                     </div>
                                   )}
-                                  {/* Pérdidas */}
                                   {totalPerdidas > 0 && (
-                                    <div className="flex justify-between items-baseline text-xs">
-                                      <span style={{ color: 'var(--danger)' }}>Cobro por pérdidas</span>
+                                    <div className="flex justify-between items-baseline text-[11px]">
+                                      <span style={{ color: 'var(--danger)' }}>P&eacute;rdidas</span>
                                       <span className="font-mono tabular-nums" style={{ color: 'var(--danger)' }}>+ S/ {totalPerdidas.toFixed(2)}</span>
                                     </div>
                                   )}
-                                  {/* Deposito */}
                                   {(c.deposito_monto || 0) > 0 && (
-                                    <div className="flex justify-between items-baseline text-xs">
+                                    <div className="flex justify-between items-baseline text-[11px]">
                                       <span style={{ color: 'var(--muted)' }}>Dep&oacute;sito</span>
                                       <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {(c.deposito_monto || 0).toFixed(2)}</span>
                                     </div>
                                   )}
-                                  {/* Divider */}
-                                  <hr style={{ borderColor: 'var(--border)', marginTop: 4, marginBottom: 2 }} />
-                                  {/* Total a pagar */}
-                                  <div className="flex justify-between items-baseline text-xs font-semibold">
-                                    <span style={{ color: 'var(--ink)' }}>Total a pagar</span>
+                                  <div style={{ borderTop: '1px solid var(--border)', marginTop: 2, marginBottom: 2 }} />
+                                  <div className="flex justify-between items-baseline text-[11px] font-semibold">
+                                    <span style={{ color: 'var(--ink)' }}>Total</span>
                                     <span className="font-mono tabular-nums" style={{ color: 'var(--ink)' }}>S/ {total.toFixed(2)}</span>
                                   </div>
-                                  {/* Pagado */}
-                                  <div className="flex justify-between items-baseline text-xs">
-                                    <span style={{ color: 'var(--muted)' }}>Pagado a la fecha</span>
+                                  <div className="flex justify-between items-baseline text-[11px]">
+                                    <span style={{ color: 'var(--muted)' }}>Pagado</span>
                                     <span className="font-mono tabular-nums" style={{ color: 'var(--success)' }}>&minus; S/ {pagado.toFixed(2)}</span>
                                   </div>
-                                  {/* Thicker divider */}
                                   <div style={{ borderTop: '2px solid var(--border)', marginTop: 2, marginBottom: 2 }} />
-                                  {/* SALDO PENDIENTE */}
                                   <div className="flex justify-between items-baseline">
-                                    <span className="text-sm font-bold" style={{ color: 'var(--ink)' }}>SALDO PENDIENTE</span>
-                                    <span className="font-mono tabular-nums font-bold text-sm" style={{ color: pendiente > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                                    <span className="text-[12px] font-bold" style={{ color: 'var(--ink)' }}>SALDO</span>
+                                    <span className="font-mono tabular-nums font-bold text-[12px]" style={{ color: pendiente > 0 ? 'var(--danger)' : 'var(--success)' }}>
                                       S/ {pendiente.toFixed(2)}
                                     </span>
                                   </div>
-                                  {/* Garantía + botón añadir + botón devolver */}
-                                  <div className="flex justify-between items-baseline text-xs">
-                                    <span style={{ color: 'var(--muted)' }}>
-                                      {garantia > 0 ? 'Garantía disponible' : 'Sin garantía'}
-                                    </span>
+                                  <div className="flex justify-between items-center text-[10px]">
+                                    <span style={{ color: 'var(--muted)' }}>Garant&iacute;a: {garantia > 0 ? 'S/ ' + garantia.toFixed(2) : 'S/ 0'}</span>
                                     <div className="flex items-center gap-1">
-                                      {garantia > 0 && <span className="font-mono" style={{ color: 'var(--info)' }}>S/ {garantia.toFixed(2)}</span>}
                                       {garantia > 0 && (
                                         <button onClick={() => setDevolverGarantiaId(devolverGarantiaId === c.id ? null : c.id)}
-                                          className="text-[11px] underline font-medium hover:opacity-70 shrink-0"
+                                          className="underline font-medium hover:opacity-70 shrink-0"
                                           style={{ color: 'var(--danger)' }}>
                                           Devolver
                                         </button>
                                       )}
                                       <button onClick={() => setAddGarantiaId(addGarantiaId === c.id ? null : c.id)}
-                                        className="text-[11px] underline font-medium hover:opacity-70 shrink-0"
+                                        className="underline font-medium hover:opacity-70 shrink-0"
                                         style={{ color: 'var(--success)' }}>
-                                        + {garantia > 0 ? 'Añadir' : 'Registrar garantía'}
-                                      </button>
+                                          + Reg.
+                                        </button>
                                     </div>
                                   </div>
-                                  {/* Formulario añadir garantía */}
                                   {addGarantiaId === c.id && (
-                                    <div className="flex items-center gap-1 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
+                                    <div className="flex items-center gap-1 mt-1 pt-1" style={{ borderTop: '0.5px solid var(--border)' }}>
                                       {['efectivo', 'yape', 'plin'].map(m => (
                                         <button key={m} onClick={() => setGarantiaMetodo(m)}
-                                          className="h-6 px-1.5 rounded text-[9px] font-medium transition-all duration-150"
+                                          className="h-5 px-1.5 rounded text-[8px] font-medium transition-all duration-150"
                                           style={{
                                             backgroundColor: garantiaMetodo === m ? 'oklch(0.55 0.13 155)' : 'var(--surface)',
                                             color: garantiaMetodo === m ? '#fff' : 'var(--muted)',
@@ -863,26 +823,25 @@ return filas.map((g, gi) => {
                                         placeholder="S/"
                                         onChange={e => setGarantiaMonto(e.target.value)}
                                         onKeyDown={e => { if (e.key === 'Enter') handleAddGarantia(); }}
-                                        className="w-16 h-6 px-1 rounded text-[10px] border font-mono text-center dev-nospin"
+                                        className="w-14 h-5 px-1 rounded text-[9px] border font-mono text-center dev-nospin"
                                         style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
                                       <button onClick={handleAddGarantia}
-                                        className="h-6 px-2 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97]"
+                                        className="h-5 px-1.5 rounded text-[9px] font-semibold transition-all duration-150 active:scale-[0.97]"
                                         style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}>+</button>
                                     </div>
                                   )}
-                                  {/* Panel devolver garantía */}
                                   {devolverGarantiaId === c.id && (
-                                    <div className="flex items-center gap-1 mt-1.5 pt-1.5" style={{ borderTop: '0.5px solid var(--border)' }}>
-                                      <span className="text-[10px]" style={{ color: 'var(--danger)' }}>Devolver S/</span>
+                                    <div className="flex items-center gap-1 mt-1 pt-1" style={{ borderTop: '0.5px solid var(--border)' }}>
+                                      <span className="text-[9px]" style={{ color: 'var(--danger)' }}>Dev S/</span>
                                       <input type="number" step="1" min="1" max={garantia} value={devGarantiaMonto}
                                         placeholder={garantia.toFixed(0)}
                                         onChange={e => setDevGarantiaMonto(e.target.value)}
                                         onKeyDown={e => { if (e.key === 'Enter') handleDevolverGarantia(); }}
-                                        className="w-16 h-6 px-1 rounded text-[10px] border font-mono text-center dev-nospin"
+                                        className="w-14 h-5 px-1 rounded text-[9px] border font-mono text-center dev-nospin"
                                         style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', borderColor: 'var(--danger)' }} />
                                       {['efectivo', 'yape', 'plin'].map(m => (
                                         <button key={m} onClick={() => setDevGarantiaMetodo(m)}
-                                          className="h-6 px-1.5 rounded text-[9px] font-medium transition-all duration-150"
+                                          className="h-5 px-1.5 rounded text-[8px] font-medium transition-all duration-150"
                                           style={{
                                             backgroundColor: devGarantiaMetodo === m ? 'oklch(0.55 0.13 155)' : 'var(--surface)',
                                             color: devGarantiaMetodo === m ? '#fff' : 'var(--muted)',
@@ -890,21 +849,17 @@ return filas.map((g, gi) => {
                                           }}>{m}</button>
                                       ))}
                                       <button onClick={handleDevolverGarantia}
-                                        className="h-6 px-2 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97]"
+                                        className="h-5 px-1.5 rounded text-[9px] font-semibold transition-all duration-150 active:scale-[0.97]"
                                         style={{ backgroundColor: 'var(--danger)', color: '#fff', border: 'none' }}>&#10003;</button>
                                     </div>
                                   )}
                                 </div>
                                 {pendiente > 0 && (
-                                  <div className="mb-3">
+                                  <div className="mb-2">
                                     <button
                                       onClick={() => setPagoModalContrato(c)}
-                                      className="w-full h-8 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-1.5"
-                                      style={{
-                                        backgroundColor: 'var(--success)',
-                                        color: '#fff',
-                                        border: 'none',
-                                      }}
+                                      className="w-full h-7 rounded-lg text-[11px] font-semibold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-1"
+                                      style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}
                                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
                                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}
                                     >
@@ -912,20 +867,19 @@ return filas.map((g, gi) => {
                                     </button>
                                   </div>
                                 )}
-                                {/* Historial de pagos */}
-                                <div className="rounded-lg mt-3" style={{ border: '0.5px solid var(--border)', backgroundColor: 'var(--bg)' }}>
+                                <div className="rounded-lg" style={{ border: '0.5px solid var(--border)', backgroundColor: 'var(--bg)' }}>
                                   <button
                                     onClick={() => setHistorialAbierto(historialAbierto === c.id ? null : c.id)}
-                                    className="flex items-center gap-1.5 w-full px-2.5 py-1.5 text-[11px] font-medium transition-colors duration-150 hover:opacity-80 rounded-lg"
+                                    className="flex items-center gap-1 w-full px-2 py-1 text-[10px] font-medium transition-colors duration-150 hover:opacity-80 rounded-lg"
                                     style={{ color: 'var(--muted)' }}>
-                                    <ChevronRight size={11}
+                                    <ChevronRight size={10}
                                       style={{ transform: historialAbierto === c.id ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }} />
-                                    Historial de pagos{pagos.length > 0 ? ` (${pagos.length})` : ''}
+                                    Pagos{pagos.length > 0 ? ` (${pagos.length})` : ''}
                                   </button>
                                   {historialAbierto === c.id && (
-                                    <div className="px-2.5 pb-1.5 space-y-1" style={{ borderTop: '0.5px solid var(--border)' }}>
+                                    <div className="px-2 pb-1 space-y-0.5" style={{ borderTop: '0.5px solid var(--border)' }}>
                                       {pagos.length === 0 ? (
-                                        <p className="pt-1.5 text-[11px]" style={{ color: 'var(--faint)' }}>Sin pagos registrados</p>
+                                        <p className="pt-1 text-[10px]" style={{ color: 'var(--faint)' }}>Sin pagos</p>
                                       ) : (
                                         (() => {
                                           const pagosAgrupados = gruparPagos(pagos);
@@ -937,28 +891,28 @@ return filas.map((g, gi) => {
                                               esDevolucionDeposito ? 'var(--danger)' :
                                                 p.metodo === 'efectivo' ? 'oklch(0.55 0.13 155)' :
                                                   p.metodo === 'yape' ? 'oklch(0.48 0.14 330)' : 'oklch(0.55 0.12 240)';
-                                            const labelMetodo = esDeposito ? 'Garantia +' :
-                                              esDevolucionDeposito ? 'Garantia -' :
-                                                esGrupo ? p.metodo + ' (distribuido)' :
+                                            const labelMetodo = esDeposito ? 'Gar +' :
+                                              esDevolucionDeposito ? 'Gar -' :
+                                                esGrupo ? p.metodo + ' (distr.)' :
                                                   p.metodo;
                                             return (
-                                              <div key={idx} className="flex items-center gap-2 pt-1.5 text-[11px]"
+                                              <div key={idx} className="flex items-center gap-1.5 py-0.5 text-[10px]"
                                                 style={{ opacity: p.anulado === 1 ? 0.35 : 1 }}>
-                                                <span className="shrink-0" style={{ color: 'var(--muted)' }}>{p.fecha_pago?.slice(5, 10) || '—'}</span>
-                                                <span className="font-mono font-medium flex-1" style={{
+                                                <span className="shrink-0 font-mono" style={{ color: 'var(--faint)' }}>{p.fecha_pago?.slice(5, 10) || '—'}</span>
+                                                <span className="font-mono font-medium flex-1 tabular-nums" style={{
                                                   color: 'var(--ink)',
                                                   textDecoration: p.anulado === 1 ? 'line-through' : 'none',
                                                 }}>
                                                   S/ {p.monto.toFixed(2)}
                                                 </span>
-                                                <span className="px-1.5 py-0.5 rounded-[10px] text-[9px] font-medium capitalize"
+                                                <span className="px-1 py-0.5 rounded text-[8px] font-medium capitalize shrink-0"
                                                   style={{ backgroundColor: colorMetodo + '20', color: colorMetodo }}>
                                                   {labelMetodo}
                                                 </span>
                                                 {p.anulado === 1
-                                                  ? <span className="text-[9px] shrink-0" style={{ color: 'var(--muted)' }}>Anulado</span>
+                                                  ? <span className="text-[8px] shrink-0" style={{ color: 'var(--muted)' }}>Anul.</span>
                                                   : <button onClick={() => setAnulandoPago(p)}
-                                                    className="text-[9px] underline hover:opacity-70 shrink-0"
+                                                    className="text-[8px] underline hover:opacity-70 shrink-0"
                                                     style={{ color: 'var(--danger)' }}>Anular</button>
                                                 }
                                               </div>
@@ -974,87 +928,87 @@ return filas.map((g, gi) => {
                             </div>
 
                              {/* ===== ACCIONES ===== */}
-                             <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderTop: '0.5px solid var(--border)' }}>
-                               <button
-                                 onClick={async () => {
-                                   if (!window.api) return;
-                                   try {
-                                     const pdfPath = await window.api.generarContratoPdf(c.id);
-                                     const b64 = await window.api.leerArchivoBase64(pdfPath);
-                                     setPdfPreviewUrl('data:application/pdf;base64,' + b64);
-                                   } catch (e) {
-                                     toast('Error al abrir contrato', 'error');
-                                   }
-                                 }}
-                                 className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
-                                 style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)', border: '0.5px solid var(--border)' }}
-                                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg)'; }}
-                                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
-                               >
-                                 <FileText size={12} /> Ver contrato
-                               </button>
-                               {c.papelera === 1 ? (
-                                 <button
-                                   onClick={() => setRestaurandoContrato(c)}
-                                   className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
-                                   style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}
-                                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
-                                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}
-                                 >
-                                   <RotateCcw size={12} /> Restaurar
-                                 </button>
-                               ) : c.estado === 'reservado' ? (
-                                 <>
-                                   <button
-                                     onClick={() => handleConvertirReserva(c.id)}
-                                     disabled={convirtiendo === c.id}
-                                     className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
-                                     style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none', opacity: convirtiendo === c.id ? 0.6 : 1 }}
-                                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
-                                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}
-                                   >
-                                     {convirtiendo === c.id ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle size={12} />}
-                                     Alquilar
-                                   </button>
-                                   <button
-                                     onClick={() => setCancelarReservaId(c.id)}
-                                     className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
-                                     style={{ backgroundColor: 'oklch(0.95 0.02 25)', color: 'var(--danger)', border: '0.5px solid var(--danger)' }}
-                                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.90 0.04 25)'; }}
-                                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.95 0.02 25)'; }}
-                                   >
-                                     <Ban size={12} /> Cancelar Reserva
-                                   </button>
-                                 </>
+                             <div className="flex items-center gap-1.5 px-3 py-2" style={{ borderTop: '0.5px solid var(--border)' }}>
+                                <button
+                                  onClick={async () => {
+                                    if (!window.api) return;
+                                    try {
+                                      const pdfPath = await window.api.generarContratoPdf(c.id);
+                                      const b64 = await window.api.leerArchivoBase64(pdfPath);
+                                      setPdfPreviewUrl('data:application/pdf;base64,' + b64);
+                                    } catch (e) {
+                                      toast('Error al abrir contrato', 'error');
+                                    }
+                                  }}
+                                  className="flex-1 h-7 rounded-lg text-[10px] font-medium transition-all duration-150 inline-flex items-center justify-center gap-1"
+                                  style={{ backgroundColor: 'var(--surface)', color: 'var(--muted)', border: '0.5px solid var(--border)' }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg)'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
+                                >
+                                  <FileText size={11} /> Ver
+                                </button>
+                                {c.papelera === 1 ? (
+                                  <button
+                                    onClick={() => setRestaurandoContrato(c)}
+                                    className="flex-1 h-7 rounded-lg text-[10px] font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1 active:scale-[0.97]"
+                                    style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}
+                                  >
+                                    <RotateCcw size={11} /> Restaurar
+                                  </button>
+                                ) : c.estado === 'reservado' ? (
+                                  <>
+                                    <button
+                                      onClick={() => handleConvertirReserva(c.id)}
+                                      disabled={convirtiendo === c.id}
+                                      className="flex-1 h-7 rounded-lg text-[10px] font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1 active:scale-[0.97]"
+                                      style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none', opacity: convirtiendo === c.id ? 0.6 : 1 }}
+                                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.42 0.14 155)'; }}
+                                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--success)'; }}
+                                    >
+                                      {convirtiendo === c.id ? <RefreshCw size={11} className="animate-spin" /> : <CheckCircle size={11} />}
+                                      Alquilar
+                                    </button>
+                                    <button
+                                      onClick={() => setCancelarReservaId(c.id)}
+                                      className="flex-1 h-7 rounded-lg text-[10px] font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1 active:scale-[0.97]"
+                                      style={{ backgroundColor: 'oklch(0.95 0.02 25)', color: 'var(--danger)', border: '0.5px solid var(--danger)' }}
+                                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.90 0.04 25)'; }}
+                                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.95 0.02 25)'; }}
+                                    >
+                                      <Ban size={11} /> Cancelar
+                                    </button>
+                                  </>
 ) : (
                                   <>
                                     <button
                                       onClick={() => setEliminandoContrato(c)}
-                                      className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
+                                      className="flex-1 h-7 rounded-lg text-[10px] font-medium transition-all duration-150 inline-flex items-center justify-center gap-1"
                                       style={{ backgroundColor: 'var(--surface)', color: 'var(--danger)', border: '0.5px solid var(--danger)' }}
                                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.95 0.02 25)'; }}
                                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
                                     >
-                                      <Trash2 size={12} /> Eliminar
+                                      <Trash2 size={11} /> Eliminar
                                     </button>
                                     <button
                                       onClick={() => setCalificarContrato(c)}
-                                      className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
+                                      className="flex-1 h-7 rounded-lg text-[10px] font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1 active:scale-[0.97]"
                                       style={{ backgroundColor: 'oklch(0.62 0.17 80 / 0.12)', color: 'oklch(0.52 0.17 80)', border: '0.5px solid oklch(0.62 0.17 80 / 0.3)' }}
                                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.2)'; }}
                                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.12)'; }}
                                     >
-                                      <Star size={12} /> Calificar
+                                      <Star size={11} /> Calificar
                                     </button>
                                     <button
                                       onClick={() => setDevolucionActiva(devolucionActiva === c.id ? null : c.id)}
-                                      className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
+                                      className="flex-1 h-7 rounded-lg text-[10px] font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1 active:scale-[0.97]"
                                       style={{ backgroundColor: devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)', color: '#fff', border: 'none' }}
                                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = devolucionActiva === c.id ? 'oklch(0.40 0.14 25)' : 'oklch(0.43 0.14 55)'; }}
                                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = devolucionActiva === c.id ? 'var(--danger)' : 'oklch(0.53 0.135 55)'; }}
                                     >
-                                      {devolucionActiva === c.id ? <X size={12} /> : (pendiente > 0 && <AlertTriangle size={12} />)}
-                                      {devolucionActiva === c.id ? 'Cancelar devolución' : 'Devolución'} <ArrowRight size={12} />
+                                      {devolucionActiva === c.id ? <X size={11} /> : (pendiente > 0 && <AlertTriangle size={11} />)}
+                                      {devolucionActiva === c.id ? 'Cancelar' : 'Devoluci\u00f3n'}
                                     </button>
                                   </>
                                 )}

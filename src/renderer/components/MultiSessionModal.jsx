@@ -812,7 +812,7 @@ function SessionForm({ session }) {
               style={{
                 backgroundColor: tarifa === 'dia' ? 'oklch(0.53 0.135 55)' : 'var(--bg)',
                 color: tarifa === 'dia' ? '#fff' : 'var(--muted)',
-              }}>S/ {(item.precio_dia || 0).toFixed(0)}/día</button>
+              }}>S/ {(item.precio_dia || 0).toFixed(2)}/día</button>
             {item.precio_minimo != null && (
               <button onClick={() => setTarifaItem(idx, 'minimo')}
                 title="Precio mínimo por día"
@@ -820,7 +820,7 @@ function SessionForm({ session }) {
                 style={{
                   backgroundColor: tarifa === 'minimo' ? 'oklch(0.55 0.12 240)' : 'var(--bg)',
                   color: tarifa === 'minimo' ? '#fff' : 'var(--muted)',
-                }}>Min S/ {item.precio_minimo.toFixed(0)}</button>
+                }}>Min S/ {item.precio_minimo.toFixed(2)}</button>
             )}
             {item.precio_mes != null && (
               <button onClick={() => setTarifaItem(idx, 'mes')}
@@ -829,7 +829,7 @@ function SessionForm({ session }) {
                 style={{
                   backgroundColor: tarifa === 'mes' ? 'oklch(0.50 0.11 155)' : 'var(--bg)',
                   color: tarifa === 'mes' ? '#fff' : 'var(--muted)',
-                }}>S/ {item.precio_mes.toFixed(0)}/mes</button>
+                }}>S/ {item.precio_mes.toFixed(2)}/mes</button>
             )}
           </span>
           <span className="text-[10px]" style={{ color: 'var(--faint)' }}>
@@ -1411,11 +1411,12 @@ const itemsData = itemsConDias.map(item => ({
                           )}
                         </span>
                         {(() => {
-                          const precios = [
-                            { val: r.precio_dia, label: 'día', color: 'var(--primary)' },
-                            { val: r.precio_minimo, label: 'mínimo', color: 'var(--warning)' },
-                            { val: r.precio_venta, label: 'venta', color: 'var(--success)' },
-                          ].filter(p => p.val != null);
+  const precios = [
+    { val: r.precio_dia, label: 'día', color: 'var(--primary)' },
+    { val: r.precio_minimo, label: 'mínimo', color: 'var(--warning)' },
+    { val: r.precio_mes, label: 'mes', color: 'var(--info)' },
+    { val: r.precio_venta, label: 'venta', color: 'var(--success)' },
+  ].filter(p => p.val != null);
                           return precios.length > 0 && (
                             <span className="flex items-center gap-x-3 gap-y-0.5 pl-[4.5rem] text-[10px]" style={{ color: 'var(--muted)' }}>
                               {precios.map(p => (

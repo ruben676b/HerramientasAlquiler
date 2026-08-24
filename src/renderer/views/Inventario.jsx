@@ -1514,22 +1514,38 @@ function ImagenField({ rutaInicial, onCambio }) {
   );
 }
 
-function ModalShell({ title, onClose, children, onSubmit, error }) {
+function ModalShell({ title, onClose, children, onSubmit, error, twoCol }) {
+  const btnCls = 'h-9 rounded-lg text-sm font-medium border transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5';
+  const cancelStyle = { color: 'var(--muted)', borderColor: 'var(--border)' };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'oklch(0 0 0 / 0.4)' }} onClick={onClose}>
-      <div className="w-full max-w-sm rounded-xl p-5 space-y-3 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border)' }} onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`w-full rounded-xl p-5 max-h-[90vh] ${twoCol ? 'max-w-lg flex flex-col' : 'max-w-sm space-y-3 overflow-y-auto'}`}
+        style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border)' }}
+        onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold" style={{ color: 'var(--ink)' }}>{title}</h2>
           <button onClick={onClose} className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 active:scale-90" style={{ color: 'var(--muted)' }}><X size={15} /></button>
         </div>
-        <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="space-y-2.5">
-          {children}
-          {error && <p className="text-xs px-1" style={{ color: 'var(--danger)' }}>{error}</p>}
-          <div className="flex gap-2 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 h-9 rounded-lg text-sm font-medium border transition-colors duration-150 hover:bg-black/5 dark:hover:bg-white/5" style={{ color: 'var(--muted)', borderColor: 'var(--border)' }}>Cancelar</button>
-            <Button type="submit" variant="primary" size="sm" className="flex-1">Guardar</Button>
-          </div>
-        </form>
+        {twoCol ? (
+          <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="flex gap-4 min-h-0 flex-1 mt-2">
+            <div className="flex-1 space-y-2.5 overflow-y-auto pr-1">{children}</div>
+            <div className="flex flex-col gap-2 shrink-0 justify-end">
+              {error && <p className="text-xs px-1" style={{ color: 'var(--danger)' }}>{error}</p>}
+              <button type="button" onClick={onClose} className={btnCls + ' px-4'} style={cancelStyle}>Cancelar</button>
+              <Button type="submit" variant="primary" size="sm" className="px-4">Guardar</Button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="space-y-2.5">
+            {children}
+            {error && <p className="text-xs px-1" style={{ color: 'var(--danger)' }}>{error}</p>}
+            <div className="flex gap-2 pt-1">
+              <button type="button" onClick={onClose} className={'flex-1 ' + btnCls} style={cancelStyle}>Cancelar</button>
+              <Button type="submit" variant="primary" size="sm" className="flex-1">Guardar</Button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -1557,7 +1573,7 @@ function ModalCrearFamilia({ onSave, onClose }) {
   };
 
   return (
-    <ModalShell title="Nueva herramienta" onClose={onClose} onSubmit={submit} error={err}>
+    <ModalShell title="Nueva herramienta" onClose={onClose} onSubmit={submit} error={err} twoCol>
       <Field label="Nombre" req>
         <input value={f.nombre} onChange={(e) => set('nombre', e.target.value)} className={inputCls} placeholder="Ej: Roto Martillo" autoFocus
           style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} />
@@ -1629,7 +1645,7 @@ function ModalEditarFamilia({ familia, onSave, onClose }) {
     precio_venta: f.precio_venta !== '' ? parseFloat(f.precio_venta) : undefined,
   }, familia.nombre, { imagen: imagenEstado });
   return (
-    <ModalShell title={'Editar ' + familia.nombre} onClose={onClose} onSubmit={submit}>
+    <ModalShell title={'Editar ' + familia.nombre} onClose={onClose} onSubmit={submit} twoCol>
       <Field label="Nombre">
         <input value={f.nombre} onChange={(e) => set('nombre', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} autoFocus />
       </Field>
@@ -1683,7 +1699,7 @@ function ModalCrearGranel({ onSave, onClose }) {
     });
   };
   return (
-    <ModalShell title="Nuevo material" onClose={onClose} onSubmit={submit}>
+    <ModalShell title="Nuevo material" onClose={onClose} onSubmit={submit} twoCol>
       <Field label="Nombre" req><input value={f.nombre} onChange={(e) => set('nombre', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} placeholder="Ej: Tabla 3m" autoFocus /></Field>
       <Field label="Descripción (opcional)">
         <textarea value={f.descripcion} onChange={(e) => set('descripcion', e.target.value)} rows={2}
@@ -1742,7 +1758,7 @@ function ModalEditarGranel({ data, onSave, onClose }) {
     precio_venta_usado: f.precio_venta_usado !== '' ? parseFloat(f.precio_venta_usado) : undefined,
   }, { imagen: imagenEstado });
   return (
-    <ModalShell title="Editar material" onClose={onClose} onSubmit={submit}>
+    <ModalShell title="Editar material" onClose={onClose} onSubmit={submit} twoCol>
       <Field label="Nombre" req><input value={f.nombre} onChange={(e) => set('nombre', e.target.value)} className={inputCls} style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', borderColor: 'var(--border)' }} autoFocus /></Field>
       <Field label="Descripción (opcional)">
         <textarea value={f.descripcion} onChange={(e) => set('descripcion', e.target.value)} rows={2}
