@@ -1003,6 +1003,9 @@ function recalcularKits(idContrato, fechaDevolucionReal) {
 function getContratos(filtros = {}) {
   const hoy = localDate();
 
+  // Helper para escapar comodines LIKE
+  const escaparLike = (s) => String(s).replace(/[%_\\]/g, '\\$&');
+
   let sql = `
     SELECT DISTINCT c.*, cl.nombre AS cliente_nombre, cl.dni AS cliente_dni,
            cl.telefono AS cliente_telefono,
@@ -1014,8 +1017,10 @@ function getContratos(filtros = {}) {
     JOIN CLIENTE cl ON c.id_cliente = cl.id
     LEFT JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id
   `;
-  if (filtros.busquedaHerramienta) {
+  if (filtros.busquedaHerramienta || filtros.busqueda) {
     sql += ' LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id';
+    sql += ' LEFT JOIN ITEM_GRANEL ig ON d.id_item_granel = ig.id';
+    sql += ' LEFT JOIN KIT k ON d.id_kit = k.id';
   }
   sql += ' WHERE 1=1';
   const params = [];
@@ -1031,28 +1036,35 @@ function getContratos(filtros = {}) {
     params.push(filtros.estado);
   }
   if (filtros.busquedaHerramienta) {
-    const p = '%' + filtros.busquedaHerramienta + '%';
-    const pSinGuion = '%' + filtros.busquedaHerramienta.replace('-', '') + '%';
+    const termEsc = escaparLike(filtros.busquedaHerramienta);
+    const p = '%' + termEsc + '%';
+    const pSinGuion = '%' + escaparLike(filtros.busquedaHerramienta.replace(/-/g, '')) + '%';
     sql += ` AND (
-      h.nombre LIKE ? OR
-      d.id_herramienta LIKE ? OR
-      REPLACE(d.id_herramienta, '-', '') LIKE ? OR
-      d.item_snapshot LIKE ?
-    )`;
-    params.push(p, p, pSinGuion, p);
-  }
-  if (filtros.busqueda) {
-    const p = '%' + filtros.busqueda + '%';
-    const pSinGuion = '%' + filtros.busqueda.replace('-', '') + '%';
-    sql += ` AND (
-      cl.nombre LIKE ? OR
-      cl.dni LIKE ? OR
-      CAST(c.id AS TEXT) LIKE ? OR
-      d.id_herramienta LIKE ? OR
-      REPLACE(d.id_herramienta, '-', '') LIKE ? OR
-      d.item_snapshot LIKE ?
+      h.nombre LIKE ? ESCAPE '\\' OR
+      ig.nombre LIKE ? ESCAPE '\\' OR
+      k.nombre LIKE ? ESCAPE '\\' OR
+      d.id_herramienta LIKE ? ESCAPE '\\' OR
+      REPLACE(d.id_herramienta, '-', '') LIKE ? ESCAPE '\\' OR
+      d.item_snapshot LIKE ? ESCAPE '\\'
     )`;
     params.push(p, p, p, p, pSinGuion, p);
+  }
+  if (filtros.busqueda) {
+    const termEsc = escaparLike(filtros.busqueda);
+    const p = '%' + termEsc + '%';
+    const pSinGuion = '%' + escaparLike(filtros.busqueda.replace(/-/g, '')) + '%';
+    sql += ` AND (
+      cl.nombre LIKE ? ESCAPE '\\' OR
+      cl.dni LIKE ? ESCAPE '\\' OR
+      CAST(c.id AS TEXT) LIKE ? ESCAPE '\\' OR
+      h.nombre LIKE ? ESCAPE '\\' OR
+      ig.nombre LIKE ? ESCAPE '\\' OR
+      k.nombre LIKE ? ESCAPE '\\' OR
+      d.id_herramienta LIKE ? ESCAPE '\\' OR
+      REPLACE(d.id_herramienta, '-', '') LIKE ? ESCAPE '\\' OR
+      d.item_snapshot LIKE ? ESCAPE '\\'
+    )`;
+    params.push(p, p, p, p, p, p, p, pSinGuion, p);
   }
 
   sql += ` ORDER BY c.fecha_modificacion DESC`;
@@ -1223,8 +1235,10 @@ function getContratos(filtros = {}) {
   if (filtros.limite && filtros.limite > 0) {
     // Construir COUNT aparte (sin regex que se rompe con subconsultas)
     let countSql = `SELECT COUNT(DISTINCT c.id) AS cnt FROM CONTRATO c JOIN CLIENTE cl ON c.id_cliente = cl.id LEFT JOIN DETALLE_CONTRATO d ON d.id_contrato = c.id`;
-    if (filtros.busquedaHerramienta) {
+    if (filtros.busquedaHerramienta || filtros.busqueda) {
       countSql += ' LEFT JOIN HERRAMIENTA h ON d.id_herramienta = h.id';
+      countSql += ' LEFT JOIN ITEM_GRANEL ig ON d.id_item_granel = ig.id';
+      countSql += ' LEFT JOIN KIT k ON d.id_kit = k.id';
     }
     countSql += ' WHERE 1=1';
     const countParams = [];
@@ -1238,16 +1252,18 @@ function getContratos(filtros = {}) {
       countParams.push(filtros.estado);
     }
     if (filtros.busquedaHerramienta) {
-      const p = '%' + filtros.busquedaHerramienta + '%';
-      const pSinGuion = '%' + filtros.busquedaHerramienta.replace('-', '') + '%';
-      countSql += ` AND (h.nombre LIKE ? OR d.id_herramienta LIKE ? OR REPLACE(d.id_herramienta, '-', '') LIKE ? OR d.item_snapshot LIKE ?)`;
-      countParams.push(p, p, pSinGuion, p);
+      const termEsc = escaparLike(filtros.busquedaHerramienta);
+      const p = '%' + termEsc + '%';
+      const pSinGuion = '%' + escaparLike(filtros.busquedaHerramienta.replace(/-/g, '')) + '%';
+      countSql += ` AND (h.nombre LIKE ? ESCAPE '\\' OR ig.nombre LIKE ? ESCAPE '\\' OR k.nombre LIKE ? ESCAPE '\\' OR d.id_herramienta LIKE ? ESCAPE '\\' OR REPLACE(d.id_herramienta, '-', '') LIKE ? ESCAPE '\\' OR d.item_snapshot LIKE ? ESCAPE '\\')`;
+      countParams.push(p, p, p, p, pSinGuion, p);
     }
     if (filtros.busqueda) {
-      const p = '%' + filtros.busqueda + '%';
-      const pSinGuion = '%' + filtros.busqueda.replace('-', '') + '%';
-      countSql += ` AND (cl.nombre LIKE ? OR cl.dni LIKE ? OR CAST(c.id AS TEXT) LIKE ? OR d.id_herramienta LIKE ? OR REPLACE(d.id_herramienta, '-', '') LIKE ? OR d.item_snapshot LIKE ?)`;
-      countParams.push(p, p, p, p, pSinGuion, p);
+      const termEsc = escaparLike(filtros.busqueda);
+      const p = '%' + termEsc + '%';
+      const pSinGuion = '%' + escaparLike(filtros.busqueda.replace(/-/g, '')) + '%';
+      countSql += ` AND (cl.nombre LIKE ? ESCAPE '\\' OR cl.dni LIKE ? ESCAPE '\\' OR CAST(c.id AS TEXT) LIKE ? ESCAPE '\\' OR h.nombre LIKE ? ESCAPE '\\' OR ig.nombre LIKE ? ESCAPE '\\' OR k.nombre LIKE ? ESCAPE '\\' OR d.id_herramienta LIKE ? ESCAPE '\\' OR REPLACE(d.id_herramienta, '-', '') LIKE ? ESCAPE '\\' OR d.item_snapshot LIKE ? ESCAPE '\\')`;
+      countParams.push(p, p, p, p, p, p, p, pSinGuion, p);
     }
     total = (db.prepare(countSql).get(...countParams) || {}).cnt || 0;
   }
