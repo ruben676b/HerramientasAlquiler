@@ -15,6 +15,7 @@ import { gruparPagos } from '../lib/gruparPagos';
 import DevolucionInline from '../components/DevolucionInline';
 import CalificarContratoModal from '../components/CalificarContratoModal';
 import AgregarItemModal from '../components/AgregarItemModal';
+import EditarItemModal from '../components/EditarItemModal';
 import TagChip from '../components/TagChip';
 import { contarHabiles, desglosarMensual } from '../lib/duracion';
 
@@ -85,6 +86,9 @@ export default function Alquileres() {
   const [devGarantiaMonto, setDevGarantiaMonto] = useState('');
   const [devGarantiaMetodo, setDevGarantiaMetodo] = useState('efectivo');
   const [agregarItemContratoId, setAgregarItemContratoId] = useState(null);
+  const [itemAEditar, setItemAEditar] = useState(null);
+  const [itemAEliminar, setItemAEliminar] = useState(null);
+  const [devolverSaldoContrato, setDevolverSaldoContrato] = useState(null);
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(0);
   const [cargandoMas, setCargandoMas] = useState(false);
@@ -185,6 +189,48 @@ export default function Alquileres() {
       recargar();
     } catch (e) {
       toast(e.message || 'Error al cancelar reserva', 'error');
+    }
+  };
+
+  
+
+  const handleGuardarItemEditado = async (formData) => {
+    if (!itemAEditar || !window.api) return;
+    try {
+      await window.api.editarItemContrato(itemAEditar.item.id, itemAEditar.idContrato, formData);
+      toast('Ítem actualizado correctamente');
+      setItemAEditar(null);
+      recargar();
+    } catch (e) {
+      toast(e.message || 'Error al editar ítem', 'error');
+    }
+  };
+
+  const handleConfirmarEliminarItem = async () => {
+    if (!itemAEliminar || !window.api) return;
+    try {
+      await window.api.eliminarItemContrato(itemAEliminar.item.id, itemAEliminar.idContrato);
+      toast('Ítem eliminado correctamente');
+      setItemAEliminar(null);
+      recargar();
+    } catch (e) {
+      toast(e.message || 'Error al eliminar ítem', 'error');
+    }
+  };
+
+  const handleDevolverSaldoConfirm = async () => {
+    if (!devolverSaldoContrato || !window.api) return;
+    try {
+      await window.api.registrarDevolucionSaldo(
+        devolverSaldoContrato.idContrato, 
+        devolverSaldoContrato.monto, 
+        garantiaMetodo
+      );
+      toast('Devolución registrada: S/ ' + devolverSaldoContrato.monto.toFixed(2));
+      setDevolverSaldoContrato(null);
+      recargar();
+    } catch (e) {
+      toast(e.message || 'Error al registrar devolución', 'error');
     }
   };
 
@@ -589,6 +635,16 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                                                   )}
                                                 </span>
                                               )}
+                                              {item.estado_devolucion === 'pendiente' && (c.estado === 'alquilado' || c.estado === 'atrasado' || c.estado === 'devolución incompleta' || c.estado === 'reservado') && (
+                                                <div className="flex gap-1 ml-auto shrink-0">
+                                                  <button onClick={() => setItemAEditar({ item, idContrato: c.id, contrato: c, isGranelOrKit: esGranel || item.tipo_item === 'kit' })} className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition-colors" title="Editar ítem">
+                                                    <Edit size={12} />
+                                                  </button>
+                                                  <button onClick={() => setItemAEliminar({ item, idContrato: c.id })} className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" title="Eliminar ítem">
+                                                    <Trash2 size={12} />
+                                                  </button>
+                                                </div>
+                                              )}
                                             </div>
                                             {/* Fila 2: Fechas */}
                                             <div className="grid grid-cols-[55px_1fr_auto] gap-x-2 items-start">
@@ -950,15 +1006,6 @@ return filas.map((g, gi) => {
                                ) : c.estado === 'reservado' ? (
                                  <>
                                    <button
-                                      onClick={() => openEditDialog(c)}
-                                     className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
-                                     style={{ backgroundColor: 'var(--surface)', color: 'var(--info)', border: '0.5px solid var(--info)' }}
-                                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.93 0.04 240)'; }}
-                                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
-                                   >
-                                     <Edit size={12} /> Editar
-                                   </button>
-                                   <button
                                      onClick={() => handleConvertirReserva(c.id)}
                                      disabled={convirtiendo === c.id}
                                      className="flex-1 h-[34px] rounded-lg text-xs font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1.5 active:scale-[0.97]"
@@ -981,15 +1028,6 @@ return filas.map((g, gi) => {
                                  </>
 ) : (
                                   <>
-                                    <button
-                                      onClick={() => openEditDialog(c)}
-                                      className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
-                                      style={{ backgroundColor: 'var(--surface)', color: 'var(--info)', border: '0.5px solid var(--info)' }}
-                                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.93 0.04 240)'; }}
-                                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
-                                    >
-                                      <Edit size={12} /> Editar
-                                    </button>
                                     <button
                                       onClick={() => setEliminandoContrato(c)}
                                       className="flex-1 h-[34px] rounded-lg text-xs font-medium transition-all duration-150 inline-flex items-center justify-center gap-1.5"
@@ -1146,9 +1184,37 @@ return filas.map((g, gi) => {
           <AgregarItemModal
             idContrato={agregarItemContratoId}
             onClose={() => setAgregarItemContratoId(null)}
-                                    onAdded={() => { const id = agregarItemContratoId; setAgregarItemContratoId(null); recargar(); setExpandido(id); }}
+            onAdded={() => { const id = agregarItemContratoId; setAgregarItemContratoId(null); recargar(); setExpandido(id); }}
           />
         )}
+
+        <EditarItemModal
+          isOpen={!!itemAEditar}
+          onClose={() => setItemAEditar(null)}
+          item={itemAEditar?.item}
+          contrato={itemAEditar?.contrato}
+          isGranelOrKit={itemAEditar?.isGranelOrKit}
+          onGuardar={handleGuardarItemEditado}
+        />
+
+        <ConfirmModal
+          open={!!itemAEliminar}
+          title="Eliminar ítem del contrato"
+          message={`¿Estás seguro de que deseas eliminar este ítem? Esto devolverá la herramienta a stock inmediatamente y se recalculará el total del alquiler.`}
+          confirmLabel="Eliminar"
+          danger
+          onConfirm={handleConfirmarEliminarItem}
+          onCancel={() => setItemAEliminar(null)}
+        />
+
+        <ConfirmModal
+          open={!!devolverSaldoContrato}
+          title="Devolver Saldo a Favor"
+          message={`El cliente tiene un saldo a favor de S/ ${devolverSaldoContrato?.monto?.toFixed(2) || '0.00'}. ¿Deseas registrar un egreso de caja para devolver este dinero?`}
+          confirmLabel="Registrar Devolución"
+          onConfirm={handleDevolverSaldoConfirm}
+          onCancel={() => setDevolverSaldoContrato(null)}
+        />
       </div>
     </>
   );

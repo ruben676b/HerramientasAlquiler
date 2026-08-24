@@ -2277,5 +2277,162 @@ function agregarItemContrato(idContrato, items) {
 
   return ejecutar();
 }
+function editarItemContrato(idDetalle, idContrato, data) {
+  const contrato = db.prepare('SELECT estado FROM CONTRATO WHERE id = ?').get(idContrato);
+  if (!contrato) throw new Error('Contrato no encontrado.');
+  if (!['alquilado', 'atrasado', 'devolución incompleta', 'reservado'].includes(contrato.estado)) {
+    throw new Error('No se puede editar un ítem en un contrato con estado: ' + contrato.estado);
+  }
 
-module.exports = { crearContrato, crearReserva, convertirReserva, cancelarReserva, autoCancelarReservas, registrarDevolucion, getContratos, registrarPagoAdicional, revertirDevolucionItem, revertirDevolucionGranel, getDevolucionesGranel, anularPago, editarContrato, editarReserva, eliminarContrato, restaurarContrato, eliminarContratoPermanente, autoEliminarPapelera, agregarItemContrato };
+  const detalle = db.prepare('SELECT * FROM DETALLE_CONTRATO WHERE id = ? AND id_contrato = ?').get(idDetalle, idContrato);
+  if (!detalle) throw new Error('Ítem no encontrado en este contrato.');
+  
+  if (detalle.estado_devolucion !== 'pendiente') {
+    throw new Error('Solo se pueden editar ítems en estado "pendiente".');
+  }
+
+  const { cantidad, precio_dia_aplicado, tarifa_aplicada, fecha_salida_item, fecha_devolucion_pactada_item } = data;
+
+  const ejecutar = db.transaction(() => {
+    // Si cambia la cantidad (solo aplica a granel y kit padre)
+    if (cantidad !== undefined && cantidad !== detalle.cantidad) {
+      if (detalle.tipo_item === 'individual') {
+        throw new Error('No se puede cambiar la cantidad de un ítem individual.');
+      } else if (detalle.tipo_item === 'granel' && !detalle.id_kit) {
+        // Es un ítem granel independiente
+        const dif = cantidad - detalle.cantidad;
+        const granel = db.prepare('SELECT cantidad_disponible, nombre FROM ITEM_GRANEL WHERE id = ?').get(detalle.id_item_granel);
+        if (dif > 0 && granel.cantidad_disponible < dif) {
+          throw new Error('Stock insuficiente para aumentar la cantidad de ' + granel.nombre + '. Disponible: ' + granel.cantidad_disponible);
+        }
+        db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?').run(dif, detalle.id_item_granel);
+      } else if (detalle.tipo_item === 'kit') {
+        const dif = cantidad - detalle.cantidad;
+        // Ajustar componentes del kit
+        const componentes = db.prepare('SELECT * FROM DETALLE_CONTRATO WHERE id_contrato = ? AND id_kit = ? AND id != ?').all(idContrato, detalle.id_kit, idDetalle);
+        for (const comp of componentes) {
+          if (comp.tipo_item === 'granel') {
+            const factor = comp.cantidad / detalle.cantidad;
+            const nuevaCant = factor * cantidad;
+            const cantDif = nuevaCant - comp.cantidad;
+            
+            const granelC = db.prepare('SELECT cantidad_disponible, nombre FROM ITEM_GRANEL WHERE id = ?').get(comp.id_item_granel);
+            if (cantDif > 0 && granelC.cantidad_disponible < cantDif) {
+              throw new Error('Stock insuficiente del componente ' + granelC.nombre + ' para aumentar el kit.');
+            }
+            db.prepare('UPDATE DETALLE_CONTRATO SET cantidad = ? WHERE id = ?').run(nuevaCant, comp.id);
+            db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = cantidad_alquilada + ? WHERE id = ?').run(cantDif, comp.id_item_granel);
+          } else if (comp.tipo_item === 'individual') {
+             // Si el kit tuviera herramientas individuales múltiples, sería complejo. 
+             // Actualmente la cantidad de kit es multiplicadora. Pero herramienta individual siempre es 1.
+             // No se soporta cambiar cantidad de un kit que incluye herramientas individuales a un número que no sea 1, 
+             // o bien las herramientas no se multiplican mágicamente. Asumiremos que los kits con herramientas
+             // individuales solo tienen cantidad 1 (o hay que arrojar error).
+             if (cantidad !== 1) {
+                 throw new Error('No se puede cambiar la cantidad de un kit que contiene herramientas individuales.');
+             }
+          }
+        }
+      }
+    }
+
+    // Normalize dates to YYYY-MM-DD format (strip any time portion)
+    const normalizedFechaSalida = fecha_salida_item
+      ? (fecha_salida_item.length > 10 ? fecha_salida_item.substring(0, 10) : fecha_salida_item)
+      : (detalle.fecha_salida_item || null);
+    const normalizedFechaDev = fecha_devolucion_pactada_item
+      ? (fecha_devolucion_pactada_item.length > 10 ? fecha_devolucion_pactada_item.substring(0, 10) : fecha_devolucion_pactada_item)
+      : (detalle.fecha_devolucion_pactada_item || null);
+
+    db.prepare(`
+      UPDATE DETALLE_CONTRATO SET 
+        cantidad = COALESCE(?, cantidad),
+        precio_dia_aplicado = COALESCE(?, precio_dia_aplicado),
+        tarifa_aplicada = COALESCE(?, tarifa_aplicada),
+        fecha_salida_item = ?,
+        fecha_devolucion_pactada_item = ?,
+        total_item_snapshot = NULL
+      WHERE id = ?
+    `).run(
+      cantidad !== undefined ? cantidad : null, 
+      precio_dia_aplicado !== undefined ? precio_dia_aplicado : null,
+      tarifa_aplicada !== undefined ? tarifa_aplicada : null,
+      normalizedFechaSalida,
+      normalizedFechaDev,
+      idDetalle
+    );
+
+    db.prepare('UPDATE CONTRATO SET fecha_modificacion = ? WHERE id = ?').run(localDateTime(), idContrato);
+    return { ok: true };
+  });
+
+  return ejecutar();
+}
+
+function eliminarItemContrato(idDetalle, idContrato) {
+  const contrato = db.prepare('SELECT estado FROM CONTRATO WHERE id = ?').get(idContrato);
+  if (!contrato) throw new Error('Contrato no encontrado.');
+  if (!['alquilado', 'atrasado', 'devolución incompleta', 'reservado'].includes(contrato.estado)) {
+    throw new Error('No se puede eliminar un ítem en un contrato con estado: ' + contrato.estado);
+  }
+
+  const detalle = db.prepare('SELECT * FROM DETALLE_CONTRATO WHERE id = ? AND id_contrato = ?').get(idDetalle, idContrato);
+  if (!detalle) throw new Error('Ítem no encontrado en este contrato.');
+  
+  if (detalle.estado_devolucion !== 'pendiente') {
+    throw new Error('Solo se pueden eliminar ítems en estado "pendiente".');
+  }
+
+  const ejecutar = db.transaction(() => {
+    // Si es un kit, procesar sus componentes primero
+    if (detalle.tipo_item === 'kit') {
+      const componentes = db.prepare('SELECT * FROM DETALLE_CONTRATO WHERE id_contrato = ? AND id_kit = ? AND id != ?').all(idContrato, detalle.id_kit, idDetalle);
+      for (const comp of componentes) {
+        if (comp.estado_devolucion !== 'pendiente') {
+           throw new Error('No se puede eliminar el kit porque uno de sus componentes ya fue devuelto.');
+        }
+        if (comp.tipo_item === 'individual') {
+          db.prepare("UPDATE HERRAMIENTA SET estado = 'disponible' WHERE id = ?").run(comp.id_herramienta);
+        } else if (comp.tipo_item === 'granel') {
+          db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = MAX(0, cantidad_alquilada - ?) WHERE id = ?').run(comp.cantidad, comp.id_item_granel);
+        }
+        db.prepare('DELETE FROM DETALLE_CONTRATO WHERE id = ?').run(comp.id);
+      }
+    } else if (detalle.tipo_item === 'individual' && !detalle.id_kit) {
+      db.prepare("UPDATE HERRAMIENTA SET estado = 'disponible' WHERE id = ?").run(detalle.id_herramienta);
+    } else if (detalle.tipo_item === 'granel' && !detalle.id_kit) {
+      db.prepare('UPDATE ITEM_GRANEL SET cantidad_alquilada = MAX(0, cantidad_alquilada - ?) WHERE id = ?').run(detalle.cantidad, detalle.id_item_granel);
+    }
+
+    db.prepare('DELETE FROM DETALLE_CONTRATO WHERE id = ?').run(idDetalle);
+    
+    // Validar si el contrato se quedó vacío
+    const items = db.prepare('SELECT count(*) as count FROM DETALLE_CONTRATO WHERE id_contrato = ?').get(idContrato);
+    if (items.count === 0) {
+      // Si se queda vacío y es reservado, lo cancelamos. Si es alquilado, tal vez lo pasamos a cancelado.
+      db.prepare("UPDATE CONTRATO SET estado = 'cancelado', fecha_modificacion = ? WHERE id = ?").run(localDateTime(), idContrato);
+    } else {
+      db.prepare('UPDATE CONTRATO SET fecha_modificacion = ? WHERE id = ?').run(localDateTime(), idContrato);
+    }
+
+    return { ok: true };
+  });
+
+  return ejecutar();
+}
+
+function registrarDevolucionSaldo(idContrato, monto, metodo) {
+  if (monto <= 0) throw new Error('El monto a devolver debe ser mayor a 0');
+  
+  const ejecutar = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO PAGO (id_contrato, monto, metodo, tipo, comprobante, notas)
+      VALUES (?, ?, ?, 'devolucion_saldo', 'recibo interno', 'Devolución de saldo a favor del cliente')
+    `).run(idContrato, monto, metodo);
+    return { ok: true };
+  });
+  
+  return ejecutar();
+}
+
+module.exports = { crearContrato, crearReserva, convertirReserva, cancelarReserva, autoCancelarReservas, registrarDevolucion, getContratos, registrarPagoAdicional, revertirDevolucionItem, revertirDevolucionGranel, getDevolucionesGranel, anularPago, editarContrato, editarReserva, eliminarContrato, restaurarContrato, eliminarContratoPermanente, autoEliminarPapelera, agregarItemContrato, editarItemContrato, eliminarItemContrato, registrarDevolucionSaldo };

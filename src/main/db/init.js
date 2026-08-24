@@ -156,7 +156,7 @@ estado TEXT NOT NULL CHECK (estado IN ('disponible', 'reservado', 'alquilado', '
       monto REAL NOT NULL CHECK (monto >= 0),
       fecha_pago TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       metodo TEXT NOT NULL CHECK (metodo IN ('efectivo', 'yape', 'plin')),
-      tipo TEXT NOT NULL CHECK (tipo IN ('adelanto', 'saldo', 'mora', 'deposito', 'devolucion_deposito')),
+      tipo TEXT NOT NULL CHECK (tipo IN ('adelanto', 'saldo', 'mora', 'deposito', 'devolucion_deposito', 'devolucion_saldo')),
       comprobante TEXT NOT NULL DEFAULT 'recibo interno' CHECK (comprobante IN ('recibo interno', 'boleta_sunat', 'factura_sunat')),
       notas TEXT,
       id_detalle INTEGER REFERENCES DETALLE_CONTRATO(id),
@@ -1079,6 +1079,52 @@ SEXTO: En caso de devolución fuera de la fecha pactada, se aplicará una mora p
     }
   } catch (e) {
     console.log('[DB] Error en backfill id_detalle DEVOLUCION_GRANEL (no crítico):', e.message);
+  }
+
+  // Migración: Actualizar CHECK constraint en PAGO para incluir 'devolucion_saldo'
+  const migradaPago = db.prepare(`SELECT valor FROM CONFIGURACION WHERE clave = 'pago_tipo_migrada'`).get();
+  if (!migradaPago) {
+    try {
+      db.exec('PRAGMA foreign_keys=off;');
+      db.exec('BEGIN TRANSACTION;');
+      
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS PAGO_NEW (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          id_contrato INTEGER NOT NULL,
+          monto REAL NOT NULL CHECK (monto >= 0),
+          fecha_pago TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+          metodo TEXT NOT NULL CHECK (metodo IN ('efectivo', 'yape', 'plin')),
+          tipo TEXT NOT NULL CHECK (tipo IN ('adelanto', 'saldo', 'mora', 'deposito', 'devolucion_deposito', 'devolucion_saldo')),
+          comprobante TEXT NOT NULL DEFAULT 'recibo interno' CHECK (comprobante IN ('recibo interno', 'boleta_sunat', 'factura_sunat')),
+          notas TEXT,
+          id_detalle INTEGER REFERENCES DETALLE_CONTRATO(id),
+          anulado INTEGER DEFAULT 0 CHECK (anulado IN (0, 1)),
+          fecha_anulacion TEXT,
+          motivo_anulacion TEXT,
+          grupo_pago TEXT,
+          FOREIGN KEY (id_contrato) REFERENCES CONTRATO(id)
+        );
+      `);
+      
+      db.exec(`INSERT INTO PAGO_NEW SELECT * FROM PAGO;`);
+      db.exec(`DROP TABLE PAGO;`);
+      db.exec(`ALTER TABLE PAGO_NEW RENAME TO PAGO;`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_pago_contrato ON PAGO(id_contrato);`);
+      
+      db.exec(
+        `INSERT OR REPLACE INTO CONFIGURACION (clave, valor, descripcion)
+         VALUES ('pago_tipo_migrada', 'true', 'Migración de tipo devolucion_saldo completada')`
+      );
+      
+      db.exec('COMMIT;');
+      db.exec('PRAGMA foreign_keys=on;');
+      console.log('[DB] Migración PAGO (devolucion_saldo) completada.');
+    } catch (e) {
+      console.log('[DB] Error en migración PAGO:', e.message);
+      db.exec('ROLLBACK;');
+      db.exec('PRAGMA foreign_keys=on;');
+    }
   }
 
   console.log('[DB] Base de datos inicializada correctamente.');
