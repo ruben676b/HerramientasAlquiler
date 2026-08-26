@@ -692,15 +692,6 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
         <div className="px-3 py-2 rounded-lg text-xs" style={{ backgroundColor: 'oklch(0.94 0.02 25)', color: 'var(--danger)' }}>{error}</div>
       )}
 
-      {modoExcepcion && itemsSeleccionables > 0 && (
-        <div className="flex items-center gap-2 px-3 py-1.5 mx-1 rounded-lg text-[10px]"
-          style={{ backgroundColor: 'oklch(0.93 0.05 55 / 0.15)', color: 'oklch(0.45 0.13 55)', border: '0.5px solid oklch(0.55 0.13 55 / 0.3)' }}>
-          <AlertTriangle size={12} className="shrink-0" />
-          <span className="flex-1">Todas marcadas como bien. ¿Alguna con problemas? Haz clic en ella para cambiar.</span>
-          <button onClick={() => setModoExcepcion(false)} className="font-bold shrink-0 px-1 hover:opacity-70" style={{ color: 'oklch(0.45 0.13 55)' }}>✕</button>
-        </div>
-      )}
-
       <div className="grid grid-cols-[3fr_2fr] gap-0 min-h-0">
         {/* COLUMNA IZQUIERDA: Items en devolución */}
         <div className="px-4 py-2 space-y-3 min-w-0">
@@ -774,16 +765,15 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                       <div className="flex gap-0.5 shrink-0">
                         {ESTADOS_OPC.map(op => {
                           const sel = est === op.id;
-                          const esExcepcion = modoExcepcion && est === 'bien' && op.id === 'bien';
                           return (
                             <button key={op.id} onClick={() => seleccionarEstado(idx, op.id)}
                               className="flex items-center gap-0.5 px-1.5 h-5 rounded text-[9px] font-medium transition-all duration-150"
                               style={{
-                                backgroundColor: esExcepcion ? 'oklch(0.55 0.13 70)' : (sel ? op.bg : 'var(--bg)'),
-                                color: esExcepcion ? '#fff' : (sel ? op.ink : 'var(--muted)'),
-                                border: esExcepcion ? 'none' : (sel ? 'none' : '0.5px solid var(--border)'),
+                                backgroundColor: sel ? op.bg : 'var(--bg)',
+                                color: sel ? op.ink : 'var(--muted)',
+                                border: sel ? 'none' : '0.5px solid var(--border)',
                               }}>
-                              <op.icon size={10} /> {esExcepcion ? '¿Problema?' : op.label}
+                              <op.icon size={10} /> {op.label}
                             </button>
                           );
                         })}
