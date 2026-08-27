@@ -1,9 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { app } = require('electron');
 const db = require('../db/database');
 
-const IMAGENES_DIR = path.join(app.getPath('documents'), 'AlquilerImagenes');
+const IMAGENES_DIR = path.join(app.getPath('userData'), 'imagenes');
+const IMAGENES_DIR_LEGACY = path.join(app.getPath('documents'), 'AlquilerImagenes');
 
 function ensureDir() {
   if (!fs.existsSync(IMAGENES_DIR)) {
@@ -13,6 +15,29 @@ function ensureDir() {
 
 function sanitizeId(id) {
   return String(id).replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function resolverRutaAbsoluta(rutaGuardada) {
+  if (!rutaGuardada) return null;
+  const base = path.basename(rutaGuardada);
+  if (path.isAbsolute(rutaGuardada)) {
+    if (fs.existsSync(rutaGuardada)) return rutaGuardada;
+    const nuevo = path.join(IMAGENES_DIR, base);
+    if (fs.existsSync(nuevo)) return nuevo;
+    const legacy = path.join(IMAGENES_DIR_LEGACY, base);
+    if (fs.existsSync(legacy)) return legacy;
+    return rutaGuardada;
+  }
+  const nuevo = path.join(IMAGENES_DIR, base);
+  if (fs.existsSync(nuevo)) return nuevo;
+  const legacy = path.join(IMAGENES_DIR_LEGACY, base);
+  if (fs.existsSync(legacy)) return legacy;
+  return nuevo;
+}
+
+function generarNombreArchivo(prefijo, ext) {
+  const uuid = crypto.randomUUID();
+  return `${prefijo}_${uuid}.${ext}`;
 }
 
 // Extraer mime y buffer de un data URL base64 (o base64 puro)
@@ -40,7 +65,8 @@ function mimeDesdeExt(ruta) {
 
 function borrarArchivoSiExiste(ruta) {
   try {
-    if (ruta && fs.existsSync(ruta)) fs.unlinkSync(ruta);
+    const abs = resolverRutaAbsoluta(ruta);
+    if (abs && fs.existsSync(abs)) fs.unlinkSync(abs);
   } catch (e) {
     console.error('[IMAGEN] No se pudo borrar archivo:', ruta, e.message);
   }
@@ -57,14 +83,19 @@ function guardarImagenHerramienta(idCategoria, base64) {
 
   ensureDir();
   const { buffer, ext } = decodificarBase64(base64);
-  const ruta = path.join(IMAGENES_DIR, 'her_' + sanitizeId(idCategoria) + '.' + ext);
+  const filename = generarNombreArchivo('her', ext);
+  const rutaAbs = path.join(IMAGENES_DIR, filename);
+  const rutaParaDB = filename;
 
-  // Si ya existía una imagen previa con otra extensión, borrarla
-  if (cat.imagen_path && cat.imagen_path !== ruta) borrarArchivoSiExiste(cat.imagen_path);
+  // Borrar imagen previa (resuelve ruta absoluta si era legacy)
+  if (cat.imagen_path) {
+    const prevAbs = resolverRutaAbsoluta(cat.imagen_path);
+    if (prevAbs !== rutaAbs) borrarArchivoSiExiste(prevAbs);
+  }
 
-  fs.writeFileSync(ruta, buffer);
-  db.prepare('UPDATE CATEGORIA_HERRAMIENTA SET imagen_path = ? WHERE id = ?').run(ruta, idCategoria);
-  return { ruta };
+  fs.writeFileSync(rutaAbs, buffer);
+  db.prepare('UPDATE CATEGORIA_HERRAMIENTA SET imagen_path = ? WHERE id = ?').run(rutaParaDB, idCategoria);
+  return { ruta: rutaAbs };
 }
 
 function eliminarImagenHerramienta(idCategoria) {
@@ -86,15 +117,20 @@ function guardarImagenGranel(nombre, base64) {
 
   ensureDir();
   const { buffer, ext } = decodificarBase64(base64);
-  const ruta = path.join(IMAGENES_DIR, 'mat_' + sanitizeId(nombre) + '.' + ext);
+  const filename = generarNombreArchivo('mat', ext);
+  const rutaAbs = path.join(IMAGENES_DIR, filename);
+  const rutaParaDB = filename;
 
-  // Borrar imagen previa con otra extensión
+  // Borrar imagen previa (si existe) — resuelve absoluto legacy
   const prev = db.prepare('SELECT imagen_path FROM ITEM_GRANEL WHERE nombre = ? AND activo = 1 AND imagen_path IS NOT NULL LIMIT 1').get(nombre);
-  if (prev && prev.imagen_path && prev.imagen_path !== ruta) borrarArchivoSiExiste(prev.imagen_path);
+  if (prev && prev.imagen_path) {
+    const prevAbs = resolverRutaAbsoluta(prev.imagen_path);
+    if (prevAbs !== rutaAbs) borrarArchivoSiExiste(prevAbs);
+  }
 
-  fs.writeFileSync(ruta, buffer);
-  db.prepare('UPDATE ITEM_GRANEL SET imagen_path = ? WHERE nombre = ? AND activo = 1').run(ruta, nombre);
-  return { ruta };
+  fs.writeFileSync(rutaAbs, buffer);
+  db.prepare('UPDATE ITEM_GRANEL SET imagen_path = ? WHERE nombre = ? AND activo = 1').run(rutaParaDB, nombre);
+  return { ruta: rutaAbs };
 }
 
 function eliminarImagenGranel(nombre) {
@@ -121,20 +157,28 @@ function getImagenItem(tipo, id) {
       JOIN CATEGORIA_HERRAMIENTA c ON h.id_categoria = c.id
       WHERE h.id = ?
     `).get(id);
-    return { ruta: row?.imagen_path || null };
+    const rutaGuardada = row?.imagen_path || null;
+    return { ruta: rutaGuardada ? resolverRutaAbsoluta(rutaGuardada) : null };
   }
   if (tipo === 'granel' && id != null) {
-    const row = db.prepare('SELECT imagen_path FROM ITEM_GRANEL WHERE id = ?').get(id);
-    return { ruta: row?.imagen_path || null };
+    const row = db.prepare('SELECT nombre, imagen_path FROM ITEM_GRANEL WHERE id = ?').get(id);
+    let rutaGuardada = row?.imagen_path || null;
+    // Fallback: si la variante no tiene imagen pero su hermana del mismo nombre sí
+    if (!rutaGuardada && row?.nombre) {
+      const hermano = db.prepare('SELECT imagen_path FROM ITEM_GRANEL WHERE nombre = ? AND activo = 1 AND imagen_path IS NOT NULL LIMIT 1').get(row.nombre);
+      rutaGuardada = hermano?.imagen_path || null;
+    }
+    return { ruta: rutaGuardada ? resolverRutaAbsoluta(rutaGuardada) : null };
   }
   return { ruta: null };
 }
 
 /** Lee un archivo de imagen y lo devuelve como data URL (mime según extensión). */
 function leerImagen(ruta) {
-  if (!ruta || !fs.existsSync(ruta)) throw new Error('Imagen no encontrada: ' + ruta);
-  const buffer = fs.readFileSync(ruta);
-  return 'data:' + mimeDesdeExt(ruta) + ';base64,' + buffer.toString('base64');
+  const abs = resolverRutaAbsoluta(ruta);
+  if (!abs || !fs.existsSync(abs)) throw new Error('Imagen no encontrada: ' + ruta);
+  const buffer = fs.readFileSync(abs);
+  return 'data:' + mimeDesdeExt(abs) + ';base64,' + buffer.toString('base64');
 }
 
 module.exports = {

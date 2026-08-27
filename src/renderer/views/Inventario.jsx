@@ -322,10 +322,11 @@ export default function Inventario() {
   const handleEditarGranel = async (nombreOrig, data, img) => {
     try {
       await window.api.editarGranelFull(nombreOrig, data);
+      const nombreActual = data.nombre || nombreOrig;
       if (img?.imagen === null) {
-        await window.api.eliminarImagenGranel(nombreOrig);
+        await window.api.eliminarImagenGranel(nombreActual);
       } else if (typeof img?.imagen === 'string') {
-        await window.api.guardarImagenGranel(data.nombre, img.imagen);
+        await window.api.guardarImagenGranel(nombreActual, img.imagen);
       }
       toast('Material actualizado'); setModal(null); await cargar();
     }

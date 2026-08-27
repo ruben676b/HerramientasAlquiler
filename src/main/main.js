@@ -23,6 +23,8 @@ function createWindow() {
     },
   });
 
+  mainWindow.maximize();
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
     // mainWindow.webContents.openDevTools({ mode: 'detach' }); // Desactivado: el usuario abre la consola manualmente si la necesita

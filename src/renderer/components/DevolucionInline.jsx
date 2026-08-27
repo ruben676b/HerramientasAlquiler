@@ -271,47 +271,131 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
 
   const marcarTodasBien = () => {
     const nuevos = {};
+    const nuevosGranel = [];
     items.forEach((item, idx) => {
+      if (item.id_item_granel) {
+        const pend = item.granel_pendiente ?? item.cantidad;
+        if (pend <= 0) return;
+        const b = buenas[idx] || 0;
+        const d = danadas[idx] || 0;
+        const p_ = perdidas[idx] || 0;
+        if (b === pend && d === 0 && p_ === 0) return;
+        nuevosGranel.push(idx);
+        return;
+      }
       if (!item.id_herramienta) return;
       if (guardadosRef.current[idx]) return;
       if (item.estado_devolucion && item.estado_devolucion !== 'pendiente') return;
       if (estados[idx] !== 'bien') nuevos[idx] = true;
     });
-    if (Object.keys(nuevos).length === 0) return;
-    setEstados(p => {
-      const n = { ...p };
-      Object.keys(nuevos).forEach(idx => { n[idx] = 'bien'; });
-      return n;
-    });
-    Object.keys(nuevos).forEach(idx => {
-      setDañosAgregados(p => { const n2 = { ...p }; delete n2[idx]; return n2; });
-      setDañosAcordeon(p => { const n2 = { ...p }; delete n2[idx]; return n2; });
-      setListaAcordeon(p => { const n2 = { ...p }; delete n2[idx]; return n2; });
-    });
-    setModoExcepcion(true);
+    if (Object.keys(nuevos).length === 0 && nuevosGranel.length === 0) {
+      // Toggle: ya todo está en "bien" -> deseleccionar todo
+      const indADeseleccionar = [];
+      items.forEach((item, idx) => {
+        if (item.id_item_granel) return;
+        if (!item.id_herramienta) return;
+        if (guardadosRef.current[idx]) return;
+        if (item.estado_devolucion && item.estado_devolucion !== 'pendiente') return;
+        if (estados[idx] != null) indADeseleccionar.push(String(idx));
+      });
+      if (indADeseleccionar.length > 0) {
+        setEstados(p => {
+          const n = { ...p };
+          indADeseleccionar.forEach(id => { delete n[id]; });
+          return n;
+        });
+        indADeseleccionar.forEach(id => {
+          setDañosAgregados(p => { const n2 = { ...p }; delete n2[id]; return n2; });
+          setDañosAcordeon(p => { const n2 = { ...p }; delete n2[id]; return n2; });
+          setListaAcordeon(p => { const n2 = { ...p }; delete n2[id]; return n2; });
+        });
+        setModoExcepcion(false);
+      }
+      const granelADeseleccionar = [];
+      items.forEach((item, idx) => {
+        if (!item.id_item_granel) return;
+        const pend = item.granel_pendiente ?? item.cantidad;
+        if (pend <= 0) return;
+        const total = (buenas[idx] || 0) + (danadas[idx] || 0) + (perdidas[idx] || 0);
+        if (total > 0) granelADeseleccionar.push(idx);
+      });
+      granelADeseleccionar.forEach(idx => {
+        setBuenas(p => { const n = { ...p }; delete n[idx]; return n; });
+        setDanadas(p => { const n = { ...p }; delete n[idx]; return n; });
+        setPerdidas(p => { const n = { ...p }; delete n[idx]; return n; });
+        setCostosPerdida(p => { const n = { ...p }; delete n[idx]; return n; });
+        setCostoPerdManual(p => { const n = { ...p }; delete n[idx]; return n; });
+        setCostosRep(p => { const n = { ...p }; delete n[idx]; return n; });
+        setDañosAgregados(p => { const n = { ...p }; delete n[idx]; return n; });
+        setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
+        setListaAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
+        setDañosCat(p => { const n = { ...p }; delete n[idx]; return n; });
+      });
+      return;
+    }
+    if (Object.keys(nuevos).length > 0) {
+      setEstados(p => {
+        const n = { ...p };
+        Object.keys(nuevos).forEach(idx => { n[idx] = 'bien'; });
+        return n;
+      });
+      Object.keys(nuevos).forEach(idx => {
+        setDañosAgregados(p => { const n2 = { ...p }; delete n2[idx]; return n2; });
+        setDañosAcordeon(p => { const n2 = { ...p }; delete n2[idx]; return n2; });
+        setListaAcordeon(p => { const n2 = { ...p }; delete n2[idx]; return n2; });
+      });
+      setModoExcepcion(true);
+    }
+    if (nuevosGranel.length > 0) {
+      nuevosGranel.forEach(idx => {
+        const item = items[idx];
+        const pend = item.granel_pendiente ?? item.cantidad;
+        setBuenas(p => ({ ...p, [idx]: pend }));
+        setDanadas(p => { const n = { ...p }; delete n[idx]; return n; });
+        setPerdidas(p => { const n = { ...p }; delete n[idx]; return n; });
+        setCostosPerdida(p => { const n = { ...p }; delete n[idx]; return n; });
+        setCostoPerdManual(p => { const n = { ...p }; delete n[idx]; return n; });
+        setCostosRep(p => { const n = { ...p }; delete n[idx]; return n; });
+        setDañosAgregados(p => { const n = { ...p }; delete n[idx]; return n; });
+        setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
+        setListaAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
+        setDañosCat(p => { const n = { ...p }; delete n[idx]; return n; });
+      });
+    }
   };
 
   const guardarDevolucionBatch = async () => {
     if (!window.api) return;
-    const pendientes = items
+    const pendientesInd = items
       .map((item, idx) => ({ item, idx }))
       .filter(({ item, idx }) => !item.id_item_granel && !guardadosRef.current[idx] && estados[idx]);
 
-    if (pendientes.length === 0) {
+    const pendientesGranel = items
+      .map((item, idx) => ({ item, idx }))
+      .filter(({ item, idx }) => {
+        if (!item.id_item_granel) return false;
+        const pend = item.granel_pendiente ?? item.cantidad;
+        if (pend <= 0) return false;
+        const total = (buenas[idx] || 0) + (danadas[idx] || 0) + (perdidas[idx] || 0);
+        return total > 0;
+      });
+
+    if (pendientesInd.length === 0 && pendientesGranel.length === 0) {
       toast('No hay devoluciones pendientes para confirmar.', 'warn');
       return;
     }
 
-    const ventas = pendientes.filter(({ idx }) => estados[idx] === 'vendido');
-    await procesarDevoluciones(pendientes);
+    await procesarDevolucionesUnificadas(pendientesInd, pendientesGranel);
   };
 
-  const procesarDevoluciones = async (pendientes) => {
+  const procesarDevolucionesUnificadas = async (pendientesInd, pendientesGranel) => {
     setCobrando(true);
-    let exitos = 0;
-    let fallos = 0;
+    let exitosInd = 0;
+    let fallosInd = 0;
+    let exitosGranel = 0;
+    let fallosGranel = 0;
 
-    for (const { item, idx } of pendientes) {
+    for (const { item, idx } of pendientesInd) {
       const estado = estados[idx];
       guardadosRef.current[idx] = true;
       try {
@@ -330,31 +414,111 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
         if (mountedRef.current) {
           setGuardados(p => ({ ...p, [idx]: true }));
         }
-        exitos++;
+        exitosInd++;
       } catch (err) {
         guardadosRef.current[idx] = false;
-        fallos++;
+        fallosInd++;
         console.error('[Devolucion] Error procesando item idx=' + idx + ' id=' + item.id + ' estado=' + estado + ':', err.message || err);
+      }
+    }
+
+    for (const { item, idx } of pendientesGranel) {
+      const pend = item.granel_pendiente ?? item.cantidad;
+      const b = Math.min(buenas[idx] || 0, pend);
+      const d = Math.min(danadas[idx] || 0, pend - b);
+      const p_ = Math.min(perdidas[idx] || 0, pend - b - d);
+      const total = b + d + p_;
+      if (total <= 0) continue;
+      if (total > pend) {
+        toast('El total devuelto (' + total + ') supera lo pendiente (' + pend + ') en ' + (item.item_nombre || item.nombre) + '.', 'error');
+        fallosGranel++;
+        continue;
+      }
+      try {
+        const hoy = localDate();
+        const outcomes = [];
+        if (b > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'bien', cantidad_devuelta: b });
+        if (d > 0) outcomes.push({
+          id_detalle: item.id,
+          estado_devolucion: 'dañado',
+          cantidad_devuelta: d,
+          costo_reparacion: (dañosAgregados[idx] || []).reduce((s, dd) => s + (parseFloat(dd.costo) || 0), 0),
+          danos: (dañosAgregados[idx] || []).map(dd => ({ nombre: dd.nombre, costo: parseFloat(dd.costo) || 0 })),
+        });
+        if (p_ > 0) outcomes.push({ id_detalle: item.id, estado_devolucion: 'perdido', cantidad_devuelta: p_, costo_perdida: parseFloat(costosPerdida[idx]) || null });
+        await window.api.registrarDevolucion({
+          idContrato: c.id,
+          fechaDevolucionReal: hoy,
+          itemsDevueltos: outcomes,
+          observaciones: notas[idx] ? { [item.id]: notas[idx] } : {},
+        });
+        if (mountedRef.current) {
+          setBuenas(p => { const n = { ...p }; delete n[idx]; return n; });
+          setDanadas(p => { const n = { ...p }; delete n[idx]; return n; });
+          setPerdidas(p => { const n = { ...p }; delete n[idx]; return n; });
+          setCostosPerdida(p => { const n = { ...p }; delete n[idx]; return n; });
+          setCostosRep(p => { const n = { ...p }; delete n[idx]; return n; });
+          setNotas(p => { const n = { ...p }; delete n[idx]; return n; });
+          setDañosAgregados(p => { const n = { ...p }; delete n[idx]; return n; });
+          setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
+          setListaAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
+          setDañosCat(p => { const n = { ...p }; delete n[idx]; return n; });
+          setDevolucionesGranel(p => { const n = { ...p }; delete n[idx]; return n; });
+        }
+        exitosGranel++;
+      } catch (err) {
+        fallosGranel++;
+        console.error('[Devolucion] Error procesando granel idx=' + idx + ' id=' + item.id + ':', err.message || err);
+        if (mountedRef.current) toast('Error en ' + (item.item_nombre || item.nombre) + ': ' + (err.message || err), 'error');
       }
     }
 
     if (mountedRef.current) {
       setCobrando(false);
-      if (exitos > 0) toast(exitos + ' herramienta' + (exitos !== 1 ? 's' : '') + ' devuelta' + (exitos !== 1 ? 's' : ''));
-      if (fallos > 0) toast(fallos + ' error' + (fallos !== 1 ? 'es' : '') + ' al procesar', 'error');
+      const totalExitos = exitosInd + exitosGranel;
+      const totalFallos = fallosInd + fallosGranel;
+      if (totalExitos > 0) {
+        const partes = [];
+        if (exitosInd > 0) partes.push(exitosInd + ' herramienta' + (exitosInd !== 1 ? 's' : ''));
+        if (exitosGranel > 0) partes.push(exitosGranel + ' material' + (exitosGranel !== 1 ? 'es' : ''));
+        toast(partes.join(' y ') + ' devuelto' + (totalExitos !== 1 ? 's' : ''));
+      }
+      if (totalFallos > 0) toast(totalFallos + ' error' + (totalFallos !== 1 ? 'es' : '') + ' al procesar', 'error');
       onRecargar();
     }
+  };
+
+  const procesarDevoluciones = async (pendientes) => {
+    await procesarDevolucionesUnificadas(pendientes, []);
   };
 
   const individualesPendientes = items.filter((item, idx) =>
     !item.id_item_granel && !guardadosRef.current[idx] && estados[idx]
   ).length;
-  const itemsSeleccionables = items.filter((item, idx) =>
-    !item.id_item_granel && !guardadosRef.current[idx]
+  const granelPendientes = items.filter((item, idx) => {
+    if (!item.id_item_granel) return false;
+    const pend = item.granel_pendiente ?? item.cantidad;
+    if (pend <= 0) return false;
+    const total = (buenas[idx] || 0) + (danadas[idx] || 0) + (perdidas[idx] || 0);
+    return total > 0;
+  }).length;
+  const pendientesParaConfirmar = individualesPendientes + granelPendientes;
+  const individualesSeleccionables = items.filter((item, idx) =>
+    !item.id_item_granel && !guardadosRef.current[idx] && (!item.estado_devolucion || item.estado_devolucion === 'pendiente')
   ).length;
-  const marcados = items.filter((item, idx) =>
+  const granelSeleccionables = items.filter((item) =>
+    item.id_item_granel && (item.granel_pendiente ?? item.cantidad) > 0
+  ).length;
+  const itemsSeleccionables = individualesSeleccionables + granelSeleccionables;
+  const marcadosIndividuales = items.filter((item, idx) =>
     !item.id_item_granel && !guardadosRef.current[idx] && estados[idx]
   ).length;
+  const marcadosGranel = items.filter((item, idx) => {
+    if (!item.id_item_granel) return false;
+    const total = (buenas[idx] || 0) + (danadas[idx] || 0) + (perdidas[idx] || 0);
+    return total > 0;
+  }).length;
+  const marcados = marcadosIndividuales + marcadosGranel;
 
   const actualizarCostoDanos = async (idx, costo) => {
     if (!window.api || !mountedRef.current) return;
@@ -989,15 +1153,10 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center justify-between pt-1" style={{ borderTop: '0.5px solid var(--border)' }}>
+                            <div className="flex items-center pt-1" style={{ borderTop: '0.5px solid var(--border)' }}>
                               <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
                                 Total: {(buenas[idx] || 0) + (danadas[idx] || 0) + (perdidas[idx] || 0)} de {pend}
                               </span>
-                              <button onClick={() => registrarDevParcialGranel(idx)}
-                                className="px-2.5 h-6 rounded text-[10px] font-semibold transition-all duration-150 active:scale-[0.97]"
-                                style={{ backgroundColor: 'oklch(0.50 0.13 155)', color: '#fff', border: 'none' }}>
-                                Registrar devolución
-                              </button>
                             </div>
                           </div>
                         )}
@@ -1184,7 +1343,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
           )}
           <div className="flex gap-2 px-4 pb-2 sticky bottom-0 z-10"
             style={{ backgroundColor: 'oklch(0.95 0.02 55)' }}>
-            {individualesPendientes > 0 && (
+            {pendientesParaConfirmar > 0 && (
               <button onClick={guardarDevolucionBatch} disabled={cobrando}
                 className="flex-1 h-9 rounded-lg text-xs font-bold transition-all duration-150 active:scale-[0.97] inline-flex items-center justify-center gap-2 disabled:opacity-50"
                 style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none' }}
