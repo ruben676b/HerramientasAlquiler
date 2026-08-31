@@ -305,12 +305,14 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
   }, [contratosConPendiente]);
 
   const contratosFiltrados = useMemo(() => {
-    if (!estadoFiltro) return contratosConPendiente;
-    if (estadoFiltro === 'deudores') return contratosConPendiente.filter(c => c._pendiente > 0 && c._herramientasAtrasadas <= 0);
-    if (estadoFiltro === 'atrasado') return contratosConPendiente.filter(c => c._pendiente > 0 && c._herramientasAtrasadas > 0);
-    if (estadoFiltro === 'devuelto') return contratosConPendiente.filter(c => c.estado === 'devuelto' && c._pendiente <= 0);
-    if (estadoFiltro === 'papelera') return contratosConPendiente.filter(c => c.papelera === 1);
-    return contratosConPendiente.filter(c => c.estado === estadoFiltro);
+    const esDevuelto = (c) => c.estado === 'devuelto' && c._pendiente <= 0;
+    if (estadoFiltro === 'devuelto') return contratosConPendiente.filter(esDevuelto);
+    const base = contratosConPendiente.filter(c => !esDevuelto(c));
+    if (!estadoFiltro) return base;
+    if (estadoFiltro === 'deudores') return base.filter(c => c._pendiente > 0 && c._herramientasAtrasadas <= 0);
+    if (estadoFiltro === 'atrasado') return base.filter(c => c._pendiente > 0 && c._herramientasAtrasadas > 0);
+    if (estadoFiltro === 'papelera') return base.filter(c => c.papelera === 1);
+    return base.filter(c => c.estado === estadoFiltro);
   }, [contratosConPendiente, estadoFiltro]);
 
   const toggleExpand = (id) => setExpandido(prev => prev === id ? null : id);
@@ -367,9 +369,10 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
             { id: '', label: 'Todos' },
             { id: 'deudores', label: 'Deudores', stateColor: 'deuda' },
             { id: 'atrasado', label: 'Deudores y herramientas atrasadas', stateColor: 'atrasado' },
-            ...['alquilado', 'devuelto', 'devolucion incompleta']
+            ...['alquilado', 'devolucion incompleta']
               .filter(e => conteo[e] > 0)
               .map(e => ({ id: e, label: e === 'devolucion incompleta' ? 'Dev. incompleta' : e.charAt(0).toUpperCase() + e.slice(1), stateColor: e === 'devolucion incompleta' ? 'incompleto' : null })),
+            { id: 'devuelto', label: 'Devueltos', stateColor: 'devuelto' },
             { id: 'reservado', label: 'Reservado', stateColor: 'reservado' },
           ].map(f => {
             const activo = estadoFiltro === f.id;
