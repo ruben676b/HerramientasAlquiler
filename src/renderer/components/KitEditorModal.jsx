@@ -93,17 +93,38 @@ export default function KitEditorModal({ kitId, onSave, onClose }) {
 
   const set = (k, v) => { setF(p => ({ ...p, [k]: v })); setErr(''); };
 
-  // Resultados unificados del buscador (herramientas + materiales, sin kits)
+  const buscarRank = (q, nombre, id) => {
+    const n = (nombre || '').toLowerCase();
+    const i = (id || '').toLowerCase();
+    if (n.startsWith(q)) return 0;
+    if (i.startsWith(q)) return 1;
+    if (n.includes(q)) return 2;
+    if (i.includes(q)) return 3;
+    return 4;
+  };
+
   const resultados = useMemo(() => {
     if (!busqueda.trim()) return [];
     const q = busqueda.toLowerCase();
     const h = herr
       .filter(x => x.nombre.toLowerCase().includes(q) || x.id.toLowerCase().includes(q))
-      .map(x => ({ ...x, _tipo: 'herramienta', _enLista: componentes.some(c => c.tipo_item === 'individual' && c.id_item === x.id) }));
+      .map(x => ({
+        ...x, _tipo: 'herramienta',
+        _enLista: componentes.some(c => c.tipo_item === 'individual' && c.id_item === x.id),
+        _rank: buscarRank(q, x.nombre, x.id),
+        _disp: x.estado === 'disponible' ? 0 : 1,
+      }));
     const g = granel
       .filter(x => x.nombre.toLowerCase().includes(q))
-      .map(x => ({ ...x, _tipo: 'granel', _enLista: componentes.some(c => c.tipo_item === 'granel' && c.id_item === x.id) }));
-    return [...h, ...g].slice(0, 12);
+      .map(x => ({
+        ...x, _tipo: 'granel',
+        _enLista: componentes.some(c => c.tipo_item === 'granel' && c.id_item === x.id),
+        _rank: buscarRank(q, x.nombre, ''),
+        _disp: 0,
+      }));
+    return [...h, ...g]
+      .sort((a, b) => a._rank - b._rank || a._disp - b._disp || (a.nombre || '').localeCompare(b.nombre || ''))
+      .slice(0, 50);
   }, [busqueda, herr, granel, componentes]);
 
   const agregar = (r) => {
@@ -234,7 +255,7 @@ export default function KitEditorModal({ kitId, onSave, onClose }) {
                 <button onClick={() => setBusqueda('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-black/5" style={{ color: 'var(--faint)' }}>✕</button>
               )}
               {busqFoco && busqueda.trim() && resultados.length > 0 && (
-                <div className="fixed z-[100] bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-lg max-h-56 overflow-y-auto"
+                <div className="fixed z-[100] bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-lg max-h-80 overflow-y-auto"
                   style={{ top: (busqRef.current?.getBoundingClientRect().bottom || 0) + 4, left: busqRef.current?.getBoundingClientRect().left || 0, width: busqRef.current?.getBoundingClientRect().width || 300 }}>
                   {resultados.map((r, idx) => {
                     const esHerr = r._tipo === 'herramienta';

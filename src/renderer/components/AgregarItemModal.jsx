@@ -35,27 +35,48 @@ export default function AgregarItemModal({ idContrato, onClose, onAdded }) {
     }).catch(() => {});
   }, []);
 
+  const buscarRank = (q, nombre, id) => {
+    const n = (nombre || '').toLowerCase();
+    const i = (id || '').toLowerCase();
+    if (n.startsWith(q)) return 0;
+    if (i.startsWith(q)) return 1;
+    if (n.includes(q)) return 2;
+    if (i.includes(q)) return 3;
+    return 4;
+  };
+
   const resultados = useMemo(() => {
     if (!busqueda) return [];
     const q = busqueda.toLowerCase();
     const herr = todasHerramientas
       .filter(h => (h.id || '').toLowerCase().includes(q) || (h.nombre || '').toLowerCase().includes(q) || (h.id || '').replace('-', '').toLowerCase().includes(q))
-      .sort((a, b) => {
-        if (a.estado === 'disponible' && b.estado !== 'disponible') return -1;
-        if (b.estado === 'disponible' && a.estado !== 'disponible') return 1;
-        return 0;
-      })
-      .slice(0, 8)
-      .map(h => ({ ...h, _tipo: 'herramienta', _enLista: items.some(i => i.id_herramienta === h.id) }));
+      .map(h => ({
+        ...h, _tipo: 'herramienta',
+        _enLista: items.some(i => i.id_herramienta === h.id),
+        _rank: buscarRank(q, h.nombre, h.id),
+        _disp: h.estado === 'disponible' ? 0 : 1,
+      }));
     const gran = granelCat
       .filter(g => (g.nombre || '').toLowerCase().includes(q))
-      .slice(0, 8)
-      .map(g => ({ ...g, _tipo: 'granel', _enLista: !!items.find(i => i.id_item_granel === g.id), _dispEfectivo: g.cantidad_disponible }));
+      .map(g => ({
+        ...g, _tipo: 'granel',
+        _enLista: !!items.find(i => i.id_item_granel === g.id),
+        _dispEfectivo: g.cantidad_disponible,
+        _rank: buscarRank(q, g.nombre, ''),
+        _disp: 0,
+      }));
     const kits = kitsCat
       .filter(k => (k.nombre || '').toLowerCase().includes(q))
-      .slice(0, 8)
-      .map(k => ({ ...k, _tipo: 'kit', _enLista: !!items.find(i => i.id_kit === k.id), _dispEfectivo: k.disponibilidad || 0 }));
-    return [...herr, ...gran, ...kits];
+      .map(k => ({
+        ...k, _tipo: 'kit',
+        _enLista: !!items.find(i => i.id_kit === k.id),
+        _dispEfectivo: k.disponibilidad || 0,
+        _rank: buscarRank(q, k.nombre, ''),
+        _disp: 0,
+      }));
+    return [...herr, ...gran, ...kits]
+      .sort((a, b) => a._rank - b._rank || a._disp - b._disp || (a.nombre || '').localeCompare(b.nombre || ''))
+      .slice(0, 50);
   }, [busqueda, todasHerramientas, granelCat, kitsCat, items]);
 
   const agregar = (r) => {
@@ -336,7 +357,7 @@ export default function AgregarItemModal({ idContrato, onClose, onAdded }) {
               <button onClick={() => setBusqueda('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-black/5" style={{ color: 'var(--faint)' }}>✕</button>
             )}
             {foco && busqueda && resultados.length > 0 && (
-              <div className="absolute z-[100] mt-1 bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-lg max-h-72 overflow-y-auto w-full">
+              <div className="absolute z-[100] mt-1 bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-lg max-h-80 overflow-y-auto w-full">
                 {resultados.map((r, idx) => {
                   const esHerr = r._tipo === 'herramienta';
                   const disponible = esHerr ? r.estado === 'disponible' && !r._enLista : r._dispEfectivo > 0;

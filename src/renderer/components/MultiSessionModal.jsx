@@ -364,18 +364,21 @@ function SessionForm({ session }) {
     return ids;
   }, [sessions, session.id, items]);
 
-  // Resultados unificados
+  const buscarRank = (q, nombre, id) => {
+    const n = (nombre || '').toLowerCase();
+    const i = (id || '').toLowerCase();
+    if (n.startsWith(q)) return 0;
+    if (i.startsWith(q)) return 1;
+    if (n.includes(q)) return 2;
+    if (i.includes(q)) return 3;
+    return 4;
+  };
+
   const resultadosUnificados = useMemo(() => {
     if (!busquedaEquipo) return [];
     const q = busquedaEquipo.toLowerCase();
     const herr = todasHerramientas
       .filter(h => (h.id || '').toLowerCase().includes(q) || (h.nombre || '').toLowerCase().includes(q) || (h.id || '').replace('-', '').toLowerCase().includes(q))
-      .sort((a, b) => {
-        if (a.estado === 'disponible' && b.estado !== 'disponible') return -1;
-        if (b.estado === 'disponible' && a.estado !== 'disponible') return 1;
-        return 0;
-      })
-      .slice(0, 8)
       .map(h => {
         const enLista = items.some(i => i.id_herramienta === h.id);
         return {
@@ -383,11 +386,12 @@ function SessionForm({ session }) {
           _tipo: 'herramienta',
           _enLista: enLista,
           _enContratoEditado: editContratoId && enLista,
+          _rank: buscarRank(q, h.nombre, h.id),
+          _disp: h.estado === 'disponible' ? 0 : 1,
         };
       });
     const gran = granelCat
       .filter(g => (g.nombre || '').toLowerCase().includes(q))
-      .slice(0, 8)
       .map(g => {
         const enLista = items.find(i => i.id_item_granel === g.id);
         const enOtras = granelEnOtrasSesiones[g.id] || 0;
@@ -396,11 +400,12 @@ function SessionForm({ session }) {
           _tipo: 'granel',
           _enLista: !!enLista,
           _dispEfectivo: g.cantidad_disponible - (enLista?.cantidad || 0) - enOtras,
+          _rank: buscarRank(q, g.nombre, ''),
+          _disp: 0,
         };
       });
     const kits = kitsCat
       .filter(k => (k.nombre || '').toLowerCase().includes(q))
-      .slice(0, 8)
       .map(k => {
         const enLista = items.find(i => i.id_kit === k.id);
         const enOtras = kitsEnOtrasSesiones[k.id] || 0;
@@ -409,9 +414,13 @@ function SessionForm({ session }) {
           _tipo: 'kit',
           _enLista: !!enLista,
           _dispEfectivo: (k.disponibilidad || 0) - (enLista?.cantidad || 0) - enOtras,
+          _rank: buscarRank(q, k.nombre, ''),
+          _disp: 0,
         };
       });
-    return [...herr, ...gran, ...kits];
+    return [...herr, ...gran, ...kits]
+      .sort((a, b) => a._rank - b._rank || a._disp - b._disp || (a.nombre || '').localeCompare(b.nombre || ''))
+      .slice(0, 50);
   }, [busquedaEquipo, todasHerramientas, granelCat, kitsCat, items, kitsEnOtrasSesiones]);
 
   const agregarHerramienta = (h) => {
@@ -1335,7 +1344,7 @@ const itemsData = itemsConDias.map(item => ({
                 <button onClick={() => setBusquedaEquipo('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-black/5" style={{ color: 'var(--faint)' }}>✕</button>
               )}
               {equipoFoco && busquedaEquipo && resultadosUnificados.length > 0 && (
-                <div className="fixed z-[100] bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-lg max-h-56 overflow-y-auto"
+                <div className="fixed z-[100] bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-lg max-h-80 overflow-y-auto"
                   style={{ top: (busquedaRef.current?.getBoundingClientRect().bottom || 0) + 4, left: busquedaRef.current?.getBoundingClientRect().left || 0, width: busquedaRef.current?.getBoundingClientRect().width || 300 }}>
                   {resultadosUnificados.map((r, idx) => {
                     const esHerr = r._tipo === 'herramienta';

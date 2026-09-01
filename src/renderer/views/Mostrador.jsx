@@ -241,7 +241,7 @@ export default function Mostrador() {
     return herramientas
       .filter(h => rank(h) < 5)
       .sort((a, b) => rank(a) - rank(b))
-      .slice(0, 20);
+      .slice(0, 50);
   }, [buscarHerramienta, herramientas]);
   const granelSel = granelCat.find((g) => g.id === parseInt(granelId, 10));
 
@@ -581,9 +581,9 @@ export default function Mostrador() {
                     <p className="text-xs mt-1" style={{ color: 'var(--warning)' }}>Sin coincidencias.</p>
                   )}
                   {mostrarSugerencias && buscarHerramienta && herramientasFiltradas.length > 0 && (
-                    <div className="absolute z-30 top-full left-0 right-0 mt-1 rounded-md border shadow-lg max-h-48 overflow-y-auto"
+                    <div className="absolute z-30 top-full left-0 right-0 mt-1 rounded-md border shadow-lg max-h-80 overflow-y-auto"
                       style={{ backgroundColor: 'var(--bg)', borderColor: 'var(--border)' }}>
-                      {herramientasFiltradas.slice(0, 12).map(h => (
+                      {herramientasFiltradas.map(h => (
                         <div key={h.id} className="w-full flex items-center gap-1 pl-3 pr-2 py-1.5 text-xs hover:bg-[var(--surface)]">
                           <button
                             onMouseDown={() => { setHerrId(h.id); setBuscarHerramienta(''); setMostrarSugerencias(false); }}
