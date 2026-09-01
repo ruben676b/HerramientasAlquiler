@@ -597,7 +597,15 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                                             const tarifaMes = item.tarifa_aplicada === 'mes';
                                             const fSalida = fmtFechaCorta(item.fecha_salida_item || c.fecha_salida);
                                             const fDev = fmtFechaCorta(item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada);
-                                            const cardBg = item.estado_devolucion === 'bien' ? 'oklch(0.92 0.07 160)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'oklch(0.92 0.06 25)' : item.estado_devolucion === 'vendido' ? 'oklch(0.92 0.07 250)' : item.estado_devolucion === 'dañado' ? 'oklch(0.92 0.07 75)' : 'var(--bg)';
+                                            const cardBg = item.estado_devolucion === 'bien' ? 'oklch(0.92 0.07 160)'
+                                              : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'oklch(0.92 0.06 25)'
+                                              : item.estado_devolucion === 'vendido' ? 'oklch(0.92 0.07 250)'
+                                              : item.estado_devolucion === 'dañado' ? 'oklch(0.92 0.07 75)'
+                                              : esGranel && (item.granel_pendiente || 0) === 0
+                                                ? (item.granel_dev_perdida || 0) > 0 ? 'oklch(0.92 0.06 25)'
+                                                  : (item.granel_dev_danada || 0) > 0 ? 'oklch(0.92 0.07 75)'
+                                                  : 'oklch(0.92 0.07 160)'
+                                              : 'var(--bg)';
                                             return (
                                               <div key={filaKey} className="rounded-lg px-2.5 py-2" style={{ backgroundColor: cardBg, border: '0.5px solid var(--border)' }}>
                                                 {/* Línea 1: Código + Nombre (wrap libre) */}
@@ -649,6 +657,12 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                                                   {esGranel && (item.granel_dev_bien || item.granel_dev_danada || item.granel_dev_perdida || 0) > 0 && (
                                                     <span className="text-[9px] shrink-0" style={{ color: 'var(--muted)' }}>
                                                       Dev:{(item.granel_dev_bien || 0) > 0 && <span style={{ color: 'var(--success)' }}> {item.granel_dev_bien}✓</span>}{(item.granel_dev_danada || 0) > 0 && <span style={{ color: 'oklch(0.55 0.13 70)' }}> {item.granel_dev_danada}⚠</span>}{(item.granel_dev_perdida || 0) > 0 && <span style={{ color: 'var(--danger)' }}> {item.granel_dev_perdida}✗</span>}{(item.granel_pendiente || 0) > 0 && <span style={{ color: 'var(--faint)' }}> pend:{item.granel_pendiente}</span>}
+                                                    </span>
+                                                  )}
+                                                  {esGranel && (item.granel_pendiente || 0) === 0 && (
+                                                    <span className="text-[8px] px-1 py-0.5 rounded font-semibold shrink-0 leading-none"
+                                                      style={{ backgroundColor: 'oklch(0.88 0.09 160)', color: 'var(--success)' }}>
+                                                      ✓ Completo
                                                     </span>
                                                   )}
                                                   {item.estado_devolucion === 'vendido' && item.costo_perdida > 0 && (
@@ -716,7 +730,7 @@ return filas.map((g, gi) => {
                                                   style={{ backgroundColor: 'oklch(0.88 0.09 25)', color: 'var(--danger)' }}>{pendientes} pend.</span>
                                               ) : (
                                                 <span className="text-[9px] px-1 py-0.5 rounded font-medium shrink-0"
-                                                  style={{ backgroundColor: 'oklch(0.88 0.09 160)', color: 'var(--success)' }}>OK</span>
+                                                  style={{ backgroundColor: 'oklch(0.88 0.09 160)', color: 'var(--success)' }}>Completo</span>
                                               )}
                                               <span className="font-mono text-[11px] font-bold shrink-0 tabular-nums" style={{ color: 'var(--ink)' }}>S/ {totalGrupo.toFixed(2)}</span>
                                             </div>
@@ -947,7 +961,7 @@ return filas.map((g, gi) => {
                                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg)'; }}
                                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
                                 >
-                                  <FileText size={11} /> Ver
+                                  <FileText size={11} /> Contrato
                                 </button>
                                 {c.papelera === 1 ? (
                                   <button

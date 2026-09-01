@@ -1239,7 +1239,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
               const renderItemCard = (item, idx) => {
                 const esKit = item.tipo_item === 'kit';
                 const estK = estados[idx] || null;
-                const devDB = item.estado_devolucion && item.estado_devolucion !== 'pendiente';
+                const devDB = (item.estado_devolucion && item.estado_devolucion !== 'pendiente') || (item.id_item_granel && (item.granel_pendiente ?? item.cantidad) === 0);
                 const yaG = guardados[idx] || devDB;
                 const styleCard = {
                   borderColor: yaG
@@ -1267,7 +1267,7 @@ setDañosAcordeon(p => { const n = { ...p }; delete n[idx]; return n; });
                         {hijos.map(hIdx => {
                           const hi = items[hIdx];
                           const estH = estados[hIdx] || null;
-                          const yaH = guardados[hIdx] || (hi.estado_devolucion && hi.estado_devolucion !== 'pendiente');
+                          const yaH = guardados[hIdx] || (hi.estado_devolucion && hi.estado_devolucion !== 'pendiente') || (hi.id_item_granel && (hi.granel_pendiente ?? hi.cantidad) === 0);
                           return (
                             <div key={hIdx} className="rounded-lg border px-3 py-2 text-xs transition-all duration-150"
                               style={{
