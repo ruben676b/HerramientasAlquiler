@@ -104,10 +104,14 @@ function generarPdfDesdeDatos(datos) {
   doc.pipe(stream);
 
   // ===== ENCABEZADO (#1: N° siempre visible) =====
-  doc.fontSize(22).font('Helvetica-Bold').text('QUISPE', { align: 'center' });
-  doc.fontSize(12).text('CONTRATO DE ALQUILER DE MAQUINARIAS', { align: 'center' });
-  doc.fontSize(12).text('DE CONSTRUCCION', { align: 'center' });
-  doc.moveDown(0.3);
+  const logoPath = path.join(__dirname, '..', 'assets', 'logo.png');
+  if (fs.existsSync(logoPath)) {
+    const logoWidth = 260;
+    const logoHeight = logoWidth * 0.228;
+    doc.image(logoPath, (doc.page.width - logoWidth) / 2, doc.y, { width: logoWidth });
+    doc.y += logoHeight + 6;
+    doc.moveDown(0.3);
+  }
   doc.fontSize(11).font('Helvetica-Bold').text(`N° ${nro}`, { align: 'center' });
   doc.moveDown(0.3);
 
