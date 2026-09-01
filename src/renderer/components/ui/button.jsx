@@ -46,12 +46,18 @@ export default function Button({
   className,
   children,
   disabled,
+  style,
   ...props
 }) {
   const s = variants[variant] || variants.primary;
   const sizeCls = size === 'sm' ? 'h-8 px-3 text-xs rounded-lg' :
                    size === 'lg' ? 'h-11 px-6 text-sm rounded-xl' :
                    'h-10 px-4 text-sm rounded-lg';
+
+  const inlineBg = style?.backgroundColor;
+  const inlineColor = style?.color;
+  const hoverBg = style?.['--hover-bg'] || s.hoverBg;
+  const hoverColor = style?.['--hover-color'] || s.hoverColor;
 
   return (
     <button
@@ -68,14 +74,15 @@ export default function Button({
         backgroundColor: s.bg,
         color: s.color,
         border: variant === 'ghost' || variant === 'danger' ? 'none' : `1px solid ${s.border}`,
+        ...style,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = s.hoverBg;
-        if (s.hoverColor) e.currentTarget.style.color = s.hoverColor;
+        e.currentTarget.style.backgroundColor = hoverBg;
+        if (hoverColor) e.currentTarget.style.color = hoverColor;
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = s.bg;
-        if (s.hoverColor) e.currentTarget.style.color = s.color;
+        e.currentTarget.style.backgroundColor = inlineBg || s.bg;
+        if (hoverColor) e.currentTarget.style.color = inlineColor || s.color;
       }}
       disabled={disabled}
       {...props}

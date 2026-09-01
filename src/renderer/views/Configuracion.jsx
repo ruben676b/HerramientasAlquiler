@@ -191,7 +191,7 @@ export default function Configuracion() {
             <div className="pt-5 border-t" style={{ borderColor: 'var(--border)' }}>
               <h3 className="text-sm font-medium mb-2 text-red-600">Restaurar Sistema</h3>
               <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>Restaura el sistema desde una copia de seguridad local. <br /><strong>Advertencia:</strong> Esta acción sobrescribirá todos los datos actuales y reiniciará la aplicación.</p>
-              <Button onClick={restaurarBackup} style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+              <Button onClick={restaurarBackup} style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', '--hover-bg': '#fdd' }}>
                 <RefreshCcw size={16} style={{ marginRight: '6px' }} /> Restaurar Backup
               </Button>
             </div>
