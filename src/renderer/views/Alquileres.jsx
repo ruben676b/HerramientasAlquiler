@@ -23,13 +23,13 @@ const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'o
 
 // Paleta de colores semánticos por estado de alquiler
 const ESTADO_COLOR = {
-  atrasado:         { vivid: 'var(--danger)',  bg: 'oklch(0.97 0.012 25)', badge: 'oklch(0.95 0.02 25)',   badgeText: 'var(--danger)' },
-  deuda:            { vivid: 'var(--warning)', bg: 'oklch(0.97 0.015 75)', badge: 'oklch(0.95 0.025 75)', badgeText: 'var(--warning)' },
-  incompleto:       { vivid: 'oklch(0.58 0.13 55)', bg: 'oklch(0.97 0.015 55)', badge: 'oklch(0.93 0.04 55)', badgeText: 'oklch(0.48 0.13 55)' },
-  reservado:        { vivid: 'var(--info)',    bg: 'oklch(0.97 0.015 240)', badge: 'oklch(0.93 0.04 240)', badgeText: 'var(--info)' },
+  atrasado:         { vivid: 'var(--danger)',  bg: 'oklch(0.93 0.05 25)', badge: 'oklch(0.88 0.09 25)',   badgeText: 'oklch(0.40 0.22 25)' },
+  deuda:            { vivid: 'var(--warning)', bg: 'oklch(0.93 0.06 75)', badge: 'oklch(0.88 0.09 75)', badgeText: 'oklch(0.47 0.16 75)' },
+  incompleto:       { vivid: 'oklch(0.58 0.13 55)', bg: 'oklch(0.93 0.05 55)', badge: 'oklch(0.88 0.08 55)', badgeText: 'oklch(0.40 0.16 55)' },
+  reservado:        { vivid: 'var(--info)',    bg: 'oklch(0.93 0.05 240)', badge: 'oklch(0.88 0.08 240)', badgeText: 'oklch(0.42 0.13 240)' },
   devuelto:         { vivid: 'var(--success)', bg: 'var(--bg)',            badge: null,                    badgeText: null },
-  papelera:         { vivid: 'oklch(0.40 0.12 25)', bg: 'oklch(0.97 0.008 25)', badge: 'oklch(0.93 0.02 25)', badgeText: 'var(--danger)' },
-  cancelado:        { vivid: 'var(--muted)',   bg: 'var(--bg)',            badge: 'oklch(0.90 0.003 60)', badgeText: 'var(--muted)' },
+  papelera:         { vivid: 'oklch(0.40 0.12 25)', bg: 'oklch(0.93 0.04 25)', badge: 'oklch(0.88 0.06 25)', badgeText: 'oklch(0.40 0.20 25)' },
+  cancelado:        { vivid: 'var(--muted)',   bg: 'var(--bg)',            badge: 'oklch(0.90 0.003 60)', badgeText: 'oklch(0.45 0.02 60)' },
   normal:           { vivid: 'var(--success)', bg: 'var(--bg)',            badge: null,                    badgeText: null },
 };
 
@@ -509,13 +509,13 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                       <div className="flex items-baseline gap-2 min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>{c.cliente_nombre}</p>
                         {c.cliente_telefono && (
-                          <span className="inline-flex items-center gap-1 text-[11px] shrink-0" style={{ color: 'oklch(0.40 0.02 240 / 0.75)' }}>
+                          <span className="inline-flex items-center gap-1 text-[11px] shrink-0" style={{ color: 'oklch(0.30 0.03 240 / 0.92)' }}>
                             <Phone size={10} />
                             {c.cliente_telefono}
                           </span>
                         )}
                         {c.cliente_dni && (
-                          <span className="inline-flex items-center gap-1 text-[11px] shrink-0 font-mono" style={{ color: 'oklch(0.40 0.02 240 / 0.75)' }}>
+                          <span className="inline-flex items-center gap-1 text-[11px] shrink-0 font-mono" style={{ color: 'oklch(0.30 0.03 240 / 0.92)' }}>
                             <CreditCard size={10} />
                             {c.cliente_dni}
                           </span>
@@ -574,7 +574,7 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                                   {(c.estado === 'alquilado' || c.estado === 'atrasado' || c.estado === 'devolución incompleta') && (
                                     <button onClick={() => setAgregarItemContratoId(c.id)}
                                       className="flex items-center gap-1 px-2 h-5 rounded text-[9px] font-semibold transition-all duration-150 active:scale-[0.97]"
-                                      style={{ backgroundColor: 'oklch(0.50 0.11 155 / 0.12)', color: 'oklch(0.45 0.12 155)', border: '1px solid oklch(0.50 0.11 155 / 0.3)' }}>
+                                      style={{ backgroundColor: 'oklch(0.50 0.11 155 / 0.12)', color: 'oklch(0.38 0.14 155)', border: '1px solid oklch(0.50 0.11 155 / 0.3)' }}>
                                       <Plus size={10} /> Agregar
                                     </button>
                                   )}
@@ -598,7 +598,7 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                                             const tarifaMes = item.tarifa_aplicada === 'mes';
                                             const fSalida = fmtFechaCorta(item.fecha_salida_item || c.fecha_salida);
                                             const fDev = fmtFechaCorta(item.fecha_devolucion_pactada_item || c.fecha_devolucion_pactada);
-                                            const cardBg = item.estado_devolucion === 'bien' ? 'oklch(0.96 0.03 160)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'oklch(0.96 0.02 25)' : item.estado_devolucion === 'vendido' ? 'oklch(0.96 0.03 250)' : item.estado_devolucion === 'dañado' ? 'oklch(0.96 0.03 75)' : 'var(--bg)';
+                                            const cardBg = item.estado_devolucion === 'bien' ? 'oklch(0.92 0.07 160)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'oklch(0.92 0.06 25)' : item.estado_devolucion === 'vendido' ? 'oklch(0.92 0.07 250)' : item.estado_devolucion === 'dañado' ? 'oklch(0.92 0.07 75)' : 'var(--bg)';
                                             return (
                                               <div key={filaKey} className="rounded-lg px-2.5 py-2" style={{ backgroundColor: cardBg, border: '0.5px solid var(--border)' }}>
                                                 {/* Línea 1: Código + Nombre (wrap libre) */}
@@ -629,15 +629,15 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                                                   </span>
                                                   {atraso > 0 && (
                                                     <span className="text-[8px] px-1.5 py-0.5 rounded font-semibold shrink-0 leading-none"
-                                                      style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>
+                                                      style={{ backgroundColor: 'oklch(0.88 0.09 25)', color: 'var(--danger)' }}>
                                                       +{atraso}d atraso · S/ {montoMora.toFixed(0)}
                                                     </span>
                                                   )}
                                                   {item.estado_devolucion && item.estado_devolucion !== 'pendiente' && (
                                                     <span className="text-[8px] px-1 py-0.5 rounded font-semibold shrink-0 leading-none"
                                                       style={{
-                                                        backgroundColor: item.estado_devolucion === 'bien' ? 'oklch(0.93 0.05 160)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'oklch(0.95 0.03 25)' : item.estado_devolucion === 'vendido' ? 'oklch(0.93 0.05 250)' : 'oklch(0.93 0.05 75)',
-                                                        color: item.estado_devolucion === 'bien' ? 'var(--success)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'var(--danger)' : item.estado_devolucion === 'vendido' ? 'oklch(0.45 0.13 250)' : 'var(--warning)',
+                                                        backgroundColor: item.estado_devolucion === 'bien' ? 'oklch(0.88 0.09 160)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'oklch(0.88 0.09 25)' : item.estado_devolucion === 'vendido' ? 'oklch(0.88 0.09 250)' : 'oklch(0.88 0.09 75)',
+                                                        color: item.estado_devolucion === 'bien' ? 'var(--success)' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'var(--danger)' : item.estado_devolucion === 'vendido' ? 'oklch(0.38 0.15 250)' : 'var(--warning)',
                                                       }}>
                                                       {item.estado_devolucion === 'bien' ? '\u2713 Dev.' : item.estado_devolucion === 'no devuelto' || item.estado_devolucion === 'perdido' ? 'Perdido' : item.estado_devolucion === 'vendido' ? 'Vendido' : 'Da\u00f1ado'}
                                                       {item.danos_devueltos && item.danos_devueltos.length > 0 && (
@@ -653,7 +653,7 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                                                     </span>
                                                   )}
                                                   {item.estado_devolucion === 'vendido' && item.costo_perdida > 0 && (
-                                                    <span className="text-[9px] shrink-0 font-medium" style={{ color: 'oklch(0.45 0.13 250)' }}>
+                                                    <span className="text-[9px] shrink-0 font-medium" style={{ color: 'oklch(0.38 0.15 250)' }}>
                                                       Venta S/ {(item.costo_perdida || 0).toFixed(2)}
                                                     </span>
                                                   )}
@@ -714,10 +714,10 @@ return filas.map((g, gi) => {
                                               </span>
                                               {pendientes > 0 ? (
                                                 <span className="text-[9px] px-1 py-0.5 rounded font-medium shrink-0"
-                                                  style={{ backgroundColor: 'oklch(0.95 0.03 25)', color: 'var(--danger)' }}>{pendientes} pend.</span>
+                                                  style={{ backgroundColor: 'oklch(0.88 0.09 25)', color: 'var(--danger)' }}>{pendientes} pend.</span>
                                               ) : (
                                                 <span className="text-[9px] px-1 py-0.5 rounded font-medium shrink-0"
-                                                  style={{ backgroundColor: 'oklch(0.93 0.05 160)', color: 'var(--success)' }}>OK</span>
+                                                  style={{ backgroundColor: 'oklch(0.88 0.09 160)', color: 'var(--success)' }}>OK</span>
                                               )}
                                               <span className="font-mono text-[11px] font-bold shrink-0 tabular-nums" style={{ color: 'var(--ink)' }}>S/ {totalGrupo.toFixed(2)}</span>
                                             </div>
@@ -762,8 +762,8 @@ return filas.map((g, gi) => {
                                   )}
                                   {totalVentas > 0 && (
                                     <div className="flex justify-between items-baseline text-[11px]">
-                                      <span style={{ color: 'oklch(0.45 0.15 250)' }}>Venta</span>
-                                      <span className="font-mono tabular-nums" style={{ color: 'oklch(0.45 0.15 250)' }}>+ S/ {totalVentas.toFixed(2)}</span>
+                                      <span style={{ color: 'oklch(0.38 0.15 250)' }}>Venta</span>
+                                      <span className="font-mono tabular-nums" style={{ color: 'oklch(0.38 0.15 250)' }}>+ S/ {totalVentas.toFixed(2)}</span>
                                     </div>
                                   )}
                                   {totalPerdidas > 0 && (
@@ -997,7 +997,7 @@ return filas.map((g, gi) => {
                                     <button
                                       onClick={() => setCalificarContrato(c)}
                                       className="flex-1 h-7 rounded-lg text-[10px] font-semibold transition-all duration-150 inline-flex items-center justify-center gap-1 active:scale-[0.97]"
-                                      style={{ backgroundColor: 'oklch(0.62 0.17 80 / 0.12)', color: 'oklch(0.52 0.17 80)', border: '0.5px solid oklch(0.62 0.17 80 / 0.3)' }}
+                                      style={{ backgroundColor: 'oklch(0.62 0.17 80 / 0.12)', color: 'oklch(0.45 0.18 80)', border: '0.5px solid oklch(0.62 0.17 80 / 0.3)' }}
                                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.2)'; }}
                                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'oklch(0.62 0.17 80 / 0.12)'; }}
                                     >
