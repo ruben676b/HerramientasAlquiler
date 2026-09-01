@@ -106,7 +106,7 @@ function generarPdfDesdeDatos(datos) {
   // ===== ENCABEZADO (#1: N° siempre visible) =====
   const logoPath = path.join(__dirname, '..', 'assets', 'logo.png');
   if (fs.existsSync(logoPath)) {
-    const logoWidth = 260;
+    const logoWidth = 190;
     const logoHeight = logoWidth * 0.228;
     doc.image(logoPath, (doc.page.width - logoWidth) / 2, doc.y, { width: logoWidth });
     doc.y += logoHeight + 6;
@@ -116,7 +116,7 @@ function generarPdfDesdeDatos(datos) {
   doc.moveDown(0.3);
 
   const tel2 = getConfig('arrendadora_telefono2');
-  doc.fontSize(8).font('Helvetica').text(
+  doc.fontSize(7.5).font('Helvetica').text(
     `RUC: ${arrendadora.ruc}  |  Tel: ${arrendadora.telefono}${tel2 ? ' / ' + tel2 : ''}`,
     { align: 'center' }
   );
@@ -167,7 +167,7 @@ function generarPdfDesdeDatos(datos) {
     .replaceAll('[TOTAL]', totalMostrar.toFixed(2))
     .replaceAll('[DEPOSITO_TEXTO]', '').trimEnd();
 
-  doc.fontSize(7).font('Helvetica');
+  doc.fontSize(6.5).font('Helvetica');
   const parrafos = clausulas.split('\n\n');
   parrafos.forEach((p) => {
     if (!p.trim()) return;
@@ -179,7 +179,7 @@ function generarPdfDesdeDatos(datos) {
       doc.font('Helvetica');
     }
     doc.text(p.trim(), 45, doc.y, { width: 505, align: 'justify' });
-    doc.moveDown(0.3);
+    doc.moveDown(0.2);
   });
 
   doc.moveDown(0.5);
@@ -203,13 +203,13 @@ function generarPdfDesdeDatos(datos) {
   const headerAlign = ['center', 'left', 'center', 'center', 'right'];
   const tableTop = doc.y;
 
-  doc.fontSize(6.5).font('Helvetica-Bold');
+  doc.fontSize(6.2).font('Helvetica-Bold');
   headers.forEach((h, i) => doc.text(h, colX[i], tableTop, { width: colWidths[i], align: headerAlign[i] }));
   doc.moveDown(0.3);
   doc.moveTo(45, doc.y).lineTo(550, doc.y).stroke();
   doc.moveDown(0.1);
 
-  doc.font('Helvetica').fontSize(6.5);
+  doc.font('Helvetica').fontSize(6.2);
   let y = doc.y;
   items.forEach((item) => {
     const tarifa = item.tarifa || 'dia';
@@ -237,7 +237,7 @@ function generarPdfDesdeDatos(datos) {
     const hSalida = doc.heightOfString(salidaTxt, { width: colWidths[2] });
     const hEntrega = doc.heightOfString(entregaTxt, { width: colWidths[3] });
     const hSub = doc.heightOfString(subTxt, { width: colWidths[4] });
-    const altoFila = Math.max(hDesc, hSalida, hEntrega, hSub) + 2;
+    const altoFila = Math.max(hDesc, hSalida, hEntrega, hSub) + 1.5;
 
     doc.text(String(item.cantidad), colX[0], y, { width: colWidths[0], align: 'center' });
     doc.text(descripcion, colX[1], y, { width: colWidths[1] });
@@ -249,32 +249,28 @@ function generarPdfDesdeDatos(datos) {
       const lineas = Array.isArray(item.desglose)
         ? item.desglose
         : [{ cantidad: '', nombre: 'Incluye: ' + item.desglose }];
-      doc.font('Helvetica-Oblique').fontSize(7);
+      doc.font('Helvetica-Oblique').fontSize(6.2);
       for (const c of lineas) {
         if (y > 720) { doc.addPage(); y = 45; }
         const hLinea = doc.heightOfString('• ' + (c.cantidad ? c.cantidad + ' × ' : '') + (c.nombre || '—'), { width: colX[2] - colX[1] - 5 });
         doc.text('• ' + (c.cantidad ? c.cantidad + ' × ' : '') + (c.nombre || '—'), colX[1], y, { width: colX[2] - colX[1] - 5 });
-        y += hLinea + 1;
+        y += hLinea + 0.5;
       }
-      doc.font('Helvetica').fontSize(6.5);
+      doc.font('Helvetica').fontSize(6.2);
     }
   });
 
   // Total
   y += 2;
   doc.moveTo(45, y).lineTo(550, y).stroke();
-  doc.moveDown(1);
+  doc.moveDown(0.5);
 
   doc.font('Helvetica-Bold').fontSize(8);
   doc.text(`TOTAL:  S/ ${totalItems.toFixed(2)}`, { align: 'right' });
-  doc.moveDown(0.5);
+  doc.moveDown(0.3);
 
-  doc.moveDown(0.5);
-
-  // ===== PAGOS =====
+  // ===== PAGOS (cuadrícula compacta: etiqueta + monto en la misma línea) =====
   const pagosY = doc.y;
-
-  // Cálculos
   const totalBase = totalItems;
   const mora = cuenta?.total_atraso || 0;
   const danos = cuenta?.total_danos || 0;
@@ -282,80 +278,42 @@ function generarPdfDesdeDatos(datos) {
   const totalAPagar = totalBase + mora + danos + perdidas;
   const pagado = cuenta?.total_pagado || 0;
   const saldo = Math.max(0, totalAPagar - pagado);
-
-  // Columna izquierda: PAGOS
-  const pagosX = 45;
-  const pagosAncho = 260;
-  const colDerX = 320;
-  const lineH = 12;
-  let py = pagosY;
-
-  // Título PAGOS
-  doc.fontSize(8).font('Helvetica-Bold').text('PAGOS:', pagosX, py);
-  py += 14;
-
-  // Título GARANTÍA (columna derecha)
-  doc.text('GARANTÍA:', colDerX, pagosY);
-
-  // Garantía (columna derecha)
-  doc.font('Helvetica').fontSize(8);
   const garantiaMonto = deposito?.monto || 0;
-  if (garantiaMonto > 0) {
-    doc.text(`S/ ${garantiaMonto.toFixed(2)} como depósito`, colDerX, pagosY + 14);
-  } else {
-    doc.text('Ninguna', colDerX, pagosY + 14);
-  }
 
-  // Total base
-  doc.font('Helvetica').text('Total', pagosX, py);
-  doc.font('Helvetica-Bold').text(`S/ ${totalBase.toFixed(2)}`, pagosX, py + 10);
-  py += 24;
+  const cIzqX = 45;
+  const cDerX = 320;
+  const cAncho = 235;
+  const rowH = 13;
+  let ry = pagosY;
 
-  // Mora (solo si > 0)
-  if (mora > 0) {
-    doc.font('Helvetica').text('Mora', pagosX, py);
-    doc.font('Helvetica-Bold').text(`+ S/ ${mora.toFixed(2)}`, pagosX, py + 10);
-    py += 24;
-  }
+  const filaPago = (etiquetaIzq, valorIzq, etiquetaDer, valorDer, negrita) => {
+    const f = negrita ? 'Helvetica-Bold' : 'Helvetica';
+    doc.font(f).fontSize(7.5).text(etiquetaIzq, cIzqX, ry, { width: cAncho - 78 });
+    doc.font('Helvetica-Bold').text(valorIzq, cIzqX, ry, { width: cAncho, align: 'right' });
+    doc.font(f).text(etiquetaDer, cDerX, ry, { width: cAncho - 78 });
+    doc.font('Helvetica-Bold').text(valorDer, cDerX, ry, { width: cAncho, align: 'right' });
+    ry += rowH;
+  };
 
-  // Daños (solo si > 0)
-  if (danos > 0) {
-    doc.font('Helvetica').text('Daños', pagosX, py);
-    doc.font('Helvetica-Bold').text(`+ S/ ${danos.toFixed(2)}`, pagosX, py + 10);
-    py += 24;
-  }
-
-  // Pérdidas (solo si > 0)
-  if (perdidas > 0) {
-    doc.font('Helvetica').text('Pérdidas', pagosX, py);
-    doc.font('Helvetica-Bold').text(`+ S/ ${perdidas.toFixed(2)}`, pagosX, py + 10);
-    py += 24;
-  }
-
-  // Total a pagar
-  doc.font('Helvetica').text('Total a pagar', pagosX, py);
-  doc.font('Helvetica-Bold').text(`S/ ${totalAPagar.toFixed(2)}`, pagosX, py + 10);
-  py += 24;
-
-  // Pagado a la fecha
-  if (cuenta) {
-    doc.font('Helvetica').text('Pagado a la fecha', pagosX, py);
-    doc.font('Helvetica-Bold').text(`- S/ ${pagado.toFixed(2)}`, pagosX, py + 10);
-    py += 24;
-  }
-
-  // SALDO PENDIENTE
-  doc.font('Helvetica-Bold').text('SALDO PENDIENTE', pagosX, py);
-  doc.text(`S/ ${saldo.toFixed(2)}`, pagosX, py + 12);
-
-  // Fecha de devolución real
+  doc.font('Helvetica-Bold').fontSize(8).text('RESUMEN DE PAGOS:', cIzqX, ry);
   if (cuenta?.fecha_devolucion_real) {
-    doc.font('Helvetica-Oblique').fontSize(7);
-    doc.text(`Devuelto el ${formatFechaLarga(cuenta.fecha_devolucion_real)}`, colDerX, pagosY + 28);
-    doc.font('Helvetica').fontSize(8);
+    doc.font('Helvetica-Oblique').fontSize(6.5)
+      .text(`Devuelto el ${formatFechaLarga(cuenta.fecha_devolucion_real)}`, cDerX, ry + 1, { width: cAncho, align: 'right' });
   }
+  ry += 14;
 
-  doc.moveDown(6);
+  filaPago('Total alquiler', 'S/ ' + totalBase.toFixed(2), 'Mora', mora > 0 ? '+ S/ ' + mora.toFixed(2) : '—', false);
+  filaPago('Daños', danos > 0 ? '+ S/ ' + danos.toFixed(2) : '—', 'Pérdidas', perdidas > 0 ? '+ S/ ' + perdidas.toFixed(2) : '—', false);
+  filaPago('Total a pagar', 'S/ ' + totalAPagar.toFixed(2), 'Garantía', garantiaMonto > 0 ? 'S/ ' + garantiaMonto.toFixed(2) : 'Ninguna', true);
+
+  // Separador antes del desglose de lo pagado/saldo
+  doc.moveTo(45, ry - 1).lineTo(550, ry - 1).stroke();
+  ry += 1;
+
+  filaPago('Pagado a la fecha', '- S/ ' + pagado.toFixed(2), 'Saldo pendiente', 'S/ ' + saldo.toFixed(2), true);
+
+  // Sincronizar el cursor con el final real del bloque de pagos
+  doc.y = ry;
 
   // Firma de la arrendadora (desde Configuración)
   let firmaArrPath = null;
@@ -367,7 +325,15 @@ function generarPdfDesdeDatos(datos) {
   }
 
   // ===== FIRMAS (3 líneas individuales) =====
-  const firmaY = doc.y;
+  // A4: 842 pt de alto, margen inferior 35 -> zona usable hasta ~807.
+  // El bloque de firmas va de firmaY-55 (imagen) a firmaY+115 (fecha): 170 pt totales.
+  // Con el pie en 660 la fecha queda ~770 incluso con nombres a 2 líneas.
+  // Para que quepa sin pisar el contenido: doc.y + 10 <= 605 -> doc.y <= 595.
+  let firmaY = 660;
+  if (doc.y > 595) {
+    doc.addPage();
+    firmaY = 90;
+  }
   const colFirmas = [45, 220, 400];
   const anchoLinea = 140;
 
