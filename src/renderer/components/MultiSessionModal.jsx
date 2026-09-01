@@ -648,7 +648,16 @@ function SessionForm({ session }) {
   };
 
   const setTarifaItem = (idx, tarifa) => {
-    setItems(items.map((it, i) => i === idx ? { ...it, tarifa, total_editado: undefined } : it));
+    setItems(items.map((it, i) => {
+      if (i !== idx) return it;
+      const updates = { tarifa, total_editado: undefined };
+      if (tarifa === 'mes') {
+        updates.fecha_devolucion_item = sumarMesCalendario(it.fecha_salida_item || fechaSalida, 1);
+      } else if ((it.tarifa || 'dia') === 'mes') {
+        updates.fecha_devolucion_item = it.fecha_salida_item || fechaSalida;
+      }
+      return { ...it, ...updates };
+    }));
   };
 
   /* --- Agrupación visual de unidades individuales por familia --- */
@@ -794,7 +803,12 @@ function SessionForm({ session }) {
               onClick={() => {
                 const actual = item.fecha_devolucion_item || fechaDevolucion;
                 const nueva = sumarMesCalendario(actual, -1);
-                if (nueva >= (item.fecha_salida_item || fechaSalida)) cambiarFechaItem(idx, nueva);
+                if (nueva >= (item.fecha_salida_item || fechaSalida)) {
+                  const updates = { fecha_devolucion_item: nueva, total_editado: undefined };
+                  const desg = desglosarMensual(item.fecha_salida_item || fechaSalida, nueva);
+                  if (desg.meses === 0) updates.tarifa = 'dia';
+                  setItems(items.map((it, i) => i === idx ? { ...it, ...updates } : it));
+                }
               }}
               disabled={sumarMesCalendario(item.fecha_devolucion_item || fechaDevolucion, -1) < (item.fecha_salida_item || fechaSalida)}
               title={`Restar 1 mes → ${sumarMesCalendario(item.fecha_devolucion_item || fechaDevolucion, -1)}`}
@@ -805,7 +819,12 @@ function SessionForm({ session }) {
                 cursor: sumarMesCalendario(item.fecha_devolucion_item || fechaDevolucion, -1) < (item.fecha_salida_item || fechaSalida) ? 'not-allowed' : 'pointer',
               }}>&minus;1 mes</button>
             <button
-              onClick={() => cambiarFechaItem(idx, sumarMesCalendario(item.fecha_devolucion_item || fechaDevolucion, 1))}
+              onClick={() => {
+                const nueva = sumarMesCalendario(item.fecha_devolucion_item || fechaDevolucion, 1);
+                const updates = { fecha_devolucion_item: nueva, total_editado: undefined };
+                if (item.precio_mes != null && (item.tarifa || 'dia') !== 'mes') updates.tarifa = 'mes';
+                setItems(items.map((it, i) => i === idx ? { ...it, ...updates } : it));
+              }}
               title={`Sumar 1 mes → ${sumarMesCalendario(item.fecha_devolucion_item || fechaDevolucion, 1)}`}
               className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
               style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>+1 mes</button>

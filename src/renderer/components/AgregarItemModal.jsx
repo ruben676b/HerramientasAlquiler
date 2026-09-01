@@ -114,7 +114,18 @@ export default function AgregarItemModal({ idContrato, onClose, onAdded }) {
       return { ...item, cantidad: nueva, total_editado: undefined };
     }));
   };
-  const setTarifaItem = (idx, tarifa) => setItems(items.map((it, i) => i === idx ? { ...it, tarifa, total_editado: undefined } : it));
+  const setTarifaItem = (idx, tarifa) => {
+    setItems(items.map((it, i) => {
+      if (i !== idx) return it;
+      const updates = { tarifa, total_editado: undefined };
+      if (tarifa === 'mes') {
+        updates.fecha_devolucion_item = sumarMesCalendario(it.fecha_salida_item, 1);
+      } else if ((it.tarifa || 'dia') === 'mes') {
+        updates.fecha_devolucion_item = it.fecha_salida_item;
+      }
+      return { ...it, ...updates };
+    }));
+  };
   const iniciarEdicionTotal = (idx) => { setTotalEditando(p => ({ ...p, [idx]: true })); setTimeout(() => inputTotalRefs.current[idx]?.select(), 60); };
   const finalizarEdicionTotal = (idx, raw) => {
     const val = parseFloat(raw);
@@ -244,12 +255,25 @@ export default function AgregarItemModal({ idContrato, onClose, onAdded }) {
               : `${item.dias_habiles_item} día${item.dias_habiles_item !== 1 ? 's' : ''}`}
           </span>
           <span className="flex gap-px rounded overflow-hidden shrink-0" style={{ border: '1px solid var(--border)' }}>
-            <button onClick={() => { const nueva = sumarMesCalendario(item.fecha_devolucion_item, -1); if (nueva >= item.fecha_salida_item) cambiarFechaItem(idx, nueva); }}
+            <button onClick={() => {
+              const nueva = sumarMesCalendario(item.fecha_devolucion_item, -1);
+              if (nueva >= item.fecha_salida_item) {
+                const updates = { fecha_devolucion_item: nueva, total_editado: undefined };
+                const desg = desglosarMensual(item.fecha_salida_item, nueva);
+                if (desg.meses === 0) updates.tarifa = 'dia';
+                setItems(items.map((it, i) => i === idx ? { ...it, ...updates } : it));
+              }
+            }}
               disabled={sumarMesCalendario(item.fecha_devolucion_item, -1) < item.fecha_salida_item}
               title={`Restar 1 mes → ${sumarMesCalendario(item.fecha_devolucion_item, -1)}`}
               className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100"
               style={{ backgroundColor: 'var(--bg)', color: sumarMesCalendario(item.fecha_devolucion_item, -1) < item.fecha_salida_item ? 'var(--faint)' : 'var(--ink)', cursor: sumarMesCalendario(item.fecha_devolucion_item, -1) < item.fecha_salida_item ? 'not-allowed' : 'pointer' }}>&minus;1 mes</button>
-            <button onClick={() => cambiarFechaItem(idx, sumarMesCalendario(item.fecha_devolucion_item, 1))} title={`Sumar 1 mes → ${sumarMesCalendario(item.fecha_devolucion_item, 1)}`}
+            <button onClick={() => {
+              const nueva = sumarMesCalendario(item.fecha_devolucion_item, 1);
+              const updates = { fecha_devolucion_item: nueva, total_editado: undefined };
+              if (item.precio_mes != null && (item.tarifa || 'dia') !== 'mes') updates.tarifa = 'mes';
+              setItems(items.map((it, i) => i === idx ? { ...it, ...updates } : it));
+            }} title={`Sumar 1 mes → ${sumarMesCalendario(item.fecha_devolucion_item, 1)}`}
               className="px-1.5 h-5 text-[9px] font-medium transition-all duration-100" style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>+1 mes</button>
           </span>
         </div>
