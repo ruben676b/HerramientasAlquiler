@@ -533,7 +533,6 @@ const pendiente = Math.max(0, total - (c.total_pagado || 0));
                         )}
                         {badges.length > 0 && (
                           <>
-                            <span className="text-[11px]" style={{ color: 'var(--muted)' }}>&middot;</span>
                             <span className="inline-flex items-center gap-1.5 flex-wrap">
                               {badges.map((b, i) => (
                                 <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[10px] text-[11px] font-medium"
